@@ -1,0 +1,24 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+html {
+  scroll-behavior: smooth;
+}
+
+/* gentle custom scrollbar to match the soft theme */
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+::-webkit-scrollbar-track {
+  background: #fffdf9;
+}
+::-webkit-scrollbar-thumb {
+  background: #f0d9cf;
+  border-radius: 9999px;
+  border: 2px solid #fffdf9;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #e6c3b6;
+}
