@@ -1,6 +1,12 @@
 # dependencies
 node_modules/
 
+# package-lock is intentionally not committed: a committed lockfile containing
+# esbuild's cross-platform optional packages triggers an npm dedup crash
+# ("Invalid Version:") during reify on clean CI installs (Vercel/Netlify).
+# A lockfile-free `npm install` resolves cleanly.
+package-lock.json
+
 # build output
 dist/
 
