@@ -1,0 +1,15 @@
+[build]
+  command = "npm run build"
+  publish = "dist"
+
+[build.environment]
+  NODE_VERSION = "22"
+
+[functions]
+  node_bundler = "esbuild"
+
+# Route the frontend's /api/extract call to the serverless function in production.
+[[redirects]]
+  from = "/api/extract"
+  to = "/.netlify/functions/extract"
+  status = 200
