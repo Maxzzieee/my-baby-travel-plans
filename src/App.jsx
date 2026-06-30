@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect, useCallback } from "react";
+import React, { useState, useMemo, useEffect, useCallback, useRef } from "react";
 import {
   Heart,
   Plane,
@@ -11,7 +11,6 @@ import {
   Wallet,
   Thermometer,
   ChevronDown,
-  Sun,
   Moon,
   Star,
   Calendar,
@@ -20,17 +19,25 @@ import {
   RefreshCw,
   Crown,
   RotateCcw,
+  Link2,
+  Image as ImageIcon,
+  PenLine,
+  Wand2,
+  Plus,
+  Trash2,
+  ExternalLink,
+  Loader2,
+  X,
 } from "lucide-react";
 
 /**
- * Max & Partner — Year-End Trip Planning Hub
+ * My Baby Travel Plans 🧳✨
  * Nov 27 – Dec 4
  *
- * Fully wired:
- *  - Two-person Heart Tracker (Max vs Partner), persisted to localStorage
- *  - Sliding deep-dive itinerary drawer (Level 4 daytime / Level 2 cozy night)
- *  - Live "right now" weather peek per city (Open-Meteo, no API key)
- *  - Baked-in recommendation engine
+ *  - Plan capture panel up top: paste a link or drop a screenshot and let the
+ *    AI read it into a structured plan, add your own notes + what you want to do.
+ *  - Two-person Heart Tracker (Max vs Partner), persisted to localStorage.
+ *  - Sliding deep-dive drawer with basecamp, food, cute-IP and a live weather peek.
  */
 
 // ---------------------------------------------------------------------------
@@ -50,7 +57,8 @@ const BUDGET_TONE = {
   over: { label: "Over Budget", emoji: "🔴", chip: ACCENTS.blush },
 };
 
-const STORAGE_KEY = "maxpartner.trip.votes.v2";
+const VOTES_KEY = "maxpartner.trip.votes.v2";
+const PLANS_KEY = "maxpartner.trip.plans.v1";
 
 // ---------------------------------------------------------------------------
 // Immutable destination data
@@ -65,7 +73,7 @@ const DESTINATIONS = [
     accent: ACCENTS.winter,
     cozyScore: 5,
     coords: { lat: 43.0618, lon: 141.3545 },
-    recommendation: { rank: 2, badge: "Best Experience", note: "The snow-globe fantasy — if budget can stretch." },
+    recommendation: { rank: 2 },
     flight: { price: "S$1,000+", per: "per pax", carrier: "Various", budget: "over", note: "Premium for peak deep-winter Hokkaido demand." },
     weather: { range: "-1°C to 6°C", label: "Freezing", snow: "High snow accumulation probability", snowIcon: true },
     sunset: "4:00 PM",
@@ -73,24 +81,6 @@ const DESTINATIONS = [
     basecamp: { station: "Nakajima Koen Station", logic: "1 stop on Namboku Subway Line to Odori Park", vibe: "Local food lanes, quiet park-side calm", price: "S$90–S$110 / night" },
     food: ["Nijo Market — massive raw uni & giant botan shrimp", "Sankaku Market — fresh ikura kaisendon bowls"],
     cuteIP: ["Sapporo PARCO — Mofusand Store", "JR Stellar Place — Pokémon Center"],
-    deepDive: {
-      level4: {
-        title: "Level 4 Purpose — Daytime Power Run",
-        items: [
-          "Open Nijo Market early for a colossal uni + ikura + botan shrimp kaisendon breakfast.",
-          "Namboku Line one stop to Odori → Sapporo PARCO Mofusand pilgrimage.",
-          "JR Stellar Place Pokémon Center sweep before the 4PM blackout.",
-        ],
-      },
-      level2: {
-        title: "Level 2 Cozy Night — Convenience Haul",
-        items: [
-          "Sunset hits at 4PM — retreat to Nakajima Koen as the snow glows.",
-          "Seicomart konbini run: Hokkaido milk, soft-serve & hot oden.",
-          "Snow-window room night, warm drinks, plan tomorrow's market list.",
-        ],
-      },
-    },
   },
   {
     id: "seoul",
@@ -101,7 +91,7 @@ const DESTINATIONS = [
     accent: ACCENTS.blush,
     cozyScore: 4,
     coords: { lat: 37.5665, lon: 126.978 },
-    recommendation: { rank: 1, badge: "Top Pick", note: "Best balance — cold, on-budget, food + IP, latest usable daylight." },
+    recommendation: { rank: 1 },
     flight: { price: "S$768", per: "per pax", carrier: "Korean Air (full-service)", budget: "target", note: "Full-service comfort right on the budget line." },
     weather: { range: "-2°C to 7°C", label: "Biting Cold", snow: "Crisp clear winds, potential early flurries", snowIcon: true },
     sunset: "5:15 PM",
@@ -109,24 +99,6 @@ const DESTINATIONS = [
     basecamp: { station: "Hapjeong Station", logic: "1 stop on Line 2 from the main Hongdae chaos", vibe: "Calm neighborhood, easy late-night returns", price: "S$80–S$100 / night" },
     food: ["Noryangjin Fish Market — live moving octopus & sashimi", "Ganjang Gejang — raw soy-marinated crab"],
     cuteIP: ["Hongdae indie illustration studios", "Flagship Kakao Friends & Line Friends Square"],
-    deepDive: {
-      level4: {
-        title: "Level 4 Purpose — Daytime Power Run",
-        items: [
-          "Noryangjin Fish Market: pick a live octopus & sashimi platter cooked upstairs.",
-          "Line 2 into Hongdae — Kakao Friends + Line Friends Square flagship sweep.",
-          "Hongdae indie illustration studios for original character art prints.",
-        ],
-      },
-      level2: {
-        title: "Level 2 Cozy Night — Convenience Haul",
-        items: [
-          "Ride one stop back to calm Hapjeong before the wind bites.",
-          "CU / GS25 run: hotteok, banana milk, instant tteokbokki cups.",
-          "Ganjang gejang takeaway feast — buttery raw crab on warm rice.",
-        ],
-      },
-    },
   },
   {
     id: "tokyo",
@@ -137,7 +109,7 @@ const DESTINATIONS = [
     accent: ACCENTS.blush,
     cozyScore: 4,
     coords: { lat: 35.6762, lon: 139.6503 },
-    recommendation: { rank: 3, badge: "Cute-IP King", note: "Unbeatable character shopping, but no snow this season." },
+    recommendation: { rank: 3 },
     flight: { price: "S$948", per: "per pax", carrier: "ZIPAIR + baggage bundle", budget: "slightly", note: "Low-cost base fare, nudged up by the baggage bundle." },
     weather: { range: "6°C to 13°C", label: "Brisk Winter Jacket", snow: "Zero snow chance", snowIcon: false },
     sunset: "4:30 PM",
@@ -145,24 +117,6 @@ const DESTINATIONS = [
     basecamp: { station: "Koenji Station", logic: "2 stops on JR Chuo Line from Shinjuku", vibe: "Retro indoor izakaya shotengai alleys", price: "S$100–S$120 / night" },
     food: ["Shinjuku & Koenji bistros — Basashi raw horse sashimi & yakiniku", "Premium beef tartare counters"],
     cuteIP: ["Tokyo Character Street — Chiikawa Land & Mofusand Mofumofu", "Shibuya Mega Pokémon Center · Nintendo Tokyo"],
-    deepDive: {
-      level4: {
-        title: "Level 4 Purpose — Daytime Power Run",
-        items: [
-          "Tokyo Character Street blitz: flagship Chiikawa Land + Mofusand Mofumofu.",
-          "Shibuya Mega Pokémon Center → Nintendo Tokyo combo at Parco.",
-          "Catch winter illuminations switching on by the 4:30PM dusk.",
-        ],
-      },
-      level2: {
-        title: "Level 2 Cozy Night — Convenience Haul",
-        items: [
-          "JR Chuo back to Koenji's retro shotengai alley warmth.",
-          "Tiny izakaya: Basashi, premium beef tartare, hot sake.",
-          "Lawson / 7-Eleven nightcap haul — karaage-kun & hot canned coffee.",
-        ],
-      },
-    },
   },
   {
     id: "taipei",
@@ -173,7 +127,7 @@ const DESTINATIONS = [
     accent: ACCENTS.mint,
     cozyScore: 3,
     coords: { lat: 25.033, lon: 121.5654 },
-    recommendation: { rank: 4, badge: "Budget King", note: "A steal — but too mild for the cold-trip brief without a mountain day." },
+    recommendation: { rank: 4 },
     flight: { price: "S$500", per: "per pax", carrier: "STARLUX / China Airlines", budget: "under", note: "The clear financial win of the shortlist." },
     weather: { range: "15°C to 20°C", label: "Cool & mild", snow: "Needs a Cingjing / Alishan mountain day for sub-10°C cold", snowIcon: false },
     sunset: "5:05 PM",
@@ -181,24 +135,6 @@ const DESTINATIONS = [
     basecamp: { station: "Shuanglian Station", logic: "1 stop on Red Line to Taipei Main", vibe: "Right next to Ningxia Night Market food rows", price: "S$70–S$90 / night" },
     food: ["Ningxia Night Market — hotpot & rich braised pork platters", "Raohe Night Market — full street-food run"],
     cuteIP: ["Huashan 1914 Creative Park — animation pop-ups", "Indie character merchandise stalls"],
-    deepDive: {
-      level4: {
-        title: "Level 4 Purpose — Daytime Power Run",
-        items: [
-          "Optional Cingjing Farm / Alishan day trip to trigger real sub-10°C cold.",
-          "Huashan 1914 Creative Park for rotating animation pop-ups & indie merch.",
-          "Red Line hop to Taipei Main for department-store character corners.",
-        ],
-      },
-      level2: {
-        title: "Level 2 Cozy Night — Convenience Haul",
-        items: [
-          "Step out of Shuanglian straight into Ningxia Night Market rows.",
-          "Braised pork rice, oyster omelette & bubbling hotpot for two.",
-          "7-Eleven / FamilyMart tea-egg & milk-tea nightcap haul.",
-        ],
-      },
-    },
   },
   {
     id: "fukuoka",
@@ -209,7 +145,7 @@ const DESTINATIONS = [
     accent: ACCENTS.mint,
     cozyScore: 3,
     coords: { lat: 33.5904, lon: 130.4017 },
-    recommendation: { rank: 5, badge: "Layover Caveat", note: "Lovely & cheap, but 8–15h layovers bruise a 7-day romantic trip." },
+    recommendation: { rank: 5 },
     flight: { price: "S$530–S$630", per: "per pax", carrier: "Budget via Hanoi / Manila", budget: "onbudget", note: "Cheap fare, but high-friction 8–15h layovers." },
     weather: { range: "7°C to 14°C", label: "Chilly & coastal", snow: "Clear brisk walking skies, no snow", snowIcon: false },
     sunset: "5:00 PM",
@@ -217,48 +153,19 @@ const DESTINATIONS = [
     basecamp: { station: "Gion Station", logic: "1 stop to Hakata Main Station", vibe: "Local neighborhood feel, walkable to Canal City", price: "S$80–S$100 / night" },
     food: ["Hakata Motsunabe — savory beef offal hotpot", "Nakasu Yatai — open-air riverside street stalls"],
     cuteIP: ["Canal City Hakata — capsule halls & official Sanrio", "Fukuoka PARCO — Mofusand Store"],
-    deepDive: {
-      level4: {
-        title: "Level 4 Purpose — Daytime Power Run",
-        items: [
-          "Canal City Hakata: massive capsule-toy halls + official Sanrio networks.",
-          "Fukuoka PARCO Mofusand Store before the riverside lights warm up.",
-          "Gachapon grinding session — Kyushu-exclusive blind-box hunting.",
-        ],
-      },
-      level2: {
-        title: "Level 2 Cozy Night — Convenience Haul",
-        items: [
-          "Nakasu Yatai riverside stalls: ramen, oden & yakitori under lanterns.",
-          "Hakata Motsunabe pot for two — garlic-chive beef-offal warmth.",
-          "Gion-side konbini run: Hakata mentaiko onigiri & hot tea.",
-        ],
-      },
-    },
   },
 ];
 
+const DEST_BY_ID = Object.fromEntries(DESTINATIONS.map((d) => [d.id, d]));
+
 const WMO = {
-  0: { t: "Clear", e: "☀️" },
-  1: { t: "Mostly clear", e: "🌤️" },
-  2: { t: "Partly cloudy", e: "⛅" },
-  3: { t: "Overcast", e: "☁️" },
-  45: { t: "Fog", e: "🌫️" },
-  48: { t: "Rime fog", e: "🌫️" },
-  51: { t: "Light drizzle", e: "🌦️" },
-  53: { t: "Drizzle", e: "🌦️" },
-  55: { t: "Dense drizzle", e: "🌧️" },
-  61: { t: "Light rain", e: "🌧️" },
-  63: { t: "Rain", e: "🌧️" },
-  65: { t: "Heavy rain", e: "🌧️" },
-  71: { t: "Light snow", e: "🌨️" },
-  73: { t: "Snow", e: "❄️" },
-  75: { t: "Heavy snow", e: "❄️" },
-  77: { t: "Snow grains", e: "🌨️" },
-  80: { t: "Rain showers", e: "🌦️" },
-  85: { t: "Snow showers", e: "🌨️" },
-  86: { t: "Snow showers", e: "❄️" },
-  95: { t: "Thunderstorm", e: "⛈️" },
+  0: { t: "Clear", e: "☀️" }, 1: { t: "Mostly clear", e: "🌤️" }, 2: { t: "Partly cloudy", e: "⛅" },
+  3: { t: "Overcast", e: "☁️" }, 45: { t: "Fog", e: "🌫️" }, 48: { t: "Rime fog", e: "🌫️" },
+  51: { t: "Light drizzle", e: "🌦️" }, 53: { t: "Drizzle", e: "🌦️" }, 55: { t: "Dense drizzle", e: "🌧️" },
+  61: { t: "Light rain", e: "🌧️" }, 63: { t: "Rain", e: "🌧️" }, 65: { t: "Heavy rain", e: "🌧️" },
+  71: { t: "Light snow", e: "🌨️" }, 73: { t: "Snow", e: "❄️" }, 75: { t: "Heavy snow", e: "❄️" },
+  77: { t: "Snow grains", e: "🌨️" }, 80: { t: "Rain showers", e: "🌦️" }, 85: { t: "Snow showers", e: "🌨️" },
+  86: { t: "Snow showers", e: "❄️" }, 95: { t: "Thunderstorm", e: "⛈️" },
 };
 
 // ---------------------------------------------------------------------------
@@ -299,7 +206,6 @@ function CozyMeter({ score, accent }) {
   );
 }
 
-// Live "right now" weather peek
 function LiveWeather({ coords, accent }) {
   const [state, setState] = useState({ status: "loading", data: null });
 
@@ -308,16 +214,11 @@ function LiveWeather({ coords, accent }) {
     const url = `https://api.open-meteo.com/v1/forecast?latitude=${coords.lat}&longitude=${coords.lon}&current=temperature_2m,weather_code&timezone=auto`;
     fetch(url)
       .then((r) => (r.ok ? r.json() : Promise.reject(r.status)))
-      .then((j) => {
-        const c = j.current;
-        setState({ status: "ok", data: { temp: Math.round(c.temperature_2m), code: c.weather_code } });
-      })
+      .then((j) => setState({ status: "ok", data: { temp: Math.round(j.current.temperature_2m), code: j.current.weather_code } }))
       .catch(() => setState({ status: "error", data: null }));
   }, [coords.lat, coords.lon]);
 
-  useEffect(() => {
-    load();
-  }, [load]);
+  useEffect(() => { load(); }, [load]);
 
   const w = state.data ? WMO[state.data.code] || { t: "—", e: "🌡️" } : null;
 
@@ -328,14 +229,283 @@ function LiveWeather({ coords, accent }) {
         {state.status === "loading" && <span className="text-sm font-semibold text-stone-400">fetching…</span>}
         {state.status === "error" && <span className="text-sm font-semibold text-stone-400">offline — see planning range</span>}
         {state.status === "ok" && (
-          <span className="text-sm font-extrabold" style={{ color: accent.text }}>
-            {w.e} {state.data.temp}°C · {w.t}
-          </span>
+          <span className="text-sm font-extrabold" style={{ color: accent.text }}>{w.e} {state.data.temp}°C · {w.t}</span>
         )}
       </div>
       <button onClick={load} className="rounded-full p-1.5 transition-transform hover:rotate-90 active:scale-90" style={{ color: accent.text }} aria-label="Refresh live weather">
         <RefreshCw size={14} strokeWidth={2.6} />
       </button>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Plan Composer — paste a link / drop a screenshot, AI reads it into a plan
+// ---------------------------------------------------------------------------
+const EMPTY_DRAFT = { title: "", summary: "", activities: [], location: "", comment: "", want: "", destinationId: "", sourceUrl: "", thumb: "" };
+
+function fileToBase64(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result));
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+}
+
+function PlanComposer({ onSave }) {
+  const [mode, setMode] = useState("link"); // link | screenshot | manual
+  const [url, setUrl] = useState("");
+  const [draft, setDraft] = useState(EMPTY_DRAFT);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  const [hasDraft, setHasDraft] = useState(false);
+  const fileRef = useRef(null);
+
+  const reset = () => { setDraft(EMPTY_DRAFT); setHasDraft(false); setUrl(""); setError(""); };
+
+  const applyExtract = (data, extra = {}) => {
+    setDraft((d) => ({
+      ...d,
+      title: data.title || d.title,
+      summary: data.summary || d.summary,
+      activities: Array.isArray(data.activities) ? data.activities : d.activities,
+      location: data.location || d.location,
+      ...extra,
+    }));
+    setHasDraft(true);
+  };
+
+  const readLink = async () => {
+    if (!url.trim()) return;
+    setBusy(true); setError("");
+    try {
+      const res = await fetch("/api/extract", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ url: url.trim() }),
+      });
+      if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error || `Server ${res.status}`);
+      applyExtract(await res.json(), { sourceUrl: url.trim() });
+    } catch (e) {
+      setError(`Couldn't read with AI (${e.message}). You can still fill it in by hand below.`);
+      setDraft((d) => ({ ...d, sourceUrl: url.trim() }));
+      setHasDraft(true);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const readScreenshot = async (file) => {
+    if (!file) return;
+    setBusy(true); setError("");
+    try {
+      const dataUrl = await fileToBase64(file);
+      const base64 = dataUrl.split(",")[1];
+      const res = await fetch("/api/extract", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ image: base64, mediaType: file.type || "image/png" }),
+      });
+      if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error || `Server ${res.status}`);
+      applyExtract(await res.json(), { thumb: dataUrl });
+    } catch (e) {
+      const dataUrl = await fileToBase64(file).catch(() => "");
+      setError(`Couldn't read the screenshot (${e.message}). Fill it in by hand below.`);
+      setDraft((d) => ({ ...d, thumb: dataUrl }));
+      setHasDraft(true);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const save = () => {
+    if (!draft.title.trim() && !draft.summary.trim()) return;
+    onSave({ ...draft, id: `plan_${Date.now()}`, createdAt: Date.now() });
+    reset();
+  };
+
+  const TABS = [
+    { id: "link", label: "Paste a link", icon: Link2 },
+    { id: "screenshot", label: "Screenshot", icon: ImageIcon },
+    { id: "manual", label: "Write it", icon: PenLine },
+  ];
+
+  return (
+    <div className="rounded-3xl border-2 border-rose-100 bg-white/85 p-5 shadow-sm backdrop-blur sm:p-6">
+      <div className="flex items-center gap-2">
+        <span className="flex h-9 w-9 items-center justify-center rounded-2xl bg-rose-100 text-rose-400"><Wand2 size={18} strokeWidth={2.6} /></span>
+        <div>
+          <h2 className="text-lg font-black text-stone-700">Add a plan idea</h2>
+          <p className="text-xs text-stone-400">Paste a link or drop a screenshot — AI reads it into a plan. Then add your own notes.</p>
+        </div>
+      </div>
+
+      {/* tabs */}
+      <div className="mt-4 flex flex-wrap gap-2">
+        {TABS.map((t) => {
+          const active = mode === t.id;
+          return (
+            <button
+              key={t.id}
+              onClick={() => { setMode(t.id); setError(""); }}
+              className="flex items-center gap-1.5 rounded-full px-3.5 py-2 text-xs font-extrabold transition-all hover:scale-[1.03] active:scale-95"
+              style={{
+                backgroundColor: active ? ACCENTS.blush.hex : "#fff",
+                color: active ? ACCENTS.blush.text : "#A8A29E",
+                border: `1.5px solid ${active ? ACCENTS.blush.border : "#E7E1D8"}`,
+              }}
+            >
+              <t.icon size={14} strokeWidth={2.8} /> {t.label}
+            </button>
+          );
+        })}
+      </div>
+
+      {/* input by mode */}
+      {mode === "link" && (
+        <div className="mt-4 flex flex-col gap-2 sm:flex-row">
+          <input
+            value={url}
+            onChange={(e) => setUrl(e.target.value)}
+            onKeyDown={(e) => e.key === "Enter" && readLink()}
+            placeholder="Paste a website, blog, or social post link…"
+            className="flex-1 rounded-2xl border-2 border-stone-200 bg-white px-4 py-2.5 text-sm outline-none focus:border-rose-200"
+          />
+          <button
+            onClick={readLink}
+            disabled={busy || !url.trim()}
+            className="flex items-center justify-center gap-1.5 rounded-2xl px-4 py-2.5 text-sm font-extrabold text-rose-500 transition-all hover:scale-[1.02] active:scale-95 disabled:opacity-50"
+            style={{ backgroundColor: ACCENTS.blush.hex, border: `1.5px solid ${ACCENTS.blush.border}` }}
+          >
+            {busy ? <Loader2 size={15} className="animate-spin" /> : <Sparkles size={15} strokeWidth={2.8} />}
+            {busy ? "Reading…" : "Read with AI"}
+          </button>
+        </div>
+      )}
+
+      {mode === "screenshot" && (
+        <div className="mt-4">
+          <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={(e) => readScreenshot(e.target.files?.[0])} />
+          <button
+            onClick={() => fileRef.current?.click()}
+            disabled={busy}
+            className="flex w-full flex-col items-center justify-center gap-2 rounded-2xl border-2 border-dashed border-stone-300 bg-stone-50/60 px-4 py-6 text-stone-400 transition-colors hover:border-rose-200 hover:text-rose-400 disabled:opacity-60"
+          >
+            {busy ? <Loader2 size={22} className="animate-spin" /> : <ImageIcon size={22} strokeWidth={2.2} />}
+            <span className="text-sm font-bold">{busy ? "Reading screenshot…" : "Click to upload a screenshot"}</span>
+            <span className="text-xs">AI will read what it's about</span>
+          </button>
+        </div>
+      )}
+
+      {mode === "manual" && !hasDraft && (
+        <button
+          onClick={() => setHasDraft(true)}
+          className="mt-4 flex items-center gap-1.5 rounded-2xl px-4 py-2.5 text-sm font-extrabold text-stone-500 transition-all hover:scale-[1.02] active:scale-95"
+          style={{ backgroundColor: ACCENTS.mint.soft, border: `1.5px solid ${ACCENTS.mint.border}` }}
+        >
+          <PenLine size={15} strokeWidth={2.8} /> Start a blank plan
+        </button>
+      )}
+
+      {error && <p className="mt-3 rounded-2xl bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-600">{error}</p>}
+
+      {/* editable draft */}
+      {hasDraft && (
+        <div className="mt-5 space-y-3 rounded-2xl border-2 border-stone-100 bg-white p-4">
+          {draft.thumb && (
+            <img src={draft.thumb} alt="screenshot" className="max-h-40 w-auto rounded-xl border border-stone-200 object-contain" />
+          )}
+          <div>
+            <label className="text-[11px] font-bold uppercase tracking-wide text-stone-400">Title</label>
+            <input value={draft.title} onChange={(e) => setDraft({ ...draft, title: e.target.value })} placeholder="e.g. Mofusand pop-up café" className="mt-1 w-full rounded-xl border-2 border-stone-200 px-3 py-2 text-sm font-bold outline-none focus:border-rose-200" />
+          </div>
+          <div>
+            <label className="text-[11px] font-bold uppercase tracking-wide text-stone-400">Summary</label>
+            <textarea value={draft.summary} onChange={(e) => setDraft({ ...draft, summary: e.target.value })} rows={2} placeholder="What is this place / idea about?" className="mt-1 w-full resize-y rounded-xl border-2 border-stone-200 px-3 py-2 text-sm outline-none focus:border-rose-200" />
+          </div>
+          {draft.activities.length > 0 && (
+            <div>
+              <label className="text-[11px] font-bold uppercase tracking-wide text-stone-400">AI-suggested activities</label>
+              <ul className="mt-1 space-y-1">
+                {draft.activities.map((a, i) => (
+                  <li key={i} className="flex items-center gap-2 text-sm text-stone-600">
+                    <span>✨</span>
+                    <input
+                      value={a}
+                      onChange={(e) => { const next = [...draft.activities]; next[i] = e.target.value; setDraft({ ...draft, activities: next }); }}
+                      className="flex-1 rounded-lg border border-stone-200 px-2 py-1 text-sm outline-none focus:border-rose-200"
+                    />
+                    <button onClick={() => setDraft({ ...draft, activities: draft.activities.filter((_, j) => j !== i) })} className="text-stone-300 hover:text-rose-400"><X size={14} /></button>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+          <div className="grid gap-3 sm:grid-cols-2">
+            <div>
+              <label className="text-[11px] font-bold uppercase tracking-wide text-stone-400">💬 Your notes / comment</label>
+              <textarea value={draft.comment} onChange={(e) => setDraft({ ...draft, comment: e.target.value })} rows={2} placeholder="Anything you want to remember…" className="mt-1 w-full resize-y rounded-xl border-2 border-stone-200 px-3 py-2 text-sm outline-none focus:border-rose-200" />
+            </div>
+            <div>
+              <label className="text-[11px] font-bold uppercase tracking-wide text-stone-400">🎯 What you want to do</label>
+              <textarea value={draft.want} onChange={(e) => setDraft({ ...draft, want: e.target.value })} rows={2} placeholder="e.g. go here on the first evening" className="mt-1 w-full resize-y rounded-xl border-2 border-stone-200 px-3 py-2 text-sm outline-none focus:border-rose-200" />
+            </div>
+          </div>
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <select value={draft.destinationId} onChange={(e) => setDraft({ ...draft, destinationId: e.target.value })} className="rounded-xl border-2 border-stone-200 px-3 py-2 text-sm font-semibold text-stone-600 outline-none focus:border-rose-200">
+              <option value="">📍 Pin to a destination (optional)</option>
+              {DESTINATIONS.map((d) => (<option key={d.id} value={d.id}>{d.emoji} {d.name}</option>))}
+            </select>
+            <div className="flex gap-2">
+              <button onClick={reset} className="rounded-2xl border-2 border-stone-200 px-4 py-2 text-sm font-extrabold text-stone-400 transition-colors hover:text-stone-600">Cancel</button>
+              <button
+                onClick={save}
+                disabled={!draft.title.trim() && !draft.summary.trim()}
+                className="flex items-center gap-1.5 rounded-2xl px-4 py-2 text-sm font-extrabold text-rose-500 transition-all hover:scale-[1.03] active:scale-95 disabled:opacity-50"
+                style={{ backgroundColor: ACCENTS.blush.hex, border: `1.5px solid ${ACCENTS.blush.border}` }}
+              >
+                <Plus size={15} strokeWidth={3} /> Save plan
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function PlanCard({ plan, onDelete }) {
+  const dest = plan.destinationId ? DEST_BY_ID[plan.destinationId] : null;
+  const accent = dest ? dest.accent : ACCENTS.blush;
+  return (
+    <div className="flex flex-col overflow-hidden rounded-3xl bg-white/90 shadow-sm backdrop-blur transition-all duration-300 hover:-translate-y-1 hover:shadow-xl" style={{ border: `2px solid ${accent.border}` }}>
+      {plan.thumb && <img src={plan.thumb} alt="" className="h-32 w-full object-cover" />}
+      <div className="flex flex-1 flex-col gap-2 p-4">
+        <div className="flex items-start justify-between gap-2">
+          <h3 className="text-base font-extrabold text-stone-800">{plan.title || "Untitled plan"}</h3>
+          <button onClick={() => onDelete(plan.id)} className="text-stone-300 transition-colors hover:text-rose-400" aria-label="Delete plan"><Trash2 size={15} /></button>
+        </div>
+        {dest && <Pill accent={accent}><MapPin size={11} strokeWidth={3} /> {dest.emoji} {dest.name}</Pill>}
+        {plan.summary && <p className="text-sm text-stone-600">{plan.summary}</p>}
+        {plan.activities?.length > 0 && (
+          <ul className="space-y-1">
+            {plan.activities.map((a, i) => (<li key={i} className="flex gap-1.5 text-xs text-stone-500"><span>✨</span><span>{a}</span></li>))}
+          </ul>
+        )}
+        {plan.want && (
+          <p className="rounded-xl px-3 py-2 text-xs font-semibold" style={{ backgroundColor: ACCENTS.mint.soft, color: ACCENTS.mint.text }}>🎯 {plan.want}</p>
+        )}
+        {plan.comment && (
+          <p className="rounded-xl px-3 py-2 text-xs text-stone-500" style={{ backgroundColor: accent.soft }}>💬 {plan.comment}</p>
+        )}
+        {plan.sourceUrl && (
+          <a href={plan.sourceUrl} target="_blank" rel="noreferrer" className="mt-auto flex items-center gap-1 pt-1 text-xs font-semibold text-stone-400 hover:text-rose-400">
+            <ExternalLink size={12} /> source
+          </a>
+        )}
+      </div>
     </div>
   );
 }
@@ -350,10 +520,7 @@ function PassportCard({ dest, votes, onVote, isOpen, onToggle }) {
   const isTopPick = dest.recommendation.rank === 1;
 
   return (
-    <div
-      className="group relative flex h-full flex-col overflow-hidden rounded-3xl bg-white/90 shadow-sm backdrop-blur transition-all duration-300 hover:-translate-y-1 hover:shadow-xl"
-      style={{ border: `2px solid ${accent.border}` }}
-    >
+    <div className="group relative flex h-full flex-col overflow-hidden rounded-3xl bg-white/90 shadow-sm backdrop-blur transition-all duration-300 hover:-translate-y-1 hover:shadow-xl" style={{ border: `2px solid ${accent.border}` }}>
       {isTopPick && (
         <div className="absolute right-4 top-12 z-10 flex items-center gap-1 rounded-full bg-amber-100 px-2.5 py-1 text-[10px] font-extrabold uppercase tracking-wide text-amber-600 shadow-sm">
           <Crown size={12} strokeWidth={3} fill="#FCD34D" /> Top Pick
@@ -372,20 +539,15 @@ function PassportCard({ dest, votes, onVote, isOpen, onToggle }) {
               <span className="text-3xl leading-none">{dest.emoji}</span>
               <h3 className="truncate text-2xl font-extrabold tracking-tight text-stone-800">{dest.name}</h3>
             </div>
-            <p className="mt-1 flex items-center gap-1 text-xs font-semibold text-stone-400">
-              <MapPin size={12} strokeWidth={2.6} />
-              {dest.region}
-            </p>
+            <p className="mt-1 flex items-center gap-1 text-xs font-semibold text-stone-400"><MapPin size={12} strokeWidth={2.6} />{dest.region}</p>
             <p className="mt-1 text-sm font-medium italic text-stone-500">"{dest.tagline}"</p>
           </div>
-
           <div className="flex flex-col items-center gap-1 rounded-2xl px-3 py-2" style={{ backgroundColor: accent.soft, border: `1.5px solid ${accent.border}` }}>
             <Heart size={22} strokeWidth={2.4} style={{ color: accent.text, fill: total > 0 ? accent.hex : "transparent" }} />
             <span className="text-sm font-extrabold tabular-nums" style={{ color: accent.text }}>{total}</span>
           </div>
         </div>
 
-        {/* Two-person heart tracker */}
         <div className="mt-4 grid grid-cols-2 gap-2">
           {["max", "partner"].map((who) => (
             <button
@@ -402,10 +564,7 @@ function PassportCard({ dest, votes, onVote, isOpen, onToggle }) {
         </div>
 
         <div className="mt-4 flex flex-wrap items-center gap-2">
-          <Pill accent={budget.chip} soft={false}>
-            <Plane size={12} strokeWidth={2.6} />
-            {dest.flight.price} {dest.flight.per}
-          </Pill>
+          <Pill accent={budget.chip} soft={false}><Plane size={12} strokeWidth={2.6} />{dest.flight.price} {dest.flight.per}</Pill>
           <Pill accent={budget.chip}>{budget.emoji} {budget.label}</Pill>
         </div>
         <p className="mt-2 pl-1 text-xs text-stone-400">{dest.flight.carrier} · {dest.flight.note}</p>
@@ -419,14 +578,8 @@ function PassportCard({ dest, votes, onVote, isOpen, onToggle }) {
       </div>
 
       <div className="flex flex-wrap items-center gap-x-4 gap-y-1 px-5 py-3 text-xs">
-        <span className="flex items-center gap-1 font-semibold text-stone-500">
-          <Snowflake size={12} strokeWidth={2.6} style={{ color: accent.text }} />
-          {dest.weather.label} — {dest.weather.snow}
-        </span>
-        <span className="flex items-center gap-1 font-semibold text-stone-500">
-          <Moon size={12} strokeWidth={2.6} style={{ color: accent.text }} />
-          {dest.sunsetNote}
-        </span>
+        <span className="flex items-center gap-1 font-semibold text-stone-500"><Snowflake size={12} strokeWidth={2.6} style={{ color: accent.text }} />{dest.weather.label} — {dest.weather.snow}</span>
+        <span className="flex items-center gap-1 font-semibold text-stone-500"><Moon size={12} strokeWidth={2.6} style={{ color: accent.text }} />{dest.sunsetNote}</span>
       </div>
 
       <div className="mt-auto flex items-center justify-between gap-3 px-5 pb-5 pt-2">
@@ -439,7 +592,7 @@ function PassportCard({ dest, votes, onVote, isOpen, onToggle }) {
           className="flex items-center gap-1.5 rounded-full px-4 py-2 text-xs font-extrabold transition-all duration-200 hover:scale-[1.03] active:scale-95"
           style={{ backgroundColor: accent.hex, color: accent.text, border: `1.5px solid ${accent.border}` }}
         >
-          {isOpen ? "Hide itinerary" : "Open deep-dive"}
+          {isOpen ? "Hide details" : "Open deep-dive"}
           <ChevronDown size={15} strokeWidth={3} className="transition-transform duration-300" style={{ transform: isOpen ? "rotate(180deg)" : "rotate(0deg)" }} />
         </button>
       </div>
@@ -459,47 +612,15 @@ function PassportCard({ dest, votes, onVote, isOpen, onToggle }) {
               <p className="mt-1 text-xs italic text-stone-500">{dest.basecamp.vibe}</p>
             </div>
 
-            <div className="rounded-2xl bg-white p-4" style={{ border: `1.5px solid ${ACCENTS.blush.border}` }}>
-              <div className="flex items-center gap-2">
-                <span className="flex items-center gap-1 rounded-full px-2.5 py-1 text-[10px] font-extrabold" style={{ backgroundColor: ACCENTS.blush.hex, color: ACCENTS.blush.text }}>
-                  <Sun size={12} strokeWidth={3} /> LV.4
-                </span>
-                <h4 className="text-sm font-extrabold text-stone-700">{dest.deepDive.level4.title}</h4>
-              </div>
-              <ul className="mt-3 space-y-2">
-                {dest.deepDive.level4.items.map((it, i) => (
-                  <li key={i} className="flex gap-2 text-sm text-stone-600"><span className="mt-0.5">✨</span><span>{it}</span></li>
-                ))}
-              </ul>
-            </div>
-
-            <div className="rounded-2xl bg-white p-4" style={{ border: `1.5px solid ${ACCENTS.winter.border}` }}>
-              <div className="flex items-center gap-2">
-                <span className="flex items-center gap-1 rounded-full px-2.5 py-1 text-[10px] font-extrabold" style={{ backgroundColor: ACCENTS.winter.hex, color: ACCENTS.winter.text }}>
-                  <Moon size={12} strokeWidth={3} /> LV.2
-                </span>
-                <h4 className="text-sm font-extrabold text-stone-700">{dest.deepDive.level2.title}</h4>
-              </div>
-              <ul className="mt-3 space-y-2">
-                {dest.deepDive.level2.items.map((it, i) => (
-                  <li key={i} className="flex gap-2 text-sm text-stone-600"><span className="mt-0.5">🧸</span><span>{it}</span></li>
-                ))}
-              </ul>
-            </div>
-
             <div className="grid gap-3 sm:grid-cols-2">
               <div className="rounded-2xl p-4" style={{ backgroundColor: ACCENTS.mint.soft, border: `1.5px solid ${ACCENTS.mint.border}` }}>
-                <p className="flex items-center gap-1.5 text-xs font-extrabold uppercase tracking-wide" style={{ color: ACCENTS.mint.text }}>
-                  <Utensils size={13} strokeWidth={2.8} /> Food Targets
-                </p>
+                <p className="flex items-center gap-1.5 text-xs font-extrabold uppercase tracking-wide" style={{ color: ACCENTS.mint.text }}><Utensils size={13} strokeWidth={2.8} /> Food Targets</p>
                 <ul className="mt-2 space-y-1.5">
                   {dest.food.map((f, i) => (<li key={i} className="flex gap-1.5 text-xs text-stone-600"><span>🍱</span><span>{f}</span></li>))}
                 </ul>
               </div>
               <div className="rounded-2xl p-4" style={{ backgroundColor: ACCENTS.blush.soft, border: `1.5px solid ${ACCENTS.blush.border}` }}>
-                <p className="flex items-center gap-1.5 text-xs font-extrabold uppercase tracking-wide" style={{ color: ACCENTS.blush.text }}>
-                  <Sparkles size={13} strokeWidth={2.8} /> Cute IP Radius
-                </p>
+                <p className="flex items-center gap-1.5 text-xs font-extrabold uppercase tracking-wide" style={{ color: ACCENTS.blush.text }}><Sparkles size={13} strokeWidth={2.8} /> Cute IP Radius</p>
                 <ul className="mt-2 space-y-1.5">
                   {dest.cuteIP.map((c, i) => (<li key={i} className="flex gap-1.5 text-xs text-stone-600"><span>🦦</span><span>{c}</span></li>))}
                 </ul>
@@ -520,46 +641,42 @@ const emptyVotes = () => DESTINATIONS.reduce((acc, d) => ({ ...acc, [d.id]: { ma
 export default function App() {
   const [votes, setVotes] = useState(() => {
     try {
-      const saved = localStorage.getItem(STORAGE_KEY);
+      const saved = localStorage.getItem(VOTES_KEY);
       if (saved) {
         const parsed = JSON.parse(saved);
-        // merge to guard against added/removed destinations
         const base = emptyVotes();
         for (const id of Object.keys(base)) {
           if (parsed[id]) base[id] = { max: parsed[id].max || 0, partner: parsed[id].partner || 0 };
         }
         return base;
       }
-    } catch (e) {
-      /* ignore corrupt storage */
-    }
+    } catch (e) { /* ignore */ }
     return emptyVotes();
   });
+
+  const [plans, setPlans] = useState(() => {
+    try {
+      const saved = localStorage.getItem(PLANS_KEY);
+      if (saved) return JSON.parse(saved);
+    } catch (e) { /* ignore */ }
+    return [];
+  });
+
   const [openId, setOpenId] = useState(null);
 
-  useEffect(() => {
-    try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(votes));
-    } catch (e) {
-      /* storage unavailable — fine */
-    }
-  }, [votes]);
+  useEffect(() => { try { localStorage.setItem(VOTES_KEY, JSON.stringify(votes)); } catch (e) {} }, [votes]);
+  useEffect(() => { try { localStorage.setItem(PLANS_KEY, JSON.stringify(plans)); } catch (e) {} }, [plans]);
 
-  const handleVote = (id, who) =>
-    setVotes((v) => ({ ...v, [id]: { ...v[id], [who]: v[id][who] + 1 } }));
-
+  const handleVote = (id, who) => setVotes((v) => ({ ...v, [id]: { ...v[id], [who]: v[id][who] + 1 } }));
   const handleToggle = (id) => setOpenId((cur) => (cur === id ? null : id));
-
   const resetVotes = () => setVotes(emptyVotes());
 
+  const addPlan = (plan) => setPlans((p) => [plan, ...p]);
+  const deletePlan = (id) => setPlans((p) => p.filter((x) => x.id !== id));
+
   const totals = useMemo(() => {
-    const out = {};
-    let sum = 0;
-    for (const d of DESTINATIONS) {
-      const t = votes[d.id].max + votes[d.id].partner;
-      out[d.id] = t;
-      sum += t;
-    }
+    const out = {}; let sum = 0;
+    for (const d of DESTINATIONS) { const t = votes[d.id].max + votes[d.id].partner; out[d.id] = t; sum += t; }
     return { out, sum };
   }, [votes]);
 
@@ -568,17 +685,6 @@ export default function App() {
     const topId = Object.entries(totals.out).sort((a, b) => b[1] - a[1])[0][0];
     return DESTINATIONS.find((d) => d.id === topId);
   }, [totals]);
-
-  // both partners agree = both have this as their personal max
-  const consensus = useMemo(() => {
-    if (totals.sum === 0) return null;
-    const topFor = (who) =>
-      [...DESTINATIONS].sort((a, b) => votes[b.id][who] - votes[a.id][who])[0];
-    const maxTop = topFor("max");
-    const partnerTop = topFor("partner");
-    if (votes[maxTop.id].max > 0 && maxTop.id === partnerTop.id) return maxTop;
-    return null;
-  }, [votes, totals]);
 
   return (
     <div
@@ -595,26 +701,40 @@ export default function App() {
         {/* Header */}
         <header className="animate-float-in text-center">
           <div className="mx-auto inline-flex items-center gap-2 rounded-full border-2 border-rose-100 bg-white/80 px-4 py-1.5 text-xs font-extrabold uppercase tracking-[0.2em] text-rose-400 shadow-sm backdrop-blur">
-            <Calendar size={13} strokeWidth={3} />
-            Nov 27 – Dec 4
+            <Calendar size={13} strokeWidth={3} /> Nov 27 – Dec 4
           </div>
           <h1 className="mt-5 text-4xl font-black tracking-tight text-stone-800 sm:text-6xl">
-            Max <span className="text-rose-300">♥</span> Partner
+            My Baby <span className="text-rose-300">♥</span> Travel Plans
           </h1>
-          <p className="mt-2 text-lg font-bold text-stone-500 sm:text-xl">Year-End Trip Planning Hub <span className="align-middle">🧳✨</span></p>
+          <p className="mt-2 text-lg font-bold text-stone-500 sm:text-xl">Our cozy year-end trip planner <span className="align-middle">🧳✨</span></p>
           <p className="mx-auto mt-3 max-w-xl text-sm text-stone-400">
-            Five cozy-winter contenders, tailored to early sunsets, raw-seafood runs and cute-character hauls. Each of you hearts your favorites — votes save automatically.
+            Drop links and screenshots to collect plan ideas, jot what you want to do, and heart your favorite destinations together.
           </p>
         </header>
 
-        {/* Recommendation banner */}
-        <div className="mx-auto mt-8 max-w-3xl animate-float-in rounded-3xl border-2 border-amber-100 bg-white/85 p-5 shadow-sm backdrop-blur">
-          <div className="flex items-start gap-3">
-            <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-2xl bg-amber-100 text-amber-500">
-              <Trophy size={20} strokeWidth={2.6} />
+        {/* Plan composer — the top capture panel */}
+        <div className="mx-auto mt-8 max-w-3xl animate-float-in">
+          <PlanComposer onSave={addPlan} />
+        </div>
+
+        {/* Saved plans */}
+        {plans.length > 0 && (
+          <section className="mt-8">
+            <h2 className="flex items-center justify-center gap-2 text-center text-lg font-black text-stone-700">
+              <Sparkles size={17} strokeWidth={2.8} className="text-rose-300" /> Our Plan Ideas ({plans.length})
+            </h2>
+            <div className="mt-5 grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
+              {plans.map((p) => (<PlanCard key={p.id} plan={p} onDelete={deletePlan} />))}
             </div>
+          </section>
+        )}
+
+        {/* Recommendation banner */}
+        <div className="mx-auto mt-12 max-w-3xl rounded-3xl border-2 border-amber-100 bg-white/85 p-5 shadow-sm backdrop-blur">
+          <div className="flex items-start gap-3">
+            <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-2xl bg-amber-100 text-amber-500"><Trophy size={20} strokeWidth={2.6} /></div>
             <div>
-              <p className="text-sm font-black text-stone-700">Claude's recommendation</p>
+              <p className="text-sm font-black text-stone-700">Top recommendation</p>
               <p className="mt-1 text-sm text-stone-500">
                 <span className="font-extrabold text-stone-700">🧸 Seoul</span> is the best all-rounder — biting cold with possible flurries, on-budget on full-service Korean Air, elite raw seafood + character flagships, and the latest usable daylight (5:15 PM). If budget can stretch and falling snow is the whole point,{" "}
                 <span className="font-extrabold text-stone-700">❄️ Sapporo</span> is the more unforgettable snow-globe trip.
@@ -629,21 +749,10 @@ export default function App() {
             <Heart size={18} strokeWidth={2.6} className="text-rose-300" fill="#FFDFD3" />
             <span className="text-sm font-extrabold text-stone-600">{totals.sum} total hearts</span>
           </div>
-          <div
-            className="flex items-center gap-2 rounded-2xl border-2 px-4 py-2.5 shadow-sm backdrop-blur"
-            style={{ borderColor: leader ? leader.accent.border : "#E7E1D8", backgroundColor: leader ? leader.accent.soft : "rgba(255,255,255,0.85)" }}
-          >
+          <div className="flex items-center gap-2 rounded-2xl border-2 px-4 py-2.5 shadow-sm backdrop-blur" style={{ borderColor: leader ? leader.accent.border : "#E7E1D8", backgroundColor: leader ? leader.accent.soft : "rgba(255,255,255,0.85)" }}>
             <Trophy size={18} strokeWidth={2.6} style={{ color: leader ? leader.accent.text : "#B8AE9E" }} />
-            <span className="text-sm font-extrabold text-stone-600">
-              {leader ? <>Leader: {leader.emoji} {leader.name}</> : "Tap a heart to start voting"}
-            </span>
+            <span className="text-sm font-extrabold text-stone-600">{leader ? <>Leader: {leader.emoji} {leader.name}</> : "Tap a heart to start voting"}</span>
           </div>
-          {consensus && (
-            <div className="flex items-center gap-2 rounded-2xl border-2 border-rose-200 bg-rose-50 px-4 py-2.5 shadow-sm backdrop-blur">
-              <span className="text-base">💞</span>
-              <span className="text-sm font-extrabold text-rose-500">You both agree: {consensus.emoji} {consensus.name}</span>
-            </div>
-          )}
           {totals.sum > 0 && (
             <button onClick={resetVotes} className="flex items-center gap-1.5 rounded-2xl border-2 border-stone-200 bg-white/85 px-4 py-2.5 text-sm font-extrabold text-stone-400 shadow-sm backdrop-blur transition-colors hover:text-stone-600">
               <RotateCcw size={15} strokeWidth={2.6} /> Reset
@@ -677,8 +786,7 @@ export default function App() {
         {/* Comparison snapshot */}
         <section className="mt-12">
           <h2 className="flex items-center justify-center gap-2 text-center text-xl font-black text-stone-700">
-            <Star size={18} strokeWidth={2.8} className="text-amber-300" fill="#FFE9B0" />
-            Quick Comparison Snapshot
+            <Star size={18} strokeWidth={2.8} className="text-amber-300" fill="#FFE9B0" /> Quick Comparison Snapshot
           </h2>
           <div className="mt-5 overflow-x-auto rounded-3xl border-2 border-stone-100 bg-white/85 shadow-sm backdrop-blur">
             <table className="w-full min-w-[720px] text-left text-sm">
@@ -704,16 +812,8 @@ export default function App() {
                     <td className="px-4 py-4 font-semibold text-stone-600">{d.weather.range}</td>
                     <td className="px-4 py-4 font-semibold text-stone-600">{d.sunset}</td>
                     <td className="px-4 py-4 font-semibold text-stone-600">{d.basecamp.price}</td>
-                    <td className="px-4 py-4">
-                      <span className="inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-extrabold" style={{ backgroundColor: d.accent.soft, color: d.accent.text }}>
-                        <Heart size={11} strokeWidth={3} fill={d.accent.hex} /> {votes[d.id].max}
-                      </span>
-                    </td>
-                    <td className="px-4 py-4">
-                      <span className="inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-extrabold" style={{ backgroundColor: d.accent.soft, color: d.accent.text }}>
-                        <Heart size={11} strokeWidth={3} fill={d.accent.hex} /> {votes[d.id].partner}
-                      </span>
-                    </td>
+                    <td className="px-4 py-4"><span className="inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-extrabold" style={{ backgroundColor: d.accent.soft, color: d.accent.text }}><Heart size={11} strokeWidth={3} fill={d.accent.hex} /> {votes[d.id].max}</span></td>
+                    <td className="px-4 py-4"><span className="inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-extrabold" style={{ backgroundColor: d.accent.soft, color: d.accent.text }}><Heart size={11} strokeWidth={3} fill={d.accent.hex} /> {votes[d.id].partner}</span></td>
                   </tr>
                 ))}
               </tbody>
@@ -723,7 +823,7 @@ export default function App() {
 
         <footer className="mt-12 text-center text-xs text-stone-400">
           <p className="font-semibold">Made with ❄️ 🍱 🦦 🧸 ✨ for a very specific kind of cozy winter trip.</p>
-          <p className="mt-1">Prices in SGD per pax · planning weather &amp; sunset for late Nov / early Dec · live temps via Open-Meteo.</p>
+          <p className="mt-1">Prices in SGD per pax · planning weather &amp; sunset for late Nov / early Dec · live temps via Open-Meteo · plan reading via Claude.</p>
         </footer>
       </div>
     </div>
