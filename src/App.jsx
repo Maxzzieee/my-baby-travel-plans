@@ -29,7 +29,10 @@ import {
   NotebookPen,
   MessageCircle,
   Send,
+  Cloud,
+  CloudOff,
 } from "lucide-react";
+import { hasSupabase, loadState, saveState, subscribe, loadGallery, postImage, deleteImage, subscribeGallery } from "./lib/supabase";
 
 /**
  * My Baby Travel Plans 🧳✨  — Nov 27 – Dec 4
@@ -187,7 +190,7 @@ const EMPTY_DRAFT = { title: "", summary: "", activities: [], location: "", comm
 // ---------------------------------------------------------------------------
 function SavedIdea({ plan, accent, onDelete, onAddComment }) {
   const [text, setText] = useState("");
-  const [who, setWho] = useState("max");
+  const [who, setWho] = useState("me");
   const comments = plan.comments || [];
 
   const add = () => {
@@ -227,7 +230,7 @@ function SavedIdea({ plan, accent, onDelete, onAddComment }) {
         {comments.length > 0 && (
           <div className="mt-2 space-y-1.5">
             {comments.map((c) => {
-              const ca = c.who === "partner" ? ACCENTS.blush : ACCENTS.winter;
+              const ca = c.who === "baby" ? ACCENTS.blush : ACCENTS.winter;
               return (
                 <div key={c.id} className="flex items-start gap-1.5 text-xs">
                   <span className="mt-0.5 rounded-md px-1.5 py-0.5 text-[10px] font-extrabold capitalize" style={{ backgroundColor: ca.soft, color: ca.text }}>{c.who}</span>
@@ -238,7 +241,7 @@ function SavedIdea({ plan, accent, onDelete, onAddComment }) {
           </div>
         )}
         <div className="mt-2 flex items-center gap-1.5">
-          <button onClick={() => setWho((w) => (w === "max" ? "partner" : "max"))} className="rounded-md px-2 py-1.5 text-[10px] font-extrabold capitalize transition-colors" style={{ backgroundColor: (who === "partner" ? ACCENTS.blush : ACCENTS.winter).soft, color: (who === "partner" ? ACCENTS.blush : ACCENTS.winter).text }} title="Tap to switch who's commenting">{who}</button>
+          <button onClick={() => setWho((w) => (w === "me" ? "baby" : "me"))} className="rounded-md px-2 py-1.5 text-[10px] font-extrabold capitalize transition-colors" style={{ backgroundColor: (who === "baby" ? ACCENTS.blush : ACCENTS.winter).soft, color: (who === "baby" ? ACCENTS.blush : ACCENTS.winter).text }} title="Tap to switch who's commenting">{who}</button>
           <input value={text} onChange={(e) => setText(e.target.value)} onKeyDown={(e) => e.key === "Enter" && add()} placeholder="Add a comment…" className="flex-1 rounded-lg border-2 border-stone-200 px-2.5 py-1.5 text-xs outline-none focus:border-rose-200" />
           <button onClick={add} disabled={!text.trim()} className="rounded-lg p-1.5 transition-all hover:scale-105 active:scale-95 disabled:opacity-40" style={{ backgroundColor: accent.hex, color: accent.text }} aria-label="Send comment"><Send size={13} strokeWidth={2.8} /></button>
         </div>
@@ -441,7 +444,7 @@ function PassportCard({ dest, votes, onVote, isOpen, onToggle, plans, onAddPlan,
         <div className="mt-4 grid grid-cols-2 gap-2">
           {["max", "partner"].map((who) => (
             <button key={who} onClick={(e) => { e.stopPropagation(); onVote(dest.id, who); }} className="flex items-center justify-center gap-2 rounded-2xl px-3 py-2.5 transition-all duration-200 hover:scale-[1.03] active:scale-95" style={{ backgroundColor: "#fff", border: `1.5px solid ${accent.border}` }}>
-              <span className="text-xs font-extrabold capitalize text-stone-500">{who}</span>
+              <span className="text-xs font-extrabold text-stone-500">{WHO_LABEL[who]}</span>
               <Heart size={16} strokeWidth={2.6} style={{ color: accent.text, fill: votes[who] > 0 ? accent.hex : "transparent" }} className={votes[who] > 0 ? "animate-pop" : ""} key={votes[who]} />
               <span className="text-sm font-extrabold tabular-nums" style={{ color: accent.text }}>{votes[who]}</span>
             </button>
@@ -509,6 +512,71 @@ function PassportCard({ dest, votes, onVote, isOpen, onToggle, plans, onAddPlan,
 // ---------------------------------------------------------------------------
 const emptyVotes = () => DESTINATIONS.reduce((acc, d) => ({ ...acc, [d.id]: { max: 0, partner: 0 } }), {});
 const emptyPlans = () => DESTINATIONS.reduce((acc, d) => ({ ...acc, [d.id]: [] }), {});
+const mergeVotes = (raw) => { const base = emptyVotes(); if (raw) for (const id of Object.keys(base)) if (raw[id]) base[id] = { max: raw[id].max || 0, partner: raw[id].partner || 0 }; return base; };
+const mergePlans = (raw) => { const base = emptyPlans(); if (raw) for (const id of Object.keys(base)) if (Array.isArray(raw[id])) base[id] = raw[id]; return base; };
+const WHO_LABEL = { max: "Me", partner: "Baby" };
+
+// ---------------------------------------------------------------------------
+// Photos & Memes wall (shared, realtime via Supabase Storage)
+// ---------------------------------------------------------------------------
+function MemeWall() {
+  const [items, setItems] = useState([]);
+  const [who, setWho] = useState("me");
+  const [caption, setCaption] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState("");
+  const fileRef = useRef(null);
+
+  const refresh = useCallback(async () => { setItems(await loadGallery()); }, []);
+  useEffect(() => { refresh(); const unsub = subscribeGallery(refresh); return () => unsub(); }, [refresh]);
+
+  const onFile = async (file) => {
+    if (!file) return;
+    setBusy(true); setErr("");
+    try { await postImage(file, who, caption.trim()); setCaption(""); await refresh(); }
+    catch (e) { setErr(e?.message || "Upload failed"); }
+    finally { setBusy(false); if (fileRef.current) fileRef.current.value = ""; }
+  };
+
+  if (!hasSupabase) return null;
+
+  return (
+    <section className="mt-12">
+      <h2 className="flex items-center justify-center gap-2 text-center text-xl font-black text-stone-700">
+        <ImageIcon size={18} strokeWidth={2.8} className="text-rose-300" /> Photos &amp; Memes
+      </h2>
+      <p className="mt-1 text-center text-sm text-stone-400">Post pics &amp; silly memes — they pop up on both our screens in real time 💕</p>
+
+      <div className="mx-auto mt-5 flex max-w-2xl flex-col gap-2 rounded-3xl border-2 border-rose-100 bg-white/85 p-4 shadow-sm backdrop-blur sm:flex-row sm:items-center">
+        <button onClick={() => setWho((w) => (w === "me" ? "baby" : "me"))} className="rounded-xl px-3 py-2.5 text-sm font-extrabold capitalize transition-colors" style={{ backgroundColor: (who === "baby" ? ACCENTS.blush : ACCENTS.winter).soft, color: (who === "baby" ? ACCENTS.blush : ACCENTS.winter).text }} title="Tap to switch who's posting">{who}</button>
+        <input value={caption} onChange={(e) => setCaption(e.target.value)} placeholder="Add a caption (optional)…" className="flex-1 rounded-xl border-2 border-stone-200 px-3 py-2.5 text-sm outline-none focus:border-rose-200" />
+        <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={(e) => onFile(e.target.files?.[0])} />
+        <button onClick={() => fileRef.current?.click()} disabled={busy} className="flex items-center justify-center gap-1.5 rounded-xl px-4 py-2.5 text-sm font-extrabold text-rose-500 transition-all hover:scale-[1.02] active:scale-95 disabled:opacity-50" style={{ backgroundColor: ACCENTS.blush.hex, border: `1.5px solid ${ACCENTS.blush.border}` }}>
+          {busy ? <Loader2 size={15} className="animate-spin" /> : <ImageIcon size={15} strokeWidth={2.8} />}{busy ? "Posting…" : "Post a photo / meme"}
+        </button>
+      </div>
+      {err && <p className="mx-auto mt-2 max-w-2xl rounded-xl bg-amber-50 px-3 py-2 text-center text-xs font-semibold text-amber-600">{err}</p>}
+
+      {items.length > 0 && (
+        <div className="mt-6 columns-2 gap-4 sm:columns-3 [&>*]:mb-4">
+          {items.map((it) => {
+            const wa = it.who === "baby" ? ACCENTS.blush : ACCENTS.winter;
+            return (
+              <div key={it.id} className="group relative break-inside-avoid overflow-hidden rounded-2xl border-2 border-white bg-white shadow-sm">
+                <img src={it.url} alt={it.caption || "meme"} className="w-full object-cover" loading="lazy" />
+                <button onClick={() => deleteImage(it).then(refresh)} className="absolute right-2 top-2 rounded-full bg-white/80 p-1.5 text-stone-400 opacity-0 shadow transition-opacity hover:text-rose-500 group-hover:opacity-100" aria-label="Delete"><Trash2 size={14} /></button>
+                <div className="flex items-center gap-2 px-3 py-2">
+                  <span className="rounded-md px-1.5 py-0.5 text-[10px] font-extrabold capitalize" style={{ backgroundColor: wa.soft, color: wa.text }}>{it.who || "?"}</span>
+                  {it.caption && <span className="truncate text-xs text-stone-500">{it.caption}</span>}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </section>
+  );
+}
 
 export default function App() {
   const [votes, setVotes] = useState(() => {
@@ -538,9 +606,44 @@ export default function App() {
   });
 
   const [openId, setOpenId] = useState(null);
+  const [synced, setSynced] = useState(false);
+  const hydrated = useRef(false);
+  const lastSynced = useRef(null);
 
-  useEffect(() => { try { localStorage.setItem(VOTES_KEY, JSON.stringify(votes)); } catch (e) {} }, [votes]);
-  useEffect(() => { try { localStorage.setItem(PLANS_KEY, JSON.stringify(plans)); } catch (e) {} }, [plans]);
+  // Load the shared board, push local seed if empty, and subscribe to partner's live changes.
+  useEffect(() => {
+    let unsub = () => {};
+    (async () => {
+      const remote = await loadState();
+      if (remote && (remote.votes || remote.plans)) {
+        const v = mergeVotes(remote.votes); const p = mergePlans(remote.plans);
+        lastSynced.current = JSON.stringify({ v, p });
+        setVotes(v); setPlans(p);
+      } else if (hasSupabase) {
+        lastSynced.current = JSON.stringify({ v: votes, p: plans });
+        saveState(votes, plans);
+      }
+      hydrated.current = true;
+      setSynced(hasSupabase);
+      unsub = subscribe((r) => {
+        const v = mergeVotes(r.votes); const p = mergePlans(r.plans);
+        lastSynced.current = JSON.stringify({ v, p });
+        setVotes(v); setPlans(p);
+      });
+    })();
+    return () => unsub();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Persist to localStorage always; push to Supabase (debounced) when it's a local change.
+  useEffect(() => {
+    try { localStorage.setItem(VOTES_KEY, JSON.stringify(votes)); localStorage.setItem(PLANS_KEY, JSON.stringify(plans)); } catch (e) {}
+    if (!hasSupabase || !hydrated.current) return;
+    const cur = JSON.stringify({ v: votes, p: plans });
+    if (cur === lastSynced.current) return;
+    const t = setTimeout(() => { lastSynced.current = cur; saveState(votes, plans); }, 400);
+    return () => clearTimeout(t);
+  }, [votes, plans]);
 
   const handleVote = (id, who) => setVotes((v) => ({ ...v, [id]: { ...v[id], [who]: v[id][who] + 1 } }));
   const handleToggle = (id) => setOpenId((cur) => (cur === id ? null : id));
@@ -575,7 +678,7 @@ export default function App() {
           <div className="mx-auto inline-flex items-center gap-2 rounded-full border-2 border-rose-100 bg-white/80 px-4 py-1.5 text-xs font-extrabold uppercase tracking-[0.2em] text-rose-400 shadow-sm backdrop-blur">
             <Calendar size={13} strokeWidth={3} /> Nov 27 – Dec 4
           </div>
-          <h1 className="mt-5 text-4xl font-black tracking-tight text-stone-800 sm:text-6xl">My Baby <span className="text-rose-300">♥</span> Travel Plans</h1>
+          <h1 className="mt-5 text-4xl font-black tracking-tight text-stone-800 sm:text-6xl">Me &amp; Baby <span className="text-rose-300">♥</span> Travel Plans</h1>
           <p className="mt-2 text-lg font-bold text-stone-500 sm:text-xl">Our cozy year-end trip planner <span className="align-middle">🧳✨</span></p>
           <p className="mx-auto mt-3 max-w-xl text-sm text-stone-400">Open any passport to build its Idea Board — paste links or screenshots and the AI scrubs them into clean plans. Heart your favorites together.</p>
         </header>
@@ -598,6 +701,10 @@ export default function App() {
           </div>
           <div className="flex items-center gap-2 rounded-2xl border-2 border-stone-100 bg-white/85 px-4 py-2.5 shadow-sm backdrop-blur">
             <NotebookPen size={18} strokeWidth={2.6} className="text-stone-400" /><span className="text-sm font-extrabold text-stone-600">{totalIdeas} ideas saved</span>
+          </div>
+          <div className="flex items-center gap-2 rounded-2xl border-2 px-4 py-2.5 shadow-sm backdrop-blur" style={{ borderColor: synced ? ACCENTS.mint.border : "#E7E1D8", backgroundColor: synced ? ACCENTS.mint.soft : "rgba(255,255,255,0.85)" }} title={synced ? "Both phones sync live" : "Saving on this device only"}>
+            {synced ? <Cloud size={18} strokeWidth={2.6} style={{ color: ACCENTS.mint.text }} /> : <CloudOff size={18} strokeWidth={2.6} className="text-stone-400" />}
+            <span className="text-sm font-extrabold text-stone-600">{synced ? "Synced live" : "Local only"}</span>
           </div>
           <div className="flex items-center gap-2 rounded-2xl border-2 px-4 py-2.5 shadow-sm backdrop-blur" style={{ borderColor: leader ? leader.accent.border : "#E7E1D8", backgroundColor: leader ? leader.accent.soft : "rgba(255,255,255,0.85)" }}>
             <Trophy size={18} strokeWidth={2.6} style={{ color: leader ? leader.accent.text : "#B8AE9E" }} /><span className="text-sm font-extrabold text-stone-600">{leader ? <>Leader: {leader.emoji} {leader.name}</> : "Tap a heart to vote"}</span>
@@ -624,13 +731,15 @@ export default function App() {
           ))}
         </main>
 
+        <MemeWall />
+
         <section className="mt-12">
           <h2 className="flex items-center justify-center gap-2 text-center text-xl font-black text-stone-700"><Star size={18} strokeWidth={2.8} className="text-amber-300" fill="#FFE9B0" /> Quick Comparison Snapshot</h2>
           <div className="mt-5 overflow-x-auto rounded-3xl border-2 border-stone-100 bg-white/85 shadow-sm backdrop-blur">
             <table className="w-full min-w-[760px] text-left text-sm">
               <thead>
                 <tr className="text-[11px] uppercase tracking-wide text-stone-400">
-                  <th className="px-5 py-4 font-extrabold">Destination</th><th className="px-4 py-4 font-extrabold">Flight</th><th className="px-4 py-4 font-extrabold">Weather</th><th className="px-4 py-4 font-extrabold">Sunset</th><th className="px-4 py-4 font-extrabold">Ideas</th><th className="px-4 py-4 font-extrabold">Max</th><th className="px-4 py-4 font-extrabold">Partner</th>
+                  <th className="px-5 py-4 font-extrabold">Destination</th><th className="px-4 py-4 font-extrabold">Flight</th><th className="px-4 py-4 font-extrabold">Weather</th><th className="px-4 py-4 font-extrabold">Sunset</th><th className="px-4 py-4 font-extrabold">Ideas</th><th className="px-4 py-4 font-extrabold">Me</th><th className="px-4 py-4 font-extrabold">Baby</th>
                 </tr>
               </thead>
               <tbody>
