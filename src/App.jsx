@@ -31,8 +31,9 @@ import {
   Send,
   Cloud,
   CloudOff,
+  Check,
 } from "lucide-react";
-import { hasSupabase, loadState, saveState, subscribe, loadGallery, postImage, deleteImage, subscribeGallery } from "./lib/supabase";
+import { hasSupabase, loadState, saveState, subscribe, loadGallery, postImage, deleteImage, subscribeGallery, loadCopy, saveCopy, subscribeCopy } from "./lib/supabase";
 
 /**
  * My Baby Travel Plans 🧳✨  — Nov 27 – Dec 4
@@ -413,88 +414,55 @@ function PassportCard({ dest, votes, onVote, isOpen, onToggle, plans, onAddPlan,
   const planCount = plans.length;
 
   return (
-    <div className="group relative flex h-full flex-col overflow-hidden rounded-3xl bg-white/90 shadow-sm backdrop-blur transition-all duration-300 hover:-translate-y-1 hover:shadow-xl" style={{ border: `2px solid ${accent.border}` }}>
-      {isTopPick && (
-        <div className="absolute right-4 top-12 z-10 flex items-center gap-1 rounded-full bg-amber-100 px-2.5 py-1 text-[10px] font-extrabold uppercase tracking-wide text-amber-600 shadow-sm">
-          <Crown size={12} strokeWidth={3} fill="#FCD34D" /> Top Pick
-        </div>
-      )}
-
-      <div className="flex items-center justify-between px-5 pt-4" style={{ color: accent.text }}>
-        <span className="text-[10px] font-bold uppercase tracking-[0.2em] opacity-70">✦ Travel Passport</span>
-        <span className="text-[10px] font-bold uppercase tracking-[0.2em] opacity-70">No. {String(DESTINATIONS.indexOf(dest) + 1).padStart(2, "0")}</span>
-      </div>
-
-      <div className="px-5 pb-4 pt-2">
-        <div className="flex items-start justify-between gap-3">
-          <div className="min-w-0">
-            <div className="flex items-center gap-2">
-              <span className="text-3xl leading-none">{dest.emoji}</span>
-              <h3 className="truncate text-2xl font-extrabold tracking-tight text-stone-800">{dest.name}</h3>
-            </div>
-            <p className="mt-1 flex items-center gap-1 text-xs font-semibold text-stone-400"><MapPin size={12} strokeWidth={2.6} />{dest.region}</p>
-            <p className="mt-1 text-sm font-medium italic text-stone-500">"{dest.tagline}"</p>
+    <div className="overflow-hidden rounded-3xl bg-white/90 shadow-sm backdrop-blur transition-all" style={{ border: `1.5px solid ${isOpen ? accent.border : "#EBE5DB"}` }}>
+      {/* Compact header — tap to expand */}
+      <button onClick={() => onToggle(dest.id)} className="flex w-full items-center gap-3 px-5 py-4 text-left transition-colors hover:bg-stone-50/50">
+        <span className="text-2xl leading-none">{dest.emoji}</span>
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center gap-2">
+            <h3 className="truncate text-lg font-extrabold text-stone-800">{dest.name}</h3>
+            {isTopPick && <span className="flex items-center gap-0.5 rounded-full bg-amber-100 px-1.5 py-0.5 text-[9px] font-extrabold uppercase text-amber-600"><Crown size={9} strokeWidth={3} fill="#FCD34D" />Top</span>}
+            {planCount > 0 && <span className="flex items-center gap-0.5 rounded-full px-1.5 py-0.5 text-[9px] font-extrabold" style={{ backgroundColor: accent.soft, color: accent.text }}><NotebookPen size={9} strokeWidth={3} />{planCount}</span>}
           </div>
-          <div className="flex flex-col items-center gap-1 rounded-2xl px-3 py-2" style={{ backgroundColor: accent.soft, border: `1.5px solid ${accent.border}` }}>
-            <Heart size={22} strokeWidth={2.4} style={{ color: accent.text, fill: total > 0 ? accent.hex : "transparent" }} />
-            <span className="text-sm font-extrabold tabular-nums" style={{ color: accent.text }}>{total}</span>
-          </div>
+          <p className="mt-0.5 truncate text-xs text-stone-400"><span className="font-bold" style={{ color: accent.text }}>{dest.flight.price}</span> · {dest.weather.range} · sunset {dest.sunset}</p>
         </div>
-
-        <div className="mt-4 grid grid-cols-2 gap-2">
-          {["max", "partner"].map((who) => (
-            <button key={who} onClick={(e) => { e.stopPropagation(); onVote(dest.id, who); }} className="flex items-center justify-center gap-2 rounded-2xl px-3 py-2.5 transition-all duration-200 hover:scale-[1.03] active:scale-95" style={{ backgroundColor: "#fff", border: `1.5px solid ${accent.border}` }}>
-              <span className="text-xs font-extrabold text-stone-500">{WHO_LABEL[who]}</span>
-              <Heart size={16} strokeWidth={2.6} style={{ color: accent.text, fill: votes[who] > 0 ? accent.hex : "transparent" }} className={votes[who] > 0 ? "animate-pop" : ""} key={votes[who]} />
-              <span className="text-sm font-extrabold tabular-nums" style={{ color: accent.text }}>{votes[who]}</span>
-            </button>
-          ))}
+        <div className="flex items-center gap-1 rounded-xl px-2.5 py-1.5" style={{ backgroundColor: accent.soft }}>
+          <Heart size={15} strokeWidth={2.5} style={{ color: accent.text, fill: total > 0 ? accent.hex : "transparent" }} />
+          <span className="text-sm font-extrabold tabular-nums" style={{ color: accent.text }}>{total}</span>
         </div>
+        <ChevronDown size={18} strokeWidth={2.8} className="text-stone-300 transition-transform duration-300" style={{ transform: isOpen ? "rotate(180deg)" : "rotate(0deg)" }} />
+      </button>
 
-        <div className="mt-4 flex flex-wrap items-center gap-2">
-          <Pill accent={budget.chip} soft={false}><Plane size={12} strokeWidth={2.6} />{dest.flight.price} {dest.flight.per}</Pill>
-          <Pill accent={budget.chip}>{budget.emoji} {budget.label}</Pill>
-        </div>
-        <p className="mt-2 pl-1 text-xs text-stone-400">{dest.flight.carrier} · {dest.flight.note}</p>
-      </div>
-
-      <div className="grid grid-cols-2 gap-4 px-5 py-4" style={{ backgroundColor: accent.soft + "80" }}>
-        <StatRow icon={dest.weather.snowIcon ? CloudSnow : Thermometer} label="Weather" value={dest.weather.range} accent={accent} />
-        <StatRow icon={Sunset} label="Sunset" value={dest.sunset} accent={accent} />
-        <StatRow icon={Train} label="Basecamp" value={dest.basecamp.station} accent={accent} />
-        <StatRow icon={Wallet} label="Stay / night" value={dest.basecamp.price} accent={accent} />
-      </div>
-
-      <div className="flex flex-wrap items-center gap-x-4 gap-y-1 px-5 py-3 text-xs">
-        <span className="flex items-center gap-1 font-semibold text-stone-500"><Snowflake size={12} strokeWidth={2.6} style={{ color: accent.text }} />{dest.weather.label} — {dest.weather.snow}</span>
-        <span className="flex items-center gap-1 font-semibold text-stone-500"><Moon size={12} strokeWidth={2.6} style={{ color: accent.text }} />{dest.sunsetNote}</span>
-      </div>
-
-      <div className="mt-auto flex items-center justify-between gap-3 px-5 pb-5 pt-2">
-        <div className="flex items-center gap-2">
-          <span className="text-[11px] font-bold uppercase tracking-wide text-stone-400">Cozy night</span>
-          <CozyMeter score={dest.cozyScore} accent={accent} />
-        </div>
-        <button onClick={() => onToggle(dest.id)} className="flex items-center gap-1.5 rounded-full px-4 py-2 text-xs font-extrabold transition-all duration-200 hover:scale-[1.03] active:scale-95" style={{ backgroundColor: accent.hex, color: accent.text, border: `1.5px solid ${accent.border}` }}>
-          {isOpen ? "Hide board" : planCount > 0 ? `Open board · ${planCount} idea${planCount > 1 ? "s" : ""}` : "Open board"}
-          <ChevronDown size={15} strokeWidth={3} className="transition-transform duration-300" style={{ transform: isOpen ? "rotate(180deg)" : "rotate(0deg)" }} />
-        </button>
-      </div>
-
-      {/* count badge when collapsed */}
-      {!isOpen && planCount > 0 && (
-        <div className="absolute left-4 top-12 z-10 flex items-center gap-1 rounded-full px-2.5 py-1 text-[10px] font-extrabold shadow-sm" style={{ backgroundColor: accent.hex, color: accent.text }}>
-          <NotebookPen size={11} strokeWidth={3} /> {planCount}
-        </div>
-      )}
-
-      {/* Sliding deep-dive drawer */}
+      {/* Expandable detail */}
       <div className="grid transition-all duration-500 ease-out" style={{ gridTemplateRows: isOpen ? "1fr" : "0fr" }}>
         <div className="overflow-hidden">
-          <div className="space-y-4 px-5 pb-6 pt-1" style={{ borderTop: `2px dashed ${accent.border}` }}>
+          <div className="space-y-4 px-5 pb-6" style={{ borderTop: `1.5px dashed ${accent.border}` }}>
+            <p className="pt-4 text-sm italic text-stone-500">"{dest.tagline}"</p>
+
+            <div>
+              <p className="mb-2 text-[11px] font-bold uppercase tracking-wide text-stone-400">Who wants it?</p>
+              <div className="grid grid-cols-2 gap-2">
+                {["max", "partner"].map((who) => (
+                  <button key={who} onClick={(e) => { e.stopPropagation(); onVote(dest.id, who); }} className="flex items-center justify-center gap-2 rounded-2xl px-3 py-2.5 transition-all hover:scale-[1.02] active:scale-95" style={{ backgroundColor: "#fff", border: `1.5px solid ${accent.border}` }}>
+                    <span className="text-xs font-extrabold text-stone-500">{WHO_LABEL[who]}</span>
+                    <Heart size={15} strokeWidth={2.6} style={{ color: accent.text, fill: votes[who] > 0 ? accent.hex : "transparent" }} className={votes[who] > 0 ? "animate-pop" : ""} key={votes[who]} />
+                    <span className="text-sm font-extrabold tabular-nums" style={{ color: accent.text }}>{votes[who]}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4 rounded-2xl p-4" style={{ backgroundColor: accent.soft + "80" }}>
+              <StatRow icon={dest.weather.snowIcon ? CloudSnow : Thermometer} label="Weather" value={dest.weather.range} accent={accent} />
+              <StatRow icon={Sunset} label="Sunset" value={dest.sunset} accent={accent} />
+              <StatRow icon={Plane} label="Flight" value={dest.flight.price} accent={accent} />
+              <StatRow icon={Wallet} label="Stay / night" value={dest.basecamp.price} accent={accent} />
+            </div>
+            <p className="text-xs text-stone-400">{budget.emoji} {budget.label} · {dest.flight.carrier} · {dest.weather.label}, {dest.weather.snow}</p>
+
             <LiveWeather coords={dest.coords} accent={accent} />
             <div className="rounded-2xl p-4" style={{ backgroundColor: accent.soft, border: `1.5px solid ${accent.border}` }}>
-              <p className="flex items-center gap-1.5 text-xs font-extrabold uppercase tracking-wide" style={{ color: accent.text }}><Train size={14} strokeWidth={2.8} /> The "Temma-Station" Basecamp</p>
+              <p className="flex items-center gap-1.5 text-xs font-extrabold uppercase tracking-wide" style={{ color: accent.text }}><Train size={14} strokeWidth={2.8} /> Basecamp</p>
               <p className="mt-1 text-sm font-bold text-stone-700">{dest.basecamp.station}</p>
               <p className="text-xs text-stone-500">{dest.basecamp.logic}</p>
               <p className="mt-1 text-xs italic text-stone-500">{dest.basecamp.vibe}</p>
@@ -515,6 +483,38 @@ const emptyPlans = () => DESTINATIONS.reduce((acc, d) => ({ ...acc, [d.id]: [] }
 const mergeVotes = (raw) => { const base = emptyVotes(); if (raw) for (const id of Object.keys(base)) if (raw[id]) base[id] = { max: raw[id].max || 0, partner: raw[id].partner || 0 }; return base; };
 const mergePlans = (raw) => { const base = emptyPlans(); if (raw) for (const id of Object.keys(base)) if (Array.isArray(raw[id])) base[id] = raw[id]; return base; };
 const WHO_LABEL = { max: "Me", partner: "Baby" };
+
+const COPY_KEY = "maxbaby.copy.v1";
+const DEFAULT_COPY = {
+  subtitle: "Our cozy year-end trip planner",
+  recommendation:
+    "Seoul is the best all-rounder — biting cold with possible flurries, on-budget on full-service Korean Air, and the latest usable daylight (5:15 PM). If budget can stretch and falling snow is the whole point, Sapporo is the more unforgettable snow-globe trip.",
+};
+
+// Inline editable text. Edits save for everyone (shared copy).
+function Editable({ value, onSave, className = "", rows = 4, center = true }) {
+  const [editing, setEditing] = useState(false);
+  const [v, setV] = useState(value);
+  useEffect(() => { setV(value); }, [value]);
+
+  if (editing) {
+    return (
+      <div className={center ? "mx-auto max-w-2xl" : ""}>
+        <textarea autoFocus value={v} onChange={(e) => setV(e.target.value)} rows={rows} className="w-full resize-y rounded-2xl border-2 border-rose-200 bg-white px-3 py-2 text-sm text-stone-600 outline-none" />
+        <div className={`mt-2 flex gap-2 ${center ? "justify-center" : ""}`}>
+          <button onClick={() => { onSave(v.trim() || value); setEditing(false); }} className="flex items-center gap-1 rounded-full bg-rose-100 px-3 py-1.5 text-xs font-extrabold text-rose-500 transition hover:bg-rose-200"><Check size={13} strokeWidth={3} /> Save for both</button>
+          <button onClick={() => { setV(value); setEditing(false); }} className="rounded-full px-3 py-1.5 text-xs font-extrabold text-stone-400 transition hover:text-stone-600">Cancel</button>
+        </div>
+      </div>
+    );
+  }
+  return (
+    <span className="group relative inline">
+      <span className={className}>{value}</span>
+      <button onClick={() => setEditing(true)} title="Edit — saved for both of you" className="ml-1.5 inline-flex translate-y-[1px] align-middle text-stone-300 opacity-60 transition-opacity hover:text-rose-400 sm:opacity-0 sm:group-hover:opacity-100"><PenLine size={13} /></button>
+    </span>
+  );
+}
 
 // ---------------------------------------------------------------------------
 // Photos & Memes wall (shared, realtime via Supabase Storage)
@@ -606,9 +606,39 @@ export default function App() {
   });
 
   const [openId, setOpenId] = useState(null);
+  const [view, setView] = useState("plan"); // plan | photos | compare
   const [synced, setSynced] = useState(false);
   const hydrated = useRef(false);
   const lastSynced = useRef(null);
+
+  const [copy, setCopy] = useState(() => {
+    try { const s = localStorage.getItem(COPY_KEY); if (s) return { ...DEFAULT_COPY, ...JSON.parse(s) }; } catch (e) {}
+    return DEFAULT_COPY;
+  });
+  const copyHydrated = useRef(false);
+  const lastCopy = useRef(null);
+  const updateCopy = (key, val) => setCopy((c) => ({ ...c, [key]: val }));
+
+  // Shared editable copy: load + subscribe + debounced save
+  useEffect(() => {
+    let unsub = () => {};
+    (async () => {
+      const remote = await loadCopy();
+      if (remote) { const m = { ...DEFAULT_COPY, ...remote }; lastCopy.current = JSON.stringify(m); setCopy(m); }
+      copyHydrated.current = true;
+      unsub = subscribeCopy((r) => { const m = { ...DEFAULT_COPY, ...r }; lastCopy.current = JSON.stringify(m); setCopy(m); });
+    })();
+    return () => unsub();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+  useEffect(() => {
+    try { localStorage.setItem(COPY_KEY, JSON.stringify(copy)); } catch (e) {}
+    if (!hasSupabase || !copyHydrated.current) return;
+    const cur = JSON.stringify(copy);
+    if (cur === lastCopy.current) return;
+    const t = setTimeout(() => { lastCopy.current = cur; saveCopy(copy); }, 500);
+    return () => clearTimeout(t);
+  }, [copy]);
 
   // Load the shared board, push local seed if empty, and subscribe to partner's live changes.
   useEffect(() => {
@@ -670,57 +700,65 @@ export default function App() {
   const totalIdeas = useMemo(() => Object.values(plans).reduce((n, arr) => n + arr.length, 0), [plans]);
 
   return (
-    <div className="min-h-screen w-full font-sans text-stone-800" style={{ backgroundColor: "#FFFDF9", backgroundImage: "radial-gradient(circle at 12% 18%, #FFEFE8 0, transparent 38%), radial-gradient(circle at 88% 12%, #E6F4FA 0, transparent 36%), radial-gradient(circle at 78% 82%, #E9F8EF 0, transparent 40%), radial-gradient(circle at 22% 88%, #FFF4DA 0, transparent 38%)" }}>
-      <div className="pointer-events-none fixed inset-0 opacity-[0.5]" style={{ backgroundImage: "radial-gradient(#EFE7DA 1px, transparent 1px)", backgroundSize: "22px 22px" }} />
+    <div className="min-h-screen w-full font-sans text-stone-800" style={{ backgroundColor: "#FFFDF9", backgroundImage: "radial-gradient(circle at 15% 10%, #FFF5F0 0, transparent 45%), radial-gradient(circle at 85% 90%, #EEF6F1 0, transparent 48%)" }}>
+      <div className="pointer-events-none fixed inset-0 opacity-[0.18]" style={{ backgroundImage: "radial-gradient(#EEE8DE 1px, transparent 1px)", backgroundSize: "26px 26px" }} />
 
       <div className="relative mx-auto max-w-6xl px-4 py-10 sm:px-6 lg:py-14">
         <header className="animate-float-in text-center">
           <div className="mx-auto inline-flex items-center gap-2 rounded-full border-2 border-rose-100 bg-white/80 px-4 py-1.5 text-xs font-extrabold uppercase tracking-[0.2em] text-rose-400 shadow-sm backdrop-blur">
             <Calendar size={13} strokeWidth={3} /> Nov 27 – Dec 4
           </div>
-          <h1 className="mt-5 text-4xl font-black tracking-tight text-stone-800 sm:text-6xl">Me &amp; Baby <span className="text-rose-300">♥</span> Travel Plans</h1>
-          <p className="mt-2 text-lg font-bold text-stone-500 sm:text-xl">Our cozy year-end trip planner <span className="align-middle">🧳✨</span></p>
-          <p className="mx-auto mt-3 max-w-xl text-sm text-stone-400">Open any passport to build its Idea Board — paste links or screenshots and the AI scrubs them into clean plans. Heart your favorites together.</p>
+          <h1 className="mt-5 text-4xl font-black tracking-tight text-stone-800 sm:text-5xl">Me &amp; Baby <span className="text-rose-300">♥</span> Travel Plans</h1>
+          <p className="mt-3 text-base font-semibold text-stone-500 sm:text-lg">
+            <Editable value={copy.subtitle} onSave={(v) => updateCopy("subtitle", v)} rows={2} />
+          </p>
         </header>
 
+        {/* Tabs — show one section at a time */}
+        <div className="mx-auto mt-8 flex max-w-md items-center justify-center gap-1.5 rounded-2xl border border-stone-200 bg-white/70 p-1.5 backdrop-blur">
+          {[
+            { id: "plan", label: "Destinations", icon: MapPin },
+            { id: "photos", label: "Photos", icon: ImageIcon },
+            { id: "compare", label: "Compare", icon: Star },
+          ].map((t) => {
+            const active = view === t.id;
+            return (
+              <button key={t.id} onClick={() => setView(t.id)} className="flex flex-1 items-center justify-center gap-1.5 rounded-xl px-3 py-2 text-sm font-extrabold transition-all" style={{ backgroundColor: active ? ACCENTS.blush.hex : "transparent", color: active ? ACCENTS.blush.text : "#A8A29E" }}>
+                <t.icon size={15} strokeWidth={2.8} /> {t.label}
+              </button>
+            );
+          })}
+        </div>
+
+        {view === "plan" && (<>
         {/* Recommendation banner */}
-        <div className="mx-auto mt-8 max-w-3xl rounded-3xl border-2 border-amber-100 bg-white/85 p-5 shadow-sm backdrop-blur">
+        <div className="mx-auto mt-8 max-w-3xl rounded-3xl border border-amber-100 bg-white/80 p-5 backdrop-blur">
           <div className="flex items-start gap-3">
             <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-2xl bg-amber-100 text-amber-500"><Trophy size={20} strokeWidth={2.6} /></div>
             <div>
               <p className="text-sm font-black text-stone-700">Top recommendation</p>
-              <p className="mt-1 text-sm text-stone-500"><span className="font-extrabold text-stone-700">🧸 Seoul</span> is the best all-rounder — biting cold with possible flurries, on-budget on full-service Korean Air, and the latest usable daylight (5:15 PM). If budget can stretch and falling snow is the whole point, <span className="font-extrabold text-stone-700">❄️ Sapporo</span> is the more unforgettable snow-globe trip.</p>
+              <p className="mt-1 text-sm leading-relaxed text-stone-500">
+                <Editable value={copy.recommendation} onSave={(v) => updateCopy("recommendation", v)} rows={5} center={false} />
+              </p>
             </div>
           </div>
         </div>
 
         {/* Live tally bar */}
         <div className="mx-auto mt-8 flex max-w-4xl flex-wrap items-center justify-center gap-3">
-          <div className="flex items-center gap-2 rounded-2xl border-2 border-rose-100 bg-white/85 px-4 py-2.5 shadow-sm backdrop-blur">
-            <Heart size={18} strokeWidth={2.6} className="text-rose-300" fill="#FFDFD3" /><span className="text-sm font-extrabold text-stone-600">{totals.sum} hearts</span>
+          <div className="flex items-center gap-2 rounded-2xl border border-stone-200 bg-white/70 px-4 py-2.5 backdrop-blur">
+            <Heart size={16} strokeWidth={2.6} className="text-rose-300" fill="#FFDFD3" /><span className="text-sm font-bold text-stone-500">{totals.sum} hearts</span>
           </div>
-          <div className="flex items-center gap-2 rounded-2xl border-2 border-stone-100 bg-white/85 px-4 py-2.5 shadow-sm backdrop-blur">
-            <NotebookPen size={18} strokeWidth={2.6} className="text-stone-400" /><span className="text-sm font-extrabold text-stone-600">{totalIdeas} ideas saved</span>
+          <div className="flex items-center gap-2 rounded-2xl border border-stone-200 bg-white/70 px-4 py-2.5 backdrop-blur" title={synced ? "Both phones sync live" : "Saving on this device only"}>
+            {synced ? <Cloud size={16} strokeWidth={2.6} style={{ color: ACCENTS.mint.text }} /> : <CloudOff size={16} strokeWidth={2.6} className="text-stone-400" />}
+            <span className="text-sm font-bold text-stone-500">{synced ? "Synced live" : "Local only"}</span>
           </div>
-          <div className="flex items-center gap-2 rounded-2xl border-2 px-4 py-2.5 shadow-sm backdrop-blur" style={{ borderColor: synced ? ACCENTS.mint.border : "#E7E1D8", backgroundColor: synced ? ACCENTS.mint.soft : "rgba(255,255,255,0.85)" }} title={synced ? "Both phones sync live" : "Saving on this device only"}>
-            {synced ? <Cloud size={18} strokeWidth={2.6} style={{ color: ACCENTS.mint.text }} /> : <CloudOff size={18} strokeWidth={2.6} className="text-stone-400" />}
-            <span className="text-sm font-extrabold text-stone-600">{synced ? "Synced live" : "Local only"}</span>
-          </div>
-          <div className="flex items-center gap-2 rounded-2xl border-2 px-4 py-2.5 shadow-sm backdrop-blur" style={{ borderColor: leader ? leader.accent.border : "#E7E1D8", backgroundColor: leader ? leader.accent.soft : "rgba(255,255,255,0.85)" }}>
-            <Trophy size={18} strokeWidth={2.6} style={{ color: leader ? leader.accent.text : "#B8AE9E" }} /><span className="text-sm font-extrabold text-stone-600">{leader ? <>Leader: {leader.emoji} {leader.name}</> : "Tap a heart to vote"}</span>
+          <div className="flex items-center gap-2 rounded-2xl border border-stone-200 bg-white/70 px-4 py-2.5 backdrop-blur">
+            <Trophy size={16} strokeWidth={2.6} style={{ color: leader ? leader.accent.text : "#B8AE9E" }} /><span className="text-sm font-bold text-stone-500">{leader ? <>Leader {leader.name}</> : "Tap a heart to vote"}</span>
           </div>
           {totals.sum > 0 && (
-            <button onClick={resetVotes} className="flex items-center gap-1.5 rounded-2xl border-2 border-stone-200 bg-white/85 px-4 py-2.5 text-sm font-extrabold text-stone-400 shadow-sm backdrop-blur transition-colors hover:text-stone-600"><RotateCcw size={15} strokeWidth={2.6} /> Reset</button>
+            <button onClick={resetVotes} className="flex items-center gap-1.5 rounded-2xl border border-stone-200 bg-white/70 px-4 py-2.5 text-sm font-bold text-stone-400 backdrop-blur transition-colors hover:text-stone-600"><RotateCcw size={14} strokeWidth={2.6} /> Reset</button>
           )}
-        </div>
-
-        {/* Accent legend */}
-        <div className="mx-auto mt-6 flex max-w-4xl flex-wrap items-center justify-center gap-2">
-          {[{ a: ACCENTS.winter, t: "Freezing · snow · early dark" }, { a: ACCENTS.blush, t: "Cute IP · character shops · photo spots" }, { a: ACCENTS.mint, t: "Budget wins · flight savings" }].map((l) => (
-            <span key={l.a.name} className="inline-flex items-center gap-2 rounded-full bg-white/70 px-3 py-1 text-[11px] font-semibold text-stone-500 backdrop-blur" style={{ border: `1.5px solid ${l.a.border}` }}>
-              <span className="h-3 w-3 rounded-full" style={{ backgroundColor: l.a.hex, border: `1px solid ${l.a.border}` }} />{l.t}
-            </span>
-          ))}
         </div>
 
         <main className="mt-10 grid grid-cols-1 gap-6 lg:grid-cols-2">
@@ -730,10 +768,12 @@ export default function App() {
             </div>
           ))}
         </main>
+        </>)}
 
-        <MemeWall />
+        {view === "photos" && <MemeWall />}
 
-        <section className="mt-12">
+        {view === "compare" && (
+        <section className="mt-8">
           <h2 className="flex items-center justify-center gap-2 text-center text-xl font-black text-stone-700"><Star size={18} strokeWidth={2.8} className="text-amber-300" fill="#FFE9B0" /> Quick Comparison Snapshot</h2>
           <div className="mt-5 overflow-x-auto rounded-3xl border-2 border-stone-100 bg-white/85 shadow-sm backdrop-blur">
             <table className="w-full min-w-[760px] text-left text-sm">
@@ -758,6 +798,7 @@ export default function App() {
             </table>
           </div>
         </section>
+        )}
 
         <footer className="mt-12 text-center text-xs text-stone-400">
           <p className="font-semibold">Made with ❄️ 🍱 🦦 🧸 ✨ for a very specific kind of cozy winter trip.</p>

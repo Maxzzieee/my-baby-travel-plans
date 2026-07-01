@@ -6,6 +6,22 @@ html {
   scroll-behavior: smooth;
 }
 
+/* Custom cursor: drop a PNG at public/custom-cursor.png (≈32x32, transparent).
+   The trailing "auto" is a safe fallback if the file is missing. The two
+   numbers are the hotspot (the "click point") in px from the top-left. */
+* {
+  cursor: url("/custom-cursor.png") 4 4, auto;
+}
+/* keep a clickable feel on interactive elements */
+a,
+button,
+[role="button"],
+label,
+select,
+summary {
+  cursor: url("/custom-cursor.png") 4 4, pointer;
+}
+
 /* gentle custom scrollbar to match the soft theme */
 ::-webkit-scrollbar {
   width: 10px;

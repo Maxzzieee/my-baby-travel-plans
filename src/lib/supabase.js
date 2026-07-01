@@ -132,3 +132,46 @@ export function subscribeGallery(onChange) {
     .subscribe();
   return () => supabase.removeChannel(channel);
 }
+
+// ---------------------------------------------------------------------------
+// Editable site copy — shared for everyone. Stored as its own trip_state row
+// (id="site_copy") in the generic `plans` jsonb column, so no schema change.
+// ---------------------------------------------------------------------------
+const COPY_ID = "site_copy";
+
+export async function loadCopy() {
+  if (!supabase) return null;
+  try {
+    const { data, error } = await supabase.from("trip_state").select("plans").eq("id", COPY_ID).maybeSingle();
+    if (error) { console.warn("[supabase] loadCopy:", error.message); return null; }
+    return data?.plans || null;
+  } catch (e) {
+    console.warn("[supabase] loadCopy failed:", e?.message || e);
+    return null;
+  }
+}
+
+export async function saveCopy(copy) {
+  if (!supabase) return;
+  try {
+    const { error } = await supabase.from("trip_state").upsert({
+      id: COPY_ID, plans: copy, last_client: clientId, updated_at: new Date().toISOString(),
+    });
+    if (error) console.warn("[supabase] saveCopy:", error.message);
+  } catch (e) {
+    console.warn("[supabase] saveCopy failed:", e?.message || e);
+  }
+}
+
+export function subscribeCopy(onRemote) {
+  if (!supabase) return () => {};
+  const channel = supabase
+    .channel("copy_changes")
+    .on("postgres_changes", { event: "*", schema: "public", table: "trip_state", filter: `id=eq.${COPY_ID}` }, (payload) => {
+      const row = payload.new;
+      if (!row || row.last_client === clientId) return;
+      onRemote(row.plans || {});
+    })
+    .subscribe();
+  return () => supabase.removeChannel(channel);
+}
