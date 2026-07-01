@@ -34,8 +34,13 @@ import {
   Check,
   ChevronLeft,
   ChevronRight,
+  CalendarDays,
+  Clock,
+  ArrowUp,
+  ArrowDown,
+  Bed,
 } from "lucide-react";
-import { hasSupabase, loadState, saveState, subscribe, loadGallery, postImage, deleteImage, subscribeGallery, loadCopy, saveCopy, subscribeCopy, loadMessages, postMessage, subscribeMessages, loadMessageCounts, subscribeAllMessages, uploadImage } from "./lib/supabase";
+import { hasSupabase, loadState, saveState, subscribe, loadGallery, postImage, deleteImage, subscribeGallery, loadCopy, saveCopy, subscribeCopy, loadMessages, postMessage, subscribeMessages, loadMessageCounts, subscribeAllMessages, uploadImage, loadItinerary, addItineraryItem, updateItineraryItem, deleteItineraryItem, subscribeItinerary } from "./lib/supabase";
 
 // Which person is on THIS device ("me" | "baby"). Set once, stored locally.
 const IDENTITY_KEY = "maxbaby.identity.v1";
@@ -112,6 +117,20 @@ const DESTINATIONS = [
     basecamp: { station: "Gion Station", logic: "1 stop to Hakata Main Station", vibe: "Local neighborhood feel, walkable to Canal City", price: "S$80–S$100 / night" },
   },
 ];
+
+const DEST_BY_ID = Object.fromEntries(DESTINATIONS.map((d) => [d.id, d]));
+
+// Trip runs Nov 27 – Dec 4, 2026 (8 days)
+const TRIP_START = new Date(2026, 10, 27);
+const TRIP_DAYS = 8;
+const dayDate = (d) => { const dt = new Date(TRIP_START); dt.setDate(dt.getDate() + d); return dt; };
+const dayLabel = (d) => dayDate(d).toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" });
+const KIND_META = {
+  stay: { label: "Stay", emoji: "🏨" },
+  activity: { label: "Activity", emoji: "✨" },
+  food: { label: "Food", emoji: "🍽️" },
+  note: { label: "Note", emoji: "📝" },
+};
 
 const WMO = {
   0: { t: "Clear", e: "☀️" }, 1: { t: "Mostly clear", e: "🌤️" }, 2: { t: "Partly cloudy", e: "⛅" },
@@ -198,12 +217,21 @@ const EMPTY_DRAFT = { title: "", summary: "", activities: [], location: "", comm
 // ---------------------------------------------------------------------------
 // A single saved idea, with its own comment thread
 // ---------------------------------------------------------------------------
-function SavedIdea({ plan, accent, onDelete, onAddComment, onEdit }) {
+function SavedIdea({ plan, accent, onDelete, onAddComment, onEdit, onAddToItinerary }) {
   const me = useContext(IdentityContext);
   const openLightbox = useContext(LightboxContext);
   const [text, setText] = useState("");
   const [uploading, setUploading] = useState(false);
+  const [showDays, setShowDays] = useState(false);
+  const [addedDay, setAddedDay] = useState(null);
   const photoRef = useRef(null);
+
+  const pickDay = (dd) => {
+    onAddToItinerary(dd);
+    setShowDays(false);
+    setAddedDay(dd);
+    setTimeout(() => setAddedDay(null), 2500);
+  };
   const comments = plan.comments || [];
   const acts = plan.activities || [];
   const photos = plan.photos || [];
@@ -280,6 +308,26 @@ function SavedIdea({ plan, accent, onDelete, onAddComment, onEdit }) {
         {plan.sourceUrl && <a href={plan.sourceUrl} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 rounded-lg bg-stone-100 px-2 py-1 text-[11px] font-semibold text-stone-400 hover:text-rose-400"><ExternalLink size={11} /> source</a>}
       </div>
 
+      {hasSupabase && (
+        <div className="mt-2">
+          {addedDay != null ? (
+            <span className="inline-flex items-center gap-1 rounded-lg bg-emerald-50 px-2.5 py-1.5 text-[11px] font-extrabold text-emerald-600"><Check size={12} strokeWidth={3} /> Added to Day {addedDay + 1} · {dayLabel(addedDay)}</span>
+          ) : !showDays ? (
+            <button onClick={() => setShowDays(true)} className="inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-[11px] font-extrabold transition-colors" style={{ backgroundColor: accent.soft, color: accent.text }}>
+              <CalendarDays size={12} strokeWidth={2.8} /> Add to itinerary
+            </button>
+          ) : (
+            <div className="flex flex-wrap items-center gap-1">
+              <span className="mr-1 text-[10px] font-bold uppercase text-stone-400">Which day?</span>
+              {Array.from({ length: TRIP_DAYS }).map((_, dd) => (
+                <button key={dd} onClick={() => pickDay(dd)} title={dayLabel(dd)} className="rounded-md px-2 py-1 text-[11px] font-extrabold transition-transform hover:scale-110" style={{ backgroundColor: accent.soft, color: accent.text }}>{dd + 1}</button>
+              ))}
+              <button onClick={() => setShowDays(false)} className="ml-1 text-stone-300 hover:text-rose-400" aria-label="Cancel"><X size={12} /></button>
+            </div>
+          )}
+        </div>
+      )}
+
       {/* comment thread */}
       <div className="mt-3 border-t border-stone-100 pt-2.5">
         <p className="flex items-center gap-1 text-[10px] font-bold uppercase tracking-wide text-stone-400"><MessageCircle size={11} strokeWidth={2.8} /> Comments{comments.length > 0 ? ` (${comments.length})` : ""}</p>
@@ -308,7 +356,7 @@ function SavedIdea({ plan, accent, onDelete, onAddComment, onEdit }) {
 // ---------------------------------------------------------------------------
 // Per-passport Idea Board (lives inside the deep-dive drawer)
 // ---------------------------------------------------------------------------
-function IdeaBoard({ dest, plans, onAdd, onDelete, onAddComment, onEdit }) {
+function IdeaBoard({ dest, plans, onAdd, onDelete, onAddComment, onEdit, onAddToItinerary }) {
   const accent = dest.accent;
   const [mode, setMode] = useState("link");
   const [url, setUrl] = useState("");
@@ -485,7 +533,7 @@ function IdeaBoard({ dest, plans, onAdd, onDelete, onAddComment, onEdit }) {
       {plans.length > 0 && (
         <div className="mt-4 space-y-2.5">
           {plans.map((p) => (
-            <SavedIdea key={p.id} plan={p} accent={accent} onDelete={(planId) => onDelete(dest.id, planId)} onAddComment={(planId, comment) => onAddComment(dest.id, planId, comment)} onEdit={onEdit} />
+            <SavedIdea key={p.id} plan={p} accent={accent} onDelete={(planId) => onDelete(dest.id, planId)} onAddComment={(planId, comment) => onAddComment(dest.id, planId, comment)} onEdit={onEdit} onAddToItinerary={(day) => onAddToItinerary(day, p)} />
           ))}
         </div>
       )}
@@ -569,7 +617,7 @@ function DestChat({ dest, isOpen }) {
 // ---------------------------------------------------------------------------
 // Passport card
 // ---------------------------------------------------------------------------
-function PassportCard({ dest, votes, onVote, isOpen, onToggle, plans, onAddPlan, onDeletePlan, onAddComment, overrides, onEditField, unread = 0, onEditPlan }) {
+function PassportCard({ dest, votes, onVote, isOpen, onToggle, plans, onAddPlan, onDeletePlan, onAddComment, overrides, onEditField, unread = 0, onEditPlan, onAddToItinerary }) {
   const accent = dest.accent;
   const budget = BUDGET_TONE[dest.flight.budget];
   const total = votes.max + votes.partner;
@@ -636,7 +684,7 @@ function PassportCard({ dest, votes, onVote, isOpen, onToggle, plans, onAddPlan,
               <p className="text-xs text-stone-500">{E("bcLogic", dest.basecamp.logic, { multiline: true, className: "text-xs text-stone-500" })}</p>
               <p className="mt-1 text-xs italic text-stone-500">{E("bcVibe", dest.basecamp.vibe, { multiline: true, className: "text-xs italic text-stone-500" })}</p>
             </div>
-            <IdeaBoard dest={dest} plans={plans} onAdd={onAddPlan} onDelete={onDeletePlan} onAddComment={onAddComment} onEdit={(planId, patch) => onEditPlan(dest.id, planId, patch)} />
+            <IdeaBoard dest={dest} plans={plans} onAdd={onAddPlan} onDelete={onDeletePlan} onAddComment={onAddComment} onEdit={(planId, patch) => onEditPlan(dest.id, planId, patch)} onAddToItinerary={(day, idea) => onAddToItinerary(dest.id, day, idea)} />
             <DestChat dest={dest} isOpen={isOpen} />
           </div>
         </div>
@@ -826,6 +874,120 @@ function Lightbox({ data, onClose }) {
   );
 }
 
+// ---------------------------------------------------------------------------
+// Itinerary — day-by-day timed planner (per destination)
+// ---------------------------------------------------------------------------
+function ItineraryRow({ item, accent, onUpdate, onRemove }) {
+  const meta = KIND_META[item.kind] || KIND_META.activity;
+  const [f, setF] = useState({ title: item.title || "", place: item.place || "", notes: item.notes || "" });
+  useEffect(() => { setF({ title: item.title || "", place: item.place || "", notes: item.notes || "" }); }, [item.id]);
+  const commit = (key) => { if (f[key] !== (item[key] || "")) onUpdate(item.id, { [key]: f[key] }); };
+  const isStay = item.kind === "stay";
+
+  return (
+    <div className="rounded-2xl bg-white p-3 shadow-sm" style={{ border: `1.5px solid ${isStay ? accent.border : "#EBE5DB"}` }}>
+      <div className="flex items-start gap-3">
+        <div className="flex flex-col items-center gap-1">
+          <span className="text-lg leading-none">{meta.emoji}</span>
+          <input type="time" value={item.start_time || ""} onChange={(e) => onUpdate(item.id, { start_time: e.target.value })} className="w-[76px] rounded-lg border border-stone-200 px-1 py-1 text-xs outline-none focus:border-rose-200" />
+        </div>
+        <div className="min-w-0 flex-1 space-y-1.5">
+          <input value={f.title} onChange={(e) => setF({ ...f, title: e.target.value })} onBlur={() => commit("title")} placeholder={isStay ? "Hotel / where you're staying" : "What are you doing?"} className="w-full rounded-lg border-2 border-stone-200 px-2 py-1.5 text-sm font-bold outline-none focus:border-rose-200" />
+          <div className="flex items-center gap-1">
+            <MapPin size={12} className="flex-shrink-0 text-stone-400" />
+            <input value={f.place} onChange={(e) => setF({ ...f, place: e.target.value })} onBlur={() => commit("place")} placeholder="place / area (for the map later)" className="w-full rounded-lg border border-stone-200 px-2 py-1 text-xs outline-none focus:border-rose-200" />
+          </div>
+          <textarea value={f.notes} onChange={(e) => setF({ ...f, notes: e.target.value })} onBlur={() => commit("notes")} placeholder="notes…" rows={1} className="w-full resize-y rounded-lg border border-stone-200 px-2 py-1 text-xs outline-none focus:border-rose-200" />
+        </div>
+        <button onClick={() => onRemove(item.id)} className="flex-shrink-0 text-stone-300 transition-colors hover:text-rose-400" aria-label="Remove"><Trash2 size={14} /></button>
+      </div>
+    </div>
+  );
+}
+
+function ItineraryView({ chosenDest, onSetChosen }) {
+  const [dest, setDest] = useState(chosenDest || DESTINATIONS[0].id);
+  const [day, setDay] = useState(0);
+  const [items, setItems] = useState([]);
+  const accent = DEST_BY_ID[dest].accent;
+
+  const refresh = useCallback(async () => setItems(await loadItinerary(dest)), [dest]);
+  useEffect(() => { refresh(); const unsub = subscribeItinerary(dest, refresh); return () => unsub(); }, [dest, refresh]);
+
+  const dayItems = useMemo(
+    () => items.filter((it) => it.day === day).sort((a, b) => (a.start_time || "~").localeCompare(b.start_time || "~") || (a.position || 0) - (b.position || 0)),
+    [items, day]
+  );
+  const countForDay = (dd) => items.filter((it) => it.day === dd).length;
+
+  const add = async (kind) => { await addItineraryItem({ dest, day, kind, start_time: "", title: "", place: "", notes: "", position: items.filter((it) => it.day === day).length }); refresh(); };
+  const update = (id, patch) => { setItems((xs) => xs.map((x) => (x.id === id ? { ...x, ...patch } : x))); updateItineraryItem(id, patch); };
+  const remove = (id) => { setItems((xs) => xs.filter((x) => x.id !== id)); deleteItineraryItem(id); };
+
+  if (!hasSupabase) {
+    return (
+      <section className="mt-8">
+        <div className="mx-auto max-w-2xl rounded-3xl border border-dashed border-stone-300 bg-white/70 p-8 text-center text-sm text-stone-400">🗓️ The itinerary planner turns on once Supabase sync is connected.</div>
+      </section>
+    );
+  }
+
+  const ADD_BTNS = [
+    { kind: "stay", label: "Add stay", icon: Bed },
+    { kind: "activity", label: "Add activity", icon: Sparkles },
+    { kind: "food", label: "Add food", icon: Utensils },
+    { kind: "note", label: "Add note", icon: NotebookPen },
+  ];
+
+  return (
+    <section className="mt-8">
+      {/* city selector */}
+      <div className="flex flex-wrap items-center justify-center gap-2">
+        {DESTINATIONS.map((x) => {
+          const active = x.id === dest;
+          return (
+            <button key={x.id} onClick={() => { setDest(x.id); setDay(0); }} className="flex items-center gap-1.5 rounded-full px-3 py-2 text-sm font-extrabold transition-all" style={{ backgroundColor: active ? x.accent.hex : "#fff", color: active ? x.accent.text : "#A8A29E", border: `1.5px solid ${active ? x.accent.border : "#E7E1D8"}` }}>
+              {chosenDest === x.id && "⭐"} {x.emoji} {x.name}
+            </button>
+          );
+        })}
+      </div>
+      <div className="mt-3 text-center">
+        <button onClick={() => onSetChosen(chosenDest === dest ? "" : dest)} className="rounded-full border px-3 py-1.5 text-xs font-extrabold transition-colors" style={{ borderColor: accent.border, color: accent.text, backgroundColor: chosenDest === dest ? accent.hex : accent.soft }}>
+          {chosenDest === dest ? "⭐ This is our trip" : "☆ Mark as our trip"}
+        </button>
+      </div>
+
+      {/* day tabs */}
+      <div className="mt-5 flex justify-start gap-2 overflow-x-auto pb-2 sm:justify-center">
+        {Array.from({ length: TRIP_DAYS }).map((_, dd) => {
+          const active = dd === day;
+          const c = countForDay(dd);
+          return (
+            <button key={dd} onClick={() => setDay(dd)} className="flex-shrink-0 rounded-2xl px-3.5 py-2 text-center transition-all" style={{ backgroundColor: active ? accent.hex : "#fff", border: `1.5px solid ${active ? accent.border : "#E7E1D8"}` }}>
+              <div className="text-[10px] font-bold uppercase" style={{ color: active ? accent.text : "#A8A29E" }}>Day {dd + 1}{c > 0 ? ` · ${c}` : ""}</div>
+              <div className="text-xs font-extrabold" style={{ color: active ? accent.text : "#78716C" }}>{dayLabel(dd)}</div>
+            </button>
+          );
+        })}
+      </div>
+
+      {/* day content */}
+      <div className="mx-auto mt-4 max-w-3xl space-y-3">
+        {dayItems.map((it) => <ItineraryRow key={it.id} item={it} accent={accent} onUpdate={update} onRemove={remove} />)}
+        {dayItems.length === 0 && <p className="py-6 text-center text-sm text-stone-400">Nothing planned for {dayLabel(day)} yet — add your hotel & activities below, or use "+ Itinerary" on any saved idea.</p>}
+        <div className="flex flex-wrap justify-center gap-2 pt-1">
+          {ADD_BTNS.map((b) => (
+            <button key={b.kind} onClick={() => add(b.kind)} className="flex items-center gap-1.5 rounded-xl border-2 border-dashed border-stone-300 px-3 py-2 text-xs font-extrabold text-stone-400 transition-colors hover:border-rose-200 hover:text-rose-400">
+              <b.icon size={14} strokeWidth={2.6} /> {b.label}
+            </button>
+          ))}
+        </div>
+      </div>
+    </section>
+  );
+}
+
 export default function App() {
   const [votes, setVotes] = useState(() => {
     try {
@@ -959,6 +1121,11 @@ export default function App() {
     ...p,
     [destId]: p[destId].map((x) => (x.id === planId ? { ...x, ...patch } : x)),
   }));
+  const addToItinerary = (destId, day, idea) => addItineraryItem({
+    dest: destId, day, kind: "activity", start_time: "",
+    title: idea.title || "", place: idea.location || idea.title || "", notes: idea.summary || "",
+    idea_id: idea.id, position: 0,
+  });
 
   const totals = useMemo(() => {
     const out = {}; let sum = 0;
@@ -1006,9 +1173,10 @@ export default function App() {
         </header>
 
         {/* Tabs — show one section at a time */}
-        <div className="mx-auto mt-8 flex max-w-md items-center justify-center gap-1.5 rounded-2xl border border-stone-200 bg-white/70 p-1.5 backdrop-blur">
+        <div className="mx-auto mt-8 flex max-w-xl items-center justify-center gap-1 rounded-2xl border border-stone-200 bg-white/70 p-1.5 backdrop-blur">
           {[
-            { id: "plan", label: "Destinations", icon: MapPin },
+            { id: "plan", label: "Decide", icon: MapPin },
+            { id: "itinerary", label: "Itinerary", icon: CalendarDays },
             { id: "photos", label: "Photos", icon: ImageIcon },
             { id: "compare", label: "Compare", icon: Star },
           ].map((t) => {
@@ -1062,7 +1230,7 @@ export default function App() {
         <main className="mt-10 grid grid-cols-1 gap-6 lg:grid-cols-2">
           {DESTINATIONS.map((dest) => (
             <div key={dest.id} className={openId === dest.id ? "lg:col-span-2" : ""}>
-              <PassportCard dest={dest} votes={votes[dest.id]} onVote={handleVote} isOpen={openId === dest.id} onToggle={handleToggle} plans={plans[dest.id]} onAddPlan={addPlan} onDeletePlan={deletePlan} onAddComment={addComment} overrides={copy.dest?.[dest.id]} onEditField={(key, val) => updateDestField(dest.id, key, val)} unread={unreadFor(dest.id)} onEditPlan={editPlan} />
+              <PassportCard dest={dest} votes={votes[dest.id]} onVote={handleVote} isOpen={openId === dest.id} onToggle={handleToggle} plans={plans[dest.id]} onAddPlan={addPlan} onDeletePlan={deletePlan} onAddComment={addComment} overrides={copy.dest?.[dest.id]} onEditField={(key, val) => updateDestField(dest.id, key, val)} unread={unreadFor(dest.id)} onEditPlan={editPlan} onAddToItinerary={addToItinerary} />
             </div>
           ))}
         </main>
@@ -1097,6 +1265,8 @@ export default function App() {
           </div>
         </section>
         )}
+
+        {view === "itinerary" && <ItineraryView chosenDest={copy.chosenDest} onSetChosen={(id) => updateCopy("chosenDest", id)} />}
 
         <footer className="mt-12 text-center text-xs text-stone-400">
           <p className="font-semibold">Made with ❄️ 🍱 🦦 🧸 ✨ for a very specific kind of cozy winter trip.</p>

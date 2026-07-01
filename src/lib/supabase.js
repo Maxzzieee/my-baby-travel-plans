@@ -249,3 +249,64 @@ export function subscribeAllMessages(onChange) {
     .subscribe();
   return () => supabase.removeChannel(channel);
 }
+
+// ---------------------------------------------------------------------------
+// Itinerary — per-destination, day-by-day timed items (realtime)
+// ---------------------------------------------------------------------------
+export async function loadItinerary(dest) {
+  if (!supabase) return [];
+  try {
+    const { data, error } = await supabase
+      .from("itinerary")
+      .select("*")
+      .eq("dest", dest)
+      .order("day", { ascending: true })
+      .order("start_time", { ascending: true, nullsFirst: true })
+      .order("position", { ascending: true });
+    if (error) { console.warn("[supabase] loadItinerary:", error.message); return []; }
+    return data || [];
+  } catch (e) {
+    console.warn("[supabase] loadItinerary failed:", e?.message || e);
+    return [];
+  }
+}
+
+export async function addItineraryItem(row) {
+  if (!supabase) return null;
+  try {
+    const { data, error } = await supabase.from("itinerary").insert(row).select().single();
+    if (error) { console.warn("[supabase] addItineraryItem:", error.message); return null; }
+    return data;
+  } catch (e) {
+    console.warn("[supabase] addItineraryItem failed:", e?.message || e);
+    return null;
+  }
+}
+
+export async function updateItineraryItem(id, patch) {
+  if (!supabase) return;
+  try {
+    const { error } = await supabase.from("itinerary").update(patch).eq("id", id);
+    if (error) console.warn("[supabase] updateItineraryItem:", error.message);
+  } catch (e) {
+    console.warn("[supabase] updateItineraryItem failed:", e?.message || e);
+  }
+}
+
+export async function deleteItineraryItem(id) {
+  if (!supabase) return;
+  try {
+    await supabase.from("itinerary").delete().eq("id", id);
+  } catch (e) {
+    console.warn("[supabase] deleteItineraryItem failed:", e?.message || e);
+  }
+}
+
+export function subscribeItinerary(dest, onChange) {
+  if (!supabase) return () => {};
+  const channel = supabase
+    .channel(`itinerary_${dest}`)
+    .on("postgres_changes", { event: "*", schema: "public", table: "itinerary", filter: `dest=eq.${dest}` }, () => onChange())
+    .subscribe();
+  return () => supabase.removeChannel(channel);
+}

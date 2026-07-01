@@ -41,11 +41,32 @@ alter table public.messages enable row level security;
 drop policy if exists "messages anon all" on public.messages;
 create policy "messages anon all" on public.messages for all using (true) with check (true);
 
+-- 2c) Itinerary — per-destination, day-by-day timed items ----------------------
+create table if not exists public.itinerary (
+  id uuid primary key default gen_random_uuid(),
+  dest text not null,
+  day int not null default 0,
+  position int not null default 0,
+  start_time text,
+  title text,
+  place text,
+  lat float8,
+  lng float8,
+  kind text default 'activity',
+  notes text,
+  idea_id text,
+  created_at timestamptz default now()
+);
+alter table public.itinerary enable row level security;
+drop policy if exists "itinerary anon all" on public.itinerary;
+create policy "itinerary anon all" on public.itinerary for all using (true) with check (true);
+
 -- 3) Realtime (ignore "already member" if you re-run) ---------------------------
 do $$ begin
   begin alter publication supabase_realtime add table public.trip_state; exception when others then null; end;
   begin alter publication supabase_realtime add table public.gallery;    exception when others then null; end;
   begin alter publication supabase_realtime add table public.messages;   exception when others then null; end;
+  begin alter publication supabase_realtime add table public.itinerary;  exception when others then null; end;
 end $$;
 
 -- 4) Storage bucket for uploaded images ----------------------------------------
