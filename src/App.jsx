@@ -32,6 +32,8 @@ import {
   Cloud,
   CloudOff,
   Check,
+  ChevronLeft,
+  ChevronRight,
 } from "lucide-react";
 import { hasSupabase, loadState, saveState, subscribe, loadGallery, postImage, deleteImage, subscribeGallery, loadCopy, saveCopy, subscribeCopy, loadMessages, postMessage, subscribeMessages, loadMessageCounts, subscribeAllMessages, uploadImage } from "./lib/supabase";
 
@@ -39,6 +41,7 @@ import { hasSupabase, loadState, saveState, subscribe, loadGallery, postImage, d
 const IDENTITY_KEY = "maxbaby.identity.v1";
 const SEEN_KEY = "maxbaby.seen.v1";
 const IdentityContext = React.createContext("me");
+const LightboxContext = React.createContext(() => {}); // openLightbox(images, index)
 const WHO_NAME = { me: "Me", baby: "Ants" };
 
 /**
@@ -197,12 +200,15 @@ const EMPTY_DRAFT = { title: "", summary: "", activities: [], location: "", comm
 // ---------------------------------------------------------------------------
 function SavedIdea({ plan, accent, onDelete, onAddComment, onEdit }) {
   const me = useContext(IdentityContext);
+  const openLightbox = useContext(LightboxContext);
   const [text, setText] = useState("");
   const [uploading, setUploading] = useState(false);
   const photoRef = useRef(null);
   const comments = plan.comments || [];
   const acts = plan.activities || [];
   const photos = plan.photos || [];
+  const allPhotos = [plan.thumb, ...photos].filter(Boolean);
+  const lbBase = plan.thumb ? 1 : 0;
 
   const addPhoto = async (file) => {
     if (!file) return;
@@ -234,18 +240,24 @@ function SavedIdea({ plan, accent, onDelete, onAddComment, onEdit }) {
         <button onClick={() => onDelete(plan.id)} className="flex-shrink-0 text-stone-300 transition-colors hover:text-rose-400" aria-label="Delete idea"><Trash2 size={14} /></button>
       </div>
 
-      <div className="mt-2 flex flex-wrap gap-1.5">
-        {plan.thumb && <img src={plan.thumb} alt="" className="h-20 w-20 rounded-lg border border-stone-200 object-cover" />}
+      <div className="mt-2 flex flex-wrap gap-2">
+        {plan.thumb && (
+          <button onClick={() => openLightbox(allPhotos, 0)} className="overflow-hidden rounded-xl border border-stone-200" aria-label="View photo">
+            <img src={plan.thumb} alt="" className="h-28 w-28 object-cover transition-transform hover:scale-105 sm:h-32 sm:w-32" />
+          </button>
+        )}
         {photos.map((src, i) => (
           <div key={i} className="relative">
-            <a href={src} target="_blank" rel="noreferrer"><img src={src} alt="" className="h-20 w-20 rounded-lg border border-stone-200 object-cover transition-transform hover:scale-105" /></a>
+            <button onClick={() => openLightbox(allPhotos, lbBase + i)} className="block overflow-hidden rounded-xl border border-stone-200" aria-label="View photo">
+              <img src={src} alt="" className="h-28 w-28 object-cover transition-transform hover:scale-105 sm:h-32 sm:w-32" />
+            </button>
             <button onClick={() => onEdit(plan.id, { photos: photos.filter((_, j) => j !== i) })} className="absolute -right-1.5 -top-1.5 rounded-full bg-white p-0.5 text-stone-400 shadow hover:text-rose-500" aria-label="Remove photo"><X size={12} /></button>
           </div>
         ))}
         <input ref={photoRef} type="file" accept="image/*" className="hidden" onChange={(e) => addPhoto(e.target.files?.[0])} />
-        <button onClick={() => photoRef.current?.click()} disabled={uploading} className="flex h-20 w-20 flex-col items-center justify-center gap-1 rounded-lg border-2 border-dashed border-stone-300 text-stone-400 transition-colors hover:border-rose-200 hover:text-rose-400 disabled:opacity-50">
-          {uploading ? <Loader2 size={16} className="animate-spin" /> : <ImageIcon size={16} strokeWidth={2.2} />}
-          <span className="text-[10px] font-bold">Add photo</span>
+        <button onClick={() => photoRef.current?.click()} disabled={uploading} className="flex h-28 w-28 flex-col items-center justify-center gap-1 rounded-xl border-2 border-dashed border-stone-300 text-stone-400 transition-colors hover:border-rose-200 hover:text-rose-400 disabled:opacity-50 sm:h-32 sm:w-32">
+          {uploading ? <Loader2 size={18} className="animate-spin" /> : <ImageIcon size={18} strokeWidth={2.2} />}
+          <span className="text-[11px] font-bold">Add photo</span>
         </button>
       </div>
 
@@ -692,8 +704,9 @@ function EditText({ value, onSave, className = "", multiline = false, placeholde
     );
   }
   return (
-    <span onClick={(e) => { stop(e); setEditing(true); }} className={`cursor-text rounded px-0.5 transition-colors hover:bg-rose-50 ${className}`} title="Click to edit — saved for both">
+    <span onClick={(e) => { stop(e); setEditing(true); }} className={`cursor-text rounded px-1 py-0.5 underline decoration-dashed decoration-stone-300 underline-offset-2 transition-colors hover:bg-rose-50 hover:decoration-rose-300 ${className}`} title="Tap to edit — saved for both">
       {value || <span className="italic text-stone-300">{placeholder}</span>}
+      <PenLine size={10} strokeWidth={2.6} className="ml-0.5 inline-block translate-y-[-1px] align-middle text-stone-300" />
     </span>
   );
 }
@@ -703,6 +716,7 @@ function EditText({ value, onSave, className = "", multiline = false, placeholde
 // ---------------------------------------------------------------------------
 function MemeWall() {
   const me = useContext(IdentityContext);
+  const openLightbox = useContext(LightboxContext);
   const [items, setItems] = useState([]);
   const [caption, setCaption] = useState("");
   const [busy, setBusy] = useState(false);
@@ -741,11 +755,11 @@ function MemeWall() {
 
       {items.length > 0 && (
         <div className="mt-6 columns-2 gap-4 sm:columns-3 [&>*]:mb-4">
-          {items.map((it) => {
+          {items.map((it, idx) => {
             const wa = it.who === "baby" ? ACCENTS.blush : ACCENTS.winter;
             return (
               <div key={it.id} className="group relative break-inside-avoid overflow-hidden rounded-2xl border-2 border-white bg-white shadow-sm">
-                <img src={it.url} alt={it.caption || "meme"} className="w-full object-cover" loading="lazy" />
+                <img src={it.url} alt={it.caption || "meme"} onClick={() => openLightbox(items.map((x) => x.url), idx)} className="w-full cursor-zoom-in object-cover" loading="lazy" />
                 <button onClick={() => deleteImage(it).then(refresh)} className="absolute right-2 top-2 rounded-full bg-white/80 p-1.5 text-stone-400 opacity-0 shadow transition-opacity hover:text-rose-500 group-hover:opacity-100" aria-label="Delete"><Trash2 size={14} /></button>
                 <div className="flex items-center gap-2 px-3 py-2">
                   <span className="rounded-md px-1.5 py-0.5 text-[10px] font-extrabold capitalize" style={{ backgroundColor: wa.soft, color: wa.text }}>{it.who || "?"}</span>
@@ -757,6 +771,58 @@ function MemeWall() {
         </div>
       )}
     </section>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Lightbox — pleasant in-app photo zoom (backdrop, Esc, arrows, swipe)
+// ---------------------------------------------------------------------------
+function Lightbox({ data, onClose }) {
+  const [i, setI] = useState(data ? data.index : 0);
+  const touchX = useRef(null);
+  const images = data?.images || [];
+  const multi = images.length > 1;
+
+  useEffect(() => { if (data) setI(data.index || 0); }, [data]);
+
+  const go = useCallback((d) => setI((x) => (x + d + images.length) % images.length), [images.length]);
+
+  useEffect(() => {
+    if (!data) return;
+    const onKey = (e) => {
+      if (e.key === "Escape") onClose();
+      else if (e.key === "ArrowRight") go(1);
+      else if (e.key === "ArrowLeft") go(-1);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [data, onClose, go]);
+
+  if (!data) return null;
+
+  return (
+    <div
+      className="fixed inset-0 z-[60] flex items-center justify-center bg-stone-900/85 p-4 backdrop-blur-sm"
+      onClick={onClose}
+      onTouchStart={(e) => { touchX.current = e.touches[0].clientX; }}
+      onTouchEnd={(e) => { if (touchX.current == null) return; const dx = e.changedTouches[0].clientX - touchX.current; if (multi && Math.abs(dx) > 50) go(dx < 0 ? 1 : -1); touchX.current = null; }}
+    >
+      <button onClick={onClose} className="absolute right-4 top-4 rounded-full bg-white/15 p-2 text-white transition-colors hover:bg-white/30" aria-label="Close"><X size={22} strokeWidth={2.6} /></button>
+      {multi && (
+        <>
+          <button onClick={(e) => { e.stopPropagation(); go(-1); }} className="absolute left-3 rounded-full bg-white/15 p-2 text-white transition-colors hover:bg-white/30" aria-label="Previous"><ChevronLeft size={26} strokeWidth={2.6} /></button>
+          <button onClick={(e) => { e.stopPropagation(); go(1); }} className="absolute right-3 rounded-full bg-white/15 p-2 text-white transition-colors hover:bg-white/30" aria-label="Next"><ChevronRight size={26} strokeWidth={2.6} /></button>
+        </>
+      )}
+      <img src={images[i]} alt="" onClick={(e) => e.stopPropagation()} className="max-h-[90vh] max-w-[92vw] rounded-2xl object-contain shadow-2xl" />
+      {multi && (
+        <div className="absolute bottom-5 flex gap-1.5">
+          {images.map((_, n) => (
+            <span key={n} className="h-1.5 rounded-full transition-all" style={{ width: n === i ? 18 : 6, backgroundColor: n === i ? "#fff" : "rgba(255,255,255,0.4)" }} />
+          ))}
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -790,6 +856,8 @@ export default function App() {
   const [openId, setOpenId] = useState(null);
   const [view, setView] = useState("plan"); // plan | photos | compare
   const [synced, setSynced] = useState(false);
+  const [lightbox, setLightbox] = useState(null); // { images, index } | null
+  const openLightbox = useCallback((images, index = 0) => setLightbox({ images: images.filter(Boolean), index }), []);
   const hydrated = useRef(false);
   const lastSynced = useRef(null);
 
@@ -909,6 +977,8 @@ export default function App() {
 
   return (
     <IdentityContext.Provider value={me || "me"}>
+    <LightboxContext.Provider value={openLightbox}>
+    <Lightbox data={lightbox} onClose={() => setLightbox(null)} />
     {!me && (
       <div className="fixed inset-0 z-50 flex items-center justify-center bg-stone-900/20 p-4 backdrop-blur-sm">
         <div className="w-full max-w-sm rounded-3xl border-2 border-rose-100 bg-white p-6 text-center shadow-xl">
@@ -1034,6 +1104,7 @@ export default function App() {
         </footer>
       </div>
     </div>
+    </LightboxContext.Provider>
     </IdentityContext.Provider>
   );
 }
