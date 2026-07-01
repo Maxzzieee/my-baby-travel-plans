@@ -33,7 +33,7 @@ import {
   CloudOff,
   Check,
 } from "lucide-react";
-import { hasSupabase, loadState, saveState, subscribe, loadGallery, postImage, deleteImage, subscribeGallery, loadCopy, saveCopy, subscribeCopy, loadMessages, postMessage, subscribeMessages, loadMessageCounts, subscribeAllMessages } from "./lib/supabase";
+import { hasSupabase, loadState, saveState, subscribe, loadGallery, postImage, deleteImage, subscribeGallery, loadCopy, saveCopy, subscribeCopy, loadMessages, postMessage, subscribeMessages, loadMessageCounts, subscribeAllMessages, uploadImage } from "./lib/supabase";
 
 // Which person is on THIS device ("me" | "baby"). Set once, stored locally.
 const IDENTITY_KEY = "maxbaby.identity.v1";
@@ -190,7 +190,7 @@ function fileToBase64(file) {
   });
 }
 
-const EMPTY_DRAFT = { title: "", summary: "", activities: [], location: "", comment: "", want: "", sourceUrl: "", thumb: "" };
+const EMPTY_DRAFT = { title: "", summary: "", activities: [], location: "", comment: "", want: "", sourceUrl: "", thumb: "", photos: [] };
 
 // ---------------------------------------------------------------------------
 // A single saved idea, with its own comment thread
@@ -209,15 +209,21 @@ function SavedIdea({ plan, accent, onDelete, onAddComment }) {
   return (
     <div className="rounded-xl bg-white p-3" style={{ border: `1.5px solid ${accent.border}` }}>
       <div className="flex items-start justify-between gap-2">
-        <div className="flex items-start gap-2">
-          {plan.thumb && <img src={plan.thumb} alt="" className="h-12 w-12 flex-shrink-0 rounded-lg border border-stone-200 object-cover" />}
-          <div>
-            <h4 className="text-sm font-extrabold text-stone-800">{plan.title || "Untitled"}</h4>
-            {plan.summary && <p className="text-xs text-stone-600">{plan.summary}</p>}
-          </div>
+        <div>
+          <h4 className="text-sm font-extrabold text-stone-800">{plan.title || "Untitled"}</h4>
+          {plan.summary && <p className="text-xs text-stone-600">{plan.summary}</p>}
         </div>
         <button onClick={() => onDelete(plan.id)} className="flex-shrink-0 text-stone-300 transition-colors hover:text-rose-400" aria-label="Delete idea"><Trash2 size={14} /></button>
       </div>
+
+      {(plan.thumb || plan.photos?.length > 0) && (
+        <div className="mt-2 flex flex-wrap gap-1.5">
+          {plan.thumb && <img src={plan.thumb} alt="" className="h-20 w-20 rounded-lg border border-stone-200 object-cover" />}
+          {(plan.photos || []).map((src, i) => (
+            <a key={i} href={src} target="_blank" rel="noreferrer"><img src={src} alt="" className="h-20 w-20 rounded-lg border border-stone-200 object-cover transition-transform hover:scale-105" /></a>
+          ))}
+        </div>
+      )}
 
       {plan.activities?.length > 0 && (
         <ul className="mt-2 space-y-1">
@@ -268,8 +274,24 @@ function IdeaBoard({ dest, plans, onAdd, onDelete, onAddComment }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const fileRef = useRef(null);
+  const photoRef = useRef(null);
 
   const reset = () => { setDraft(EMPTY_DRAFT); setHasDraft(false); setUrl(""); setError(""); };
+
+  const addPhoto = async (file) => {
+    if (!file) return;
+    setBusy(true); setError("");
+    try {
+      const src = hasSupabase ? await uploadImage(file) : await fileToBase64(file);
+      if (src) setDraft((d) => ({ ...d, photos: [...(d.photos || []), src] }));
+      setHasDraft(true);
+    } catch (e) {
+      setError(`Couldn't add photo (${e?.message || e}).`);
+    } finally {
+      setBusy(false);
+      if (photoRef.current) photoRef.current.value = "";
+    }
+  };
 
   const applyExtract = (data, extra = {}) => {
     setDraft((d) => ({
@@ -304,8 +326,14 @@ function IdeaBoard({ dest, plans, onAdd, onDelete, onAddComment }) {
     if (!file) return;
     const dataUrl = await fileToBase64(file).catch(() => "");
     const base64 = dataUrl.split(",")[1];
-    setDraft((d) => ({ ...d, thumb: dataUrl }));
-    callExtract({ image: base64, mediaType: file.type || "image/png" }, { thumb: dataUrl });
+    // Keep the screenshot as a photo on the idea: upload to storage when synced,
+    // otherwise fall back to the inline data URL.
+    if (hasSupabase) {
+      uploadImage(file).then((src) => { if (src) setDraft((d) => ({ ...d, photos: [...(d.photos || []), src] })); }).catch(() => {});
+    } else {
+      setDraft((d) => ({ ...d, photos: [...(d.photos || []), dataUrl] }));
+    }
+    callExtract({ image: base64, mediaType: file.type || "image/png" });
   };
 
   const save = () => {
@@ -369,7 +397,21 @@ function IdeaBoard({ dest, plans, onAdd, onDelete, onAddComment }) {
       {/* editable draft */}
       {hasDraft && (
         <div className="mt-4 space-y-3 rounded-xl border-2 border-stone-100 bg-stone-50/50 p-3">
-          {draft.thumb && <img src={draft.thumb} alt="" className="max-h-36 w-auto rounded-lg border border-stone-200 object-contain" />}
+          {/* photos */}
+          <div className="flex flex-wrap gap-2">
+            {draft.thumb && <img src={draft.thumb} alt="" className="h-20 w-20 rounded-lg border border-stone-200 object-cover" />}
+            {(draft.photos || []).map((src, i) => (
+              <div key={i} className="relative">
+                <img src={src} alt="" className="h-20 w-20 rounded-lg border border-stone-200 object-cover" />
+                <button onClick={() => setDraft({ ...draft, photos: draft.photos.filter((_, j) => j !== i) })} className="absolute -right-1.5 -top-1.5 rounded-full bg-white p-0.5 text-stone-400 shadow hover:text-rose-500"><X size={12} /></button>
+              </div>
+            ))}
+            <input ref={photoRef} type="file" accept="image/*" className="hidden" onChange={(e) => addPhoto(e.target.files?.[0])} />
+            <button onClick={() => photoRef.current?.click()} disabled={busy} className="flex h-20 w-20 flex-col items-center justify-center gap-1 rounded-lg border-2 border-dashed border-stone-300 text-stone-400 transition-colors hover:border-rose-200 hover:text-rose-400 disabled:opacity-50">
+              {busy ? <Loader2 size={16} className="animate-spin" /> : <ImageIcon size={16} strokeWidth={2.2} />}
+              <span className="text-[10px] font-bold">Add photo</span>
+            </button>
+          </div>
           <input value={draft.title} onChange={(e) => setDraft({ ...draft, title: e.target.value })} placeholder="Title" className="w-full rounded-lg border-2 border-stone-200 px-3 py-2 text-sm font-bold outline-none focus:border-rose-200" />
           <textarea value={draft.summary} onChange={(e) => setDraft({ ...draft, summary: e.target.value })} rows={2} placeholder="What is this place / idea about?" className="w-full resize-y rounded-lg border-2 border-stone-200 px-3 py-2 text-sm outline-none focus:border-rose-200" />
           {draft.activities.length > 0 && (

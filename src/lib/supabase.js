@@ -114,6 +114,17 @@ export async function postImage(file, who, caption) {
   return ins.data;
 }
 
+// Upload an image to storage and return its public URL (for attaching to ideas).
+export async function uploadImage(file) {
+  if (!supabase) return null;
+  const ext = (file.name.split(".").pop() || "png").toLowerCase();
+  const path = `ideas/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
+  const up = await supabase.storage.from(BUCKET).upload(path, file, { cacheControl: "3600", upsert: false });
+  if (up.error) throw up.error;
+  const { data } = supabase.storage.from(BUCKET).getPublicUrl(path);
+  return data.publicUrl;
+}
+
 export async function deleteImage(item) {
   if (!supabase) return;
   try {
