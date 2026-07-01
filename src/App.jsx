@@ -195,10 +195,11 @@ const EMPTY_DRAFT = { title: "", summary: "", activities: [], location: "", comm
 // ---------------------------------------------------------------------------
 // A single saved idea, with its own comment thread
 // ---------------------------------------------------------------------------
-function SavedIdea({ plan, accent, onDelete, onAddComment }) {
+function SavedIdea({ plan, accent, onDelete, onAddComment, onEdit }) {
   const me = useContext(IdentityContext);
   const [text, setText] = useState("");
   const comments = plan.comments || [];
+  const acts = plan.activities || [];
 
   const add = () => {
     if (!text.trim()) return;
@@ -209,9 +210,9 @@ function SavedIdea({ plan, accent, onDelete, onAddComment }) {
   return (
     <div className="rounded-xl bg-white p-3" style={{ border: `1.5px solid ${accent.border}` }}>
       <div className="flex items-start justify-between gap-2">
-        <div>
-          <h4 className="text-sm font-extrabold text-stone-800">{plan.title || "Untitled"}</h4>
-          {plan.summary && <p className="text-xs text-stone-600">{plan.summary}</p>}
+        <div className="min-w-0">
+          <EditText value={plan.title || ""} onSave={(v) => onEdit(plan.id, { title: v })} placeholder="Untitled" className="text-sm font-extrabold text-stone-800" />
+          <div className="text-xs text-stone-600"><EditText value={plan.summary || ""} onSave={(v) => onEdit(plan.id, { summary: v })} multiline placeholder="add a summary…" className="text-xs" /></div>
         </div>
         <button onClick={() => onDelete(plan.id)} className="flex-shrink-0 text-stone-300 transition-colors hover:text-rose-400" aria-label="Delete idea"><Trash2 size={14} /></button>
       </div>
@@ -225,15 +226,22 @@ function SavedIdea({ plan, accent, onDelete, onAddComment }) {
         </div>
       )}
 
-      {plan.activities?.length > 0 && (
-        <ul className="mt-2 space-y-1">
-          {plan.activities.map((a, i) => (<li key={i} className="flex gap-1.5 text-xs text-stone-500"><span>✨</span><span>{a}</span></li>))}
-        </ul>
-      )}
+      <ul className="mt-2 space-y-1">
+        {acts.map((a, i) => (
+          <li key={i} className="flex items-center gap-1.5 text-xs text-stone-500">
+            <span>✨</span>
+            <EditText value={a} onSave={(v) => onEdit(plan.id, { activities: acts.map((x, j) => (j === i ? v : x)) })} className="text-xs" />
+            <button onClick={() => onEdit(plan.id, { activities: acts.filter((_, j) => j !== i) })} className="text-stone-300 hover:text-rose-400" aria-label="Remove"><X size={11} /></button>
+          </li>
+        ))}
+        <li>
+          <button onClick={() => onEdit(plan.id, { activities: [...acts, "New idea"] })} className="flex items-center gap-1 text-[11px] font-bold text-stone-400 transition-colors hover:text-rose-400"><Plus size={11} strokeWidth={3} /> add activity</button>
+        </li>
+      </ul>
 
-      <div className="mt-2 flex flex-wrap gap-1.5">
-        {plan.want && <span className="rounded-lg px-2 py-1 text-[11px] font-semibold" style={{ backgroundColor: ACCENTS.mint.soft, color: ACCENTS.mint.text }}>🎯 {plan.want}</span>}
-        {plan.comment && <span className="rounded-lg px-2 py-1 text-[11px] text-stone-500" style={{ backgroundColor: accent.soft }}>💬 {plan.comment}</span>}
+      <div className="mt-2 flex flex-wrap items-center gap-1.5">
+        <span className="rounded-lg px-2 py-1 text-[11px] font-semibold" style={{ backgroundColor: ACCENTS.mint.soft, color: ACCENTS.mint.text }}>🎯 <EditText value={plan.want || ""} onSave={(v) => onEdit(plan.id, { want: v })} placeholder="what to do…" className="text-[11px]" /></span>
+        <span className="rounded-lg px-2 py-1 text-[11px] text-stone-500" style={{ backgroundColor: accent.soft }}>💬 <EditText value={plan.comment || ""} onSave={(v) => onEdit(plan.id, { comment: v })} placeholder="note…" className="text-[11px]" /></span>
         {plan.sourceUrl && <a href={plan.sourceUrl} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 rounded-lg bg-stone-100 px-2 py-1 text-[11px] font-semibold text-stone-400 hover:text-rose-400"><ExternalLink size={11} /> source</a>}
       </div>
 
@@ -265,7 +273,7 @@ function SavedIdea({ plan, accent, onDelete, onAddComment }) {
 // ---------------------------------------------------------------------------
 // Per-passport Idea Board (lives inside the deep-dive drawer)
 // ---------------------------------------------------------------------------
-function IdeaBoard({ dest, plans, onAdd, onDelete, onAddComment }) {
+function IdeaBoard({ dest, plans, onAdd, onDelete, onAddComment, onEdit }) {
   const accent = dest.accent;
   const [mode, setMode] = useState("link");
   const [url, setUrl] = useState("");
@@ -442,7 +450,7 @@ function IdeaBoard({ dest, plans, onAdd, onDelete, onAddComment }) {
       {plans.length > 0 && (
         <div className="mt-4 space-y-2.5">
           {plans.map((p) => (
-            <SavedIdea key={p.id} plan={p} accent={accent} onDelete={(planId) => onDelete(dest.id, planId)} onAddComment={(planId, comment) => onAddComment(dest.id, planId, comment)} />
+            <SavedIdea key={p.id} plan={p} accent={accent} onDelete={(planId) => onDelete(dest.id, planId)} onAddComment={(planId, comment) => onAddComment(dest.id, planId, comment)} onEdit={onEdit} />
           ))}
         </div>
       )}
@@ -526,7 +534,7 @@ function DestChat({ dest, isOpen }) {
 // ---------------------------------------------------------------------------
 // Passport card
 // ---------------------------------------------------------------------------
-function PassportCard({ dest, votes, onVote, isOpen, onToggle, plans, onAddPlan, onDeletePlan, onAddComment, overrides, onEditField, unread = 0 }) {
+function PassportCard({ dest, votes, onVote, isOpen, onToggle, plans, onAddPlan, onDeletePlan, onAddComment, overrides, onEditField, unread = 0, onEditPlan }) {
   const accent = dest.accent;
   const budget = BUDGET_TONE[dest.flight.budget];
   const total = votes.max + votes.partner;
@@ -593,7 +601,7 @@ function PassportCard({ dest, votes, onVote, isOpen, onToggle, plans, onAddPlan,
               <p className="text-xs text-stone-500">{E("bcLogic", dest.basecamp.logic, { multiline: true, className: "text-xs text-stone-500" })}</p>
               <p className="mt-1 text-xs italic text-stone-500">{E("bcVibe", dest.basecamp.vibe, { multiline: true, className: "text-xs italic text-stone-500" })}</p>
             </div>
-            <IdeaBoard dest={dest} plans={plans} onAdd={onAddPlan} onDelete={onDeletePlan} onAddComment={onAddComment} />
+            <IdeaBoard dest={dest} plans={plans} onAdd={onAddPlan} onDelete={onDeletePlan} onAddComment={onAddComment} onEdit={(planId, patch) => onEditPlan(dest.id, planId, patch)} />
             <DestChat dest={dest} isOpen={isOpen} />
           </div>
         </div>
@@ -856,6 +864,10 @@ export default function App() {
     ...p,
     [destId]: p[destId].map((x) => (x.id === planId ? { ...x, comments: [...(x.comments || []), comment] } : x)),
   }));
+  const editPlan = (destId, planId, patch) => setPlans((p) => ({
+    ...p,
+    [destId]: p[destId].map((x) => (x.id === planId ? { ...x, ...patch } : x)),
+  }));
 
   const totals = useMemo(() => {
     const out = {}; let sum = 0;
@@ -957,7 +969,7 @@ export default function App() {
         <main className="mt-10 grid grid-cols-1 gap-6 lg:grid-cols-2">
           {DESTINATIONS.map((dest) => (
             <div key={dest.id} className={openId === dest.id ? "lg:col-span-2" : ""}>
-              <PassportCard dest={dest} votes={votes[dest.id]} onVote={handleVote} isOpen={openId === dest.id} onToggle={handleToggle} plans={plans[dest.id]} onAddPlan={addPlan} onDeletePlan={deletePlan} onAddComment={addComment} overrides={copy.dest?.[dest.id]} onEditField={(key, val) => updateDestField(dest.id, key, val)} unread={unreadFor(dest.id)} />
+              <PassportCard dest={dest} votes={votes[dest.id]} onVote={handleVote} isOpen={openId === dest.id} onToggle={handleToggle} plans={plans[dest.id]} onAddPlan={addPlan} onDeletePlan={deletePlan} onAddComment={addComment} overrides={copy.dest?.[dest.id]} onEditField={(key, val) => updateDestField(dest.id, key, val)} unread={unreadFor(dest.id)} onEditPlan={editPlan} />
             </div>
           ))}
         </main>
