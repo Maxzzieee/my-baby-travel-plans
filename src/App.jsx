@@ -33,7 +33,7 @@ import {
   CloudOff,
   Check,
 } from "lucide-react";
-import { hasSupabase, loadState, saveState, subscribe, loadGallery, postImage, deleteImage, subscribeGallery, loadCopy, saveCopy, subscribeCopy } from "./lib/supabase";
+import { hasSupabase, loadState, saveState, subscribe, loadGallery, postImage, deleteImage, subscribeGallery, loadCopy, saveCopy, subscribeCopy, loadMessages, postMessage, subscribeMessages } from "./lib/supabase";
 
 /**
  * My Baby Travel Plans 🧳✨  — Nov 27 – Dec 4
@@ -404,6 +404,80 @@ function IdeaBoard({ dest, plans, onAdd, onDelete, onAddComment }) {
 }
 
 // ---------------------------------------------------------------------------
+// Per-destination live chat (instant, realtime — like IG/YouTube comments)
+// ---------------------------------------------------------------------------
+function DestChat({ dest, isOpen }) {
+  const accent = dest.accent;
+  const [msgs, setMsgs] = useState([]);
+  const [who, setWho] = useState("me");
+  const [text, setText] = useState("");
+  const [sending, setSending] = useState(false);
+  const endRef = useRef(null);
+
+  const refresh = useCallback(async () => { setMsgs(await loadMessages(dest.id)); }, [dest.id]);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    refresh();
+    const unsub = subscribeMessages(dest.id, refresh);
+    return () => unsub();
+  }, [isOpen, dest.id, refresh]);
+
+  useEffect(() => { endRef.current?.scrollIntoView({ behavior: "smooth", block: "nearest" }); }, [msgs.length]);
+
+  const send = async () => {
+    const body = text.trim();
+    if (!body || sending) return;
+    setText(""); setSending(true);
+    // optimistic — show instantly for the sender
+    const optimistic = { id: `tmp_${Date.now()}`, dest: dest.id, who, body, created_at: new Date().toISOString(), _optimistic: true };
+    setMsgs((m) => [...m, optimistic]);
+    await postMessage({ dest: dest.id, who, body });
+    setSending(false);
+    refresh(); // reconcile with server truth (realtime also refreshes both sides)
+  };
+
+  if (!hasSupabase) {
+    return (
+      <div className="rounded-2xl border border-dashed border-stone-300 bg-stone-50/60 p-4 text-center text-xs text-stone-400">
+        💬 Live chat turns on once Supabase sync is connected.
+      </div>
+    );
+  }
+
+  return (
+    <div className="rounded-2xl bg-white p-4" style={{ border: `1.5px solid ${accent.border}` }}>
+      <p className="flex items-center gap-1.5 text-xs font-extrabold uppercase tracking-wide" style={{ color: accent.text }}>
+        <MessageCircle size={14} strokeWidth={2.8} /> Chat · {dest.name}
+      </p>
+
+      <div className="mt-3 max-h-64 space-y-2 overflow-y-auto pr-1">
+        {msgs.length === 0 && <p className="py-4 text-center text-xs text-stone-400">No messages yet — say something 💕</p>}
+        {msgs.map((m) => {
+          const mine = m.who === "me";
+          const wa = m.who === "baby" ? ACCENTS.blush : ACCENTS.winter;
+          return (
+            <div key={m.id} className={`flex ${mine ? "justify-end" : "justify-start"}`}>
+              <div className={`max-w-[82%] rounded-2xl px-3 py-1.5 ${m._optimistic ? "opacity-60" : ""}`} style={{ backgroundColor: wa.soft }}>
+                <span className="mr-1.5 text-[10px] font-extrabold capitalize" style={{ color: wa.text }}>{m.who}</span>
+                <span className="text-sm text-stone-600">{m.body}</span>
+              </div>
+            </div>
+          );
+        })}
+        <div ref={endRef} />
+      </div>
+
+      <div className="mt-3 flex items-center gap-1.5">
+        <button onClick={() => setWho((w) => (w === "me" ? "baby" : "me"))} className="rounded-lg px-2.5 py-2 text-[11px] font-extrabold capitalize transition-colors" style={{ backgroundColor: (who === "baby" ? ACCENTS.blush : ACCENTS.winter).soft, color: (who === "baby" ? ACCENTS.blush : ACCENTS.winter).text }} title="Tap to switch who's typing">{who}</button>
+        <input value={text} onChange={(e) => setText(e.target.value)} onKeyDown={(e) => e.key === "Enter" && send()} placeholder="Type a message…" className="flex-1 rounded-xl border-2 border-stone-200 px-3 py-2 text-sm outline-none focus:border-rose-200" />
+        <button onClick={send} disabled={!text.trim() || sending} className="rounded-xl p-2 transition-all hover:scale-105 active:scale-95 disabled:opacity-40" style={{ backgroundColor: accent.hex, color: accent.text }} aria-label="Send"><Send size={15} strokeWidth={2.8} /></button>
+      </div>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
 // Passport card
 // ---------------------------------------------------------------------------
 function PassportCard({ dest, votes, onVote, isOpen, onToggle, plans, onAddPlan, onDeletePlan, onAddComment, overrides, onEditField }) {
@@ -473,6 +547,7 @@ function PassportCard({ dest, votes, onVote, isOpen, onToggle, plans, onAddPlan,
               <p className="mt-1 text-xs italic text-stone-500">{E("bcVibe", dest.basecamp.vibe, { multiline: true, className: "text-xs italic text-stone-500" })}</p>
             </div>
             <IdeaBoard dest={dest} plans={plans} onAdd={onAddPlan} onDelete={onDeletePlan} onAddComment={onAddComment} />
+            <DestChat dest={dest} isOpen={isOpen} />
           </div>
         </div>
       </div>

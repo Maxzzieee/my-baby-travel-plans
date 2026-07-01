@@ -175,3 +175,42 @@ export function subscribeCopy(onRemote) {
     .subscribe();
   return () => supabase.removeChannel(channel);
 }
+
+// ---------------------------------------------------------------------------
+// Per-destination live chat — append-only `messages` table, realtime
+// ---------------------------------------------------------------------------
+export async function loadMessages(dest) {
+  if (!supabase) return [];
+  try {
+    const { data, error } = await supabase
+      .from("messages")
+      .select("*")
+      .eq("dest", dest)
+      .order("created_at", { ascending: true })
+      .limit(500);
+    if (error) { console.warn("[supabase] loadMessages:", error.message); return []; }
+    return data || [];
+  } catch (e) {
+    console.warn("[supabase] loadMessages failed:", e?.message || e);
+    return [];
+  }
+}
+
+export async function postMessage({ dest, who, body }) {
+  if (!supabase) return;
+  try {
+    const { error } = await supabase.from("messages").insert({ dest, who, body });
+    if (error) console.warn("[supabase] postMessage:", error.message);
+  } catch (e) {
+    console.warn("[supabase] postMessage failed:", e?.message || e);
+  }
+}
+
+export function subscribeMessages(dest, onChange) {
+  if (!supabase) return () => {};
+  const channel = supabase
+    .channel(`messages_${dest}`)
+    .on("postgres_changes", { event: "*", schema: "public", table: "messages", filter: `dest=eq.${dest}` }, () => onChange())
+    .subscribe();
+  return () => supabase.removeChannel(channel);
+}

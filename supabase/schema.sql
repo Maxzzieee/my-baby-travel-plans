@@ -29,10 +29,23 @@ alter table public.gallery enable row level security;
 drop policy if exists "gallery anon all" on public.gallery;
 create policy "gallery anon all" on public.gallery for all using (true) with check (true);
 
+-- 2b) Per-destination live chat (instant, append-only) -------------------------
+create table if not exists public.messages (
+  id uuid primary key default gen_random_uuid(),
+  dest text not null,
+  who text,
+  body text not null,
+  created_at timestamptz default now()
+);
+alter table public.messages enable row level security;
+drop policy if exists "messages anon all" on public.messages;
+create policy "messages anon all" on public.messages for all using (true) with check (true);
+
 -- 3) Realtime (ignore "already member" if you re-run) ---------------------------
 do $$ begin
   begin alter publication supabase_realtime add table public.trip_state; exception when others then null; end;
   begin alter publication supabase_realtime add table public.gallery;    exception when others then null; end;
+  begin alter publication supabase_realtime add table public.messages;   exception when others then null; end;
 end $$;
 
 -- 4) Storage bucket for uploaded images ----------------------------------------
