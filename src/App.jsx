@@ -198,8 +198,25 @@ const EMPTY_DRAFT = { title: "", summary: "", activities: [], location: "", comm
 function SavedIdea({ plan, accent, onDelete, onAddComment, onEdit }) {
   const me = useContext(IdentityContext);
   const [text, setText] = useState("");
+  const [uploading, setUploading] = useState(false);
+  const photoRef = useRef(null);
   const comments = plan.comments || [];
   const acts = plan.activities || [];
+  const photos = plan.photos || [];
+
+  const addPhoto = async (file) => {
+    if (!file) return;
+    setUploading(true);
+    try {
+      const src = hasSupabase ? await uploadImage(file) : await fileToBase64(file);
+      if (src) onEdit(plan.id, { photos: [...photos, src] });
+    } catch (e) {
+      console.warn("add photo failed:", e?.message || e);
+    } finally {
+      setUploading(false);
+      if (photoRef.current) photoRef.current.value = "";
+    }
+  };
 
   const add = () => {
     if (!text.trim()) return;
@@ -217,14 +234,20 @@ function SavedIdea({ plan, accent, onDelete, onAddComment, onEdit }) {
         <button onClick={() => onDelete(plan.id)} className="flex-shrink-0 text-stone-300 transition-colors hover:text-rose-400" aria-label="Delete idea"><Trash2 size={14} /></button>
       </div>
 
-      {(plan.thumb || plan.photos?.length > 0) && (
-        <div className="mt-2 flex flex-wrap gap-1.5">
-          {plan.thumb && <img src={plan.thumb} alt="" className="h-20 w-20 rounded-lg border border-stone-200 object-cover" />}
-          {(plan.photos || []).map((src, i) => (
-            <a key={i} href={src} target="_blank" rel="noreferrer"><img src={src} alt="" className="h-20 w-20 rounded-lg border border-stone-200 object-cover transition-transform hover:scale-105" /></a>
-          ))}
-        </div>
-      )}
+      <div className="mt-2 flex flex-wrap gap-1.5">
+        {plan.thumb && <img src={plan.thumb} alt="" className="h-20 w-20 rounded-lg border border-stone-200 object-cover" />}
+        {photos.map((src, i) => (
+          <div key={i} className="relative">
+            <a href={src} target="_blank" rel="noreferrer"><img src={src} alt="" className="h-20 w-20 rounded-lg border border-stone-200 object-cover transition-transform hover:scale-105" /></a>
+            <button onClick={() => onEdit(plan.id, { photos: photos.filter((_, j) => j !== i) })} className="absolute -right-1.5 -top-1.5 rounded-full bg-white p-0.5 text-stone-400 shadow hover:text-rose-500" aria-label="Remove photo"><X size={12} /></button>
+          </div>
+        ))}
+        <input ref={photoRef} type="file" accept="image/*" className="hidden" onChange={(e) => addPhoto(e.target.files?.[0])} />
+        <button onClick={() => photoRef.current?.click()} disabled={uploading} className="flex h-20 w-20 flex-col items-center justify-center gap-1 rounded-lg border-2 border-dashed border-stone-300 text-stone-400 transition-colors hover:border-rose-200 hover:text-rose-400 disabled:opacity-50">
+          {uploading ? <Loader2 size={16} className="animate-spin" /> : <ImageIcon size={16} strokeWidth={2.2} />}
+          <span className="text-[10px] font-bold">Add photo</span>
+        </button>
+      </div>
 
       <ul className="mt-2 space-y-1">
         {acts.map((a, i) => (
