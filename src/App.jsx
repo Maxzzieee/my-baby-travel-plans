@@ -406,38 +406,43 @@ function IdeaBoard({ dest, plans, onAdd, onDelete, onAddComment }) {
 // ---------------------------------------------------------------------------
 // Passport card
 // ---------------------------------------------------------------------------
-function PassportCard({ dest, votes, onVote, isOpen, onToggle, plans, onAddPlan, onDeletePlan, onAddComment }) {
+function PassportCard({ dest, votes, onVote, isOpen, onToggle, plans, onAddPlan, onDeletePlan, onAddComment, overrides, onEditField }) {
   const accent = dest.accent;
   const budget = BUDGET_TONE[dest.flight.budget];
   const total = votes.max + votes.partner;
   const isTopPick = dest.recommendation.rank === 1;
   const planCount = plans.length;
+  const t = (key, fallback) => (overrides && overrides[key] != null ? overrides[key] : fallback);
+  const E = (key, fallback, opts = {}) => <EditText value={t(key, fallback)} onSave={(v) => onEditField(key, v)} {...opts} />;
 
   return (
     <div className="overflow-hidden rounded-3xl bg-white/90 shadow-sm backdrop-blur transition-all" style={{ border: `1.5px solid ${isOpen ? accent.border : "#EBE5DB"}` }}>
-      {/* Compact header — tap to expand */}
-      <button onClick={() => onToggle(dest.id)} className="flex w-full items-center gap-3 px-5 py-4 text-left transition-colors hover:bg-stone-50/50">
+      {/* Compact header — tap to expand (text is click-to-edit) */}
+      <div onClick={() => onToggle(dest.id)} className="flex w-full cursor-pointer items-center gap-3 px-5 py-4 transition-colors hover:bg-stone-50/50">
         <span className="text-2xl leading-none">{dest.emoji}</span>
         <div className="min-w-0 flex-1">
-          <div className="flex items-center gap-2">
-            <h3 className="truncate text-lg font-extrabold text-stone-800">{dest.name}</h3>
+          <div className="flex flex-wrap items-center gap-2">
+            {E("name", dest.name, { className: "text-lg font-extrabold text-stone-800" })}
             {isTopPick && <span className="flex items-center gap-0.5 rounded-full bg-amber-100 px-1.5 py-0.5 text-[9px] font-extrabold uppercase text-amber-600"><Crown size={9} strokeWidth={3} fill="#FCD34D" />Top</span>}
             {planCount > 0 && <span className="flex items-center gap-0.5 rounded-full px-1.5 py-0.5 text-[9px] font-extrabold" style={{ backgroundColor: accent.soft, color: accent.text }}><NotebookPen size={9} strokeWidth={3} />{planCount}</span>}
           </div>
-          <p className="mt-0.5 truncate text-xs text-stone-400"><span className="font-bold" style={{ color: accent.text }}>{dest.flight.price}</span> · {dest.weather.range} · sunset {dest.sunset}</p>
+          <p className="mt-0.5 text-xs text-stone-400"><span className="font-bold" style={{ color: accent.text }}>{t("flightPrice", dest.flight.price)}</span> · {t("weatherRange", dest.weather.range)} · sunset {t("sunset", dest.sunset)}</p>
         </div>
         <div className="flex items-center gap-1 rounded-xl px-2.5 py-1.5" style={{ backgroundColor: accent.soft }}>
           <Heart size={15} strokeWidth={2.5} style={{ color: accent.text, fill: total > 0 ? accent.hex : "transparent" }} />
           <span className="text-sm font-extrabold tabular-nums" style={{ color: accent.text }}>{total}</span>
         </div>
         <ChevronDown size={18} strokeWidth={2.8} className="text-stone-300 transition-transform duration-300" style={{ transform: isOpen ? "rotate(180deg)" : "rotate(0deg)" }} />
-      </button>
+      </div>
 
       {/* Expandable detail */}
       <div className="grid transition-all duration-500 ease-out" style={{ gridTemplateRows: isOpen ? "1fr" : "0fr" }}>
         <div className="overflow-hidden">
           <div className="space-y-4 px-5 pb-6" style={{ borderTop: `1.5px dashed ${accent.border}` }}>
-            <p className="pt-4 text-sm italic text-stone-500">"{dest.tagline}"</p>
+            <div className="pt-4">
+              <p className="text-sm italic text-stone-500">{E("tagline", dest.tagline, { multiline: true, className: "italic" })}</p>
+              <p className="mt-1 flex items-center gap-1 text-xs text-stone-400"><MapPin size={11} strokeWidth={2.6} />{E("region", dest.region, { className: "text-xs" })}</p>
+            </div>
 
             <div>
               <p className="mb-2 text-[11px] font-bold uppercase tracking-wide text-stone-400">Who wants it?</p>
@@ -453,19 +458,19 @@ function PassportCard({ dest, votes, onVote, isOpen, onToggle, plans, onAddPlan,
             </div>
 
             <div className="grid grid-cols-2 gap-4 rounded-2xl p-4" style={{ backgroundColor: accent.soft + "80" }}>
-              <StatRow icon={dest.weather.snowIcon ? CloudSnow : Thermometer} label="Weather" value={dest.weather.range} accent={accent} />
-              <StatRow icon={Sunset} label="Sunset" value={dest.sunset} accent={accent} />
-              <StatRow icon={Plane} label="Flight" value={dest.flight.price} accent={accent} />
-              <StatRow icon={Wallet} label="Stay / night" value={dest.basecamp.price} accent={accent} />
+              <StatRow icon={dest.weather.snowIcon ? CloudSnow : Thermometer} label="Weather" value={E("weatherRange", dest.weather.range, { className: "text-sm font-semibold text-stone-700" })} accent={accent} />
+              <StatRow icon={Sunset} label="Sunset" value={E("sunset", dest.sunset, { className: "text-sm font-semibold text-stone-700" })} accent={accent} />
+              <StatRow icon={Plane} label="Flight" value={E("flightPrice", dest.flight.price, { className: "text-sm font-semibold text-stone-700" })} accent={accent} />
+              <StatRow icon={Wallet} label="Stay / night" value={E("stayPrice", dest.basecamp.price, { className: "text-sm font-semibold text-stone-700" })} accent={accent} />
             </div>
-            <p className="text-xs text-stone-400">{budget.emoji} {budget.label} · {dest.flight.carrier} · {dest.weather.label}, {dest.weather.snow}</p>
+            <p className="text-xs text-stone-400">{budget.emoji} {budget.label} · {E("carrier", dest.flight.carrier, { className: "text-xs" })} · {E("weatherLabel", dest.weather.label, { className: "text-xs" })}, {E("weatherSnow", dest.weather.snow, { multiline: true, className: "text-xs" })}</p>
 
             <LiveWeather coords={dest.coords} accent={accent} />
             <div className="rounded-2xl p-4" style={{ backgroundColor: accent.soft, border: `1.5px solid ${accent.border}` }}>
               <p className="flex items-center gap-1.5 text-xs font-extrabold uppercase tracking-wide" style={{ color: accent.text }}><Train size={14} strokeWidth={2.8} /> Basecamp</p>
-              <p className="mt-1 text-sm font-bold text-stone-700">{dest.basecamp.station}</p>
-              <p className="text-xs text-stone-500">{dest.basecamp.logic}</p>
-              <p className="mt-1 text-xs italic text-stone-500">{dest.basecamp.vibe}</p>
+              <p className="mt-1 text-sm font-bold text-stone-700">{E("bcStation", dest.basecamp.station, { className: "text-sm font-bold text-stone-700" })}</p>
+              <p className="text-xs text-stone-500">{E("bcLogic", dest.basecamp.logic, { multiline: true, className: "text-xs text-stone-500" })}</p>
+              <p className="mt-1 text-xs italic text-stone-500">{E("bcVibe", dest.basecamp.vibe, { multiline: true, className: "text-xs italic text-stone-500" })}</p>
             </div>
             <IdeaBoard dest={dest} plans={plans} onAdd={onAddPlan} onDelete={onDeletePlan} onAddComment={onAddComment} />
           </div>
@@ -512,6 +517,30 @@ function Editable({ value, onSave, className = "", rows = 4, center = true }) {
     <span className="group relative inline">
       <span className={className}>{value}</span>
       <button onClick={() => setEditing(true)} title="Edit — saved for both of you" className="ml-1.5 inline-flex translate-y-[1px] align-middle text-stone-300 opacity-60 transition-opacity hover:text-rose-400 sm:opacity-0 sm:group-hover:opacity-100"><PenLine size={13} /></button>
+    </span>
+  );
+}
+
+// Click-to-edit inline text. Click the text → type → Enter/blur saves (for both).
+function EditText({ value, onSave, className = "", multiline = false, placeholder = "text" }) {
+  const [editing, setEditing] = useState(false);
+  const [v, setV] = useState(value);
+  useEffect(() => { setV(value); }, [value]);
+
+  const commit = () => { setEditing(false); const nv = (v ?? "").trim(); if (nv && nv !== value) onSave(nv); };
+  const stop = (e) => e.stopPropagation();
+
+  if (editing) {
+    const common = { autoFocus: true, value: v, onClick: stop, onChange: (e) => setV(e.target.value), onBlur: commit };
+    return multiline ? (
+      <textarea {...common} rows={2} className={`w-full resize-y rounded-lg border border-rose-200 bg-white px-2 py-1 outline-none ${className}`} />
+    ) : (
+      <input {...common} onKeyDown={(e) => { if (e.key === "Enter") commit(); if (e.key === "Escape") { setV(value); setEditing(false); } }} className={`rounded-lg border border-rose-200 bg-white px-2 py-0.5 outline-none ${className}`} />
+    );
+  }
+  return (
+    <span onClick={(e) => { stop(e); setEditing(true); }} className={`cursor-text rounded px-0.5 transition-colors hover:bg-rose-50 ${className}`} title="Click to edit — saved for both">
+      {value || <span className="italic text-stone-300">{placeholder}</span>}
     </span>
   );
 }
@@ -618,6 +647,7 @@ export default function App() {
   const copyHydrated = useRef(false);
   const lastCopy = useRef(null);
   const updateCopy = (key, val) => setCopy((c) => ({ ...c, [key]: val }));
+  const updateDestField = (destId, key, val) => setCopy((c) => ({ ...c, dest: { ...(c.dest || {}), [destId]: { ...((c.dest || {})[destId] || {}), [key]: val } } }));
 
   // Shared editable copy: load + subscribe + debounced save
   useEffect(() => {
@@ -764,7 +794,7 @@ export default function App() {
         <main className="mt-10 grid grid-cols-1 gap-6 lg:grid-cols-2">
           {DESTINATIONS.map((dest) => (
             <div key={dest.id} className={openId === dest.id ? "lg:col-span-2" : ""}>
-              <PassportCard dest={dest} votes={votes[dest.id]} onVote={handleVote} isOpen={openId === dest.id} onToggle={handleToggle} plans={plans[dest.id]} onAddPlan={addPlan} onDeletePlan={deletePlan} onAddComment={addComment} />
+              <PassportCard dest={dest} votes={votes[dest.id]} onVote={handleVote} isOpen={openId === dest.id} onToggle={handleToggle} plans={plans[dest.id]} onAddPlan={addPlan} onDeletePlan={deletePlan} onAddComment={addComment} overrides={copy.dest?.[dest.id]} onEditField={(key, val) => updateDestField(dest.id, key, val)} />
             </div>
           ))}
         </main>
