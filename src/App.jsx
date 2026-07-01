@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect, useCallback, useRef } from "react";
+import React, { useState, useMemo, useEffect, useCallback, useRef, useContext } from "react";
 import {
   Heart,
   Plane,
@@ -33,7 +33,13 @@ import {
   CloudOff,
   Check,
 } from "lucide-react";
-import { hasSupabase, loadState, saveState, subscribe, loadGallery, postImage, deleteImage, subscribeGallery, loadCopy, saveCopy, subscribeCopy, loadMessages, postMessage, subscribeMessages } from "./lib/supabase";
+import { hasSupabase, loadState, saveState, subscribe, loadGallery, postImage, deleteImage, subscribeGallery, loadCopy, saveCopy, subscribeCopy, loadMessages, postMessage, subscribeMessages, loadMessageCounts, subscribeAllMessages } from "./lib/supabase";
+
+// Which person is on THIS device ("me" | "baby"). Set once, stored locally.
+const IDENTITY_KEY = "maxbaby.identity.v1";
+const SEEN_KEY = "maxbaby.seen.v1";
+const IdentityContext = React.createContext("me");
+const WHO_NAME = { me: "Me", baby: "Ants" };
 
 /**
  * My Baby Travel Plans 🧳✨  — Nov 27 – Dec 4
@@ -190,13 +196,13 @@ const EMPTY_DRAFT = { title: "", summary: "", activities: [], location: "", comm
 // A single saved idea, with its own comment thread
 // ---------------------------------------------------------------------------
 function SavedIdea({ plan, accent, onDelete, onAddComment }) {
+  const me = useContext(IdentityContext);
   const [text, setText] = useState("");
-  const [who, setWho] = useState("me");
   const comments = plan.comments || [];
 
   const add = () => {
     if (!text.trim()) return;
-    onAddComment(plan.id, { id: `c_${Date.now()}`, who, text: text.trim(), at: Date.now() });
+    onAddComment(plan.id, { id: `c_${Date.now()}`, who: me, text: text.trim(), at: Date.now() });
     setText("");
   };
 
@@ -234,7 +240,7 @@ function SavedIdea({ plan, accent, onDelete, onAddComment }) {
               const ca = c.who === "baby" ? ACCENTS.blush : ACCENTS.winter;
               return (
                 <div key={c.id} className="flex items-start gap-1.5 text-xs">
-                  <span className="mt-0.5 rounded-md px-1.5 py-0.5 text-[10px] font-extrabold capitalize" style={{ backgroundColor: ca.soft, color: ca.text }}>{c.who}</span>
+                  <span className="mt-0.5 rounded-md px-1.5 py-0.5 text-[10px] font-extrabold" style={{ backgroundColor: ca.soft, color: ca.text }}>{WHO_NAME[c.who] || "?"}</span>
                   <span className="text-stone-600">{c.text}</span>
                 </div>
               );
@@ -242,8 +248,7 @@ function SavedIdea({ plan, accent, onDelete, onAddComment }) {
           </div>
         )}
         <div className="mt-2 flex items-center gap-1.5">
-          <button onClick={() => setWho((w) => (w === "me" ? "baby" : "me"))} className="rounded-md px-2 py-1.5 text-[10px] font-extrabold capitalize transition-colors" style={{ backgroundColor: (who === "baby" ? ACCENTS.blush : ACCENTS.winter).soft, color: (who === "baby" ? ACCENTS.blush : ACCENTS.winter).text }} title="Tap to switch who's commenting">{who}</button>
-          <input value={text} onChange={(e) => setText(e.target.value)} onKeyDown={(e) => e.key === "Enter" && add()} placeholder="Add a comment…" className="flex-1 rounded-lg border-2 border-stone-200 px-2.5 py-1.5 text-xs outline-none focus:border-rose-200" />
+          <input value={text} onChange={(e) => setText(e.target.value)} onKeyDown={(e) => e.key === "Enter" && add()} placeholder={`Comment as ${WHO_NAME[me]}…`} className="flex-1 rounded-lg border-2 border-stone-200 px-2.5 py-1.5 text-xs outline-none focus:border-rose-200" />
           <button onClick={add} disabled={!text.trim()} className="rounded-lg p-1.5 transition-all hover:scale-105 active:scale-95 disabled:opacity-40" style={{ backgroundColor: accent.hex, color: accent.text }} aria-label="Send comment"><Send size={13} strokeWidth={2.8} /></button>
         </div>
       </div>
@@ -408,8 +413,8 @@ function IdeaBoard({ dest, plans, onAdd, onDelete, onAddComment }) {
 // ---------------------------------------------------------------------------
 function DestChat({ dest, isOpen }) {
   const accent = dest.accent;
+  const me = useContext(IdentityContext);
   const [msgs, setMsgs] = useState([]);
-  const [who, setWho] = useState("me");
   const [text, setText] = useState("");
   const [sending, setSending] = useState(false);
   const endRef = useRef(null);
@@ -430,9 +435,9 @@ function DestChat({ dest, isOpen }) {
     if (!body || sending) return;
     setText(""); setSending(true);
     // optimistic — show instantly for the sender
-    const optimistic = { id: `tmp_${Date.now()}`, dest: dest.id, who, body, created_at: new Date().toISOString(), _optimistic: true };
+    const optimistic = { id: `tmp_${Date.now()}`, dest: dest.id, who: me, body, created_at: new Date().toISOString(), _optimistic: true };
     setMsgs((m) => [...m, optimistic]);
-    await postMessage({ dest: dest.id, who, body });
+    await postMessage({ dest: dest.id, who: me, body });
     setSending(false);
     refresh(); // reconcile with server truth (realtime also refreshes both sides)
   };
@@ -454,12 +459,12 @@ function DestChat({ dest, isOpen }) {
       <div className="mt-3 max-h-64 space-y-2 overflow-y-auto pr-1">
         {msgs.length === 0 && <p className="py-4 text-center text-xs text-stone-400">No messages yet — say something 💕</p>}
         {msgs.map((m) => {
-          const mine = m.who === "me";
+          const mine = m.who === me;
           const wa = m.who === "baby" ? ACCENTS.blush : ACCENTS.winter;
           return (
             <div key={m.id} className={`flex ${mine ? "justify-end" : "justify-start"}`}>
               <div className={`max-w-[82%] rounded-2xl px-3 py-1.5 ${m._optimistic ? "opacity-60" : ""}`} style={{ backgroundColor: wa.soft }}>
-                <span className="mr-1.5 text-[10px] font-extrabold capitalize" style={{ color: wa.text }}>{m.who}</span>
+                <span className="mr-1.5 text-[10px] font-extrabold" style={{ color: wa.text }}>{WHO_NAME[m.who] || "?"}</span>
                 <span className="text-sm text-stone-600">{m.body}</span>
               </div>
             </div>
@@ -469,8 +474,7 @@ function DestChat({ dest, isOpen }) {
       </div>
 
       <div className="mt-3 flex items-center gap-1.5">
-        <button onClick={() => setWho((w) => (w === "me" ? "baby" : "me"))} className="rounded-lg px-2.5 py-2 text-[11px] font-extrabold capitalize transition-colors" style={{ backgroundColor: (who === "baby" ? ACCENTS.blush : ACCENTS.winter).soft, color: (who === "baby" ? ACCENTS.blush : ACCENTS.winter).text }} title="Tap to switch who's typing">{who}</button>
-        <input value={text} onChange={(e) => setText(e.target.value)} onKeyDown={(e) => e.key === "Enter" && send()} placeholder="Type a message…" className="flex-1 rounded-xl border-2 border-stone-200 px-3 py-2 text-sm outline-none focus:border-rose-200" />
+        <input value={text} onChange={(e) => setText(e.target.value)} onKeyDown={(e) => e.key === "Enter" && send()} placeholder={`Message as ${WHO_NAME[me]}…`} className="flex-1 rounded-xl border-2 border-stone-200 px-3 py-2 text-sm outline-none focus:border-rose-200" />
         <button onClick={send} disabled={!text.trim() || sending} className="rounded-xl p-2 transition-all hover:scale-105 active:scale-95 disabled:opacity-40" style={{ backgroundColor: accent.hex, color: accent.text }} aria-label="Send"><Send size={15} strokeWidth={2.8} /></button>
       </div>
     </div>
@@ -480,7 +484,7 @@ function DestChat({ dest, isOpen }) {
 // ---------------------------------------------------------------------------
 // Passport card
 // ---------------------------------------------------------------------------
-function PassportCard({ dest, votes, onVote, isOpen, onToggle, plans, onAddPlan, onDeletePlan, onAddComment, overrides, onEditField }) {
+function PassportCard({ dest, votes, onVote, isOpen, onToggle, plans, onAddPlan, onDeletePlan, onAddComment, overrides, onEditField, unread = 0 }) {
   const accent = dest.accent;
   const budget = BUDGET_TONE[dest.flight.budget];
   const total = votes.max + votes.partner;
@@ -499,6 +503,7 @@ function PassportCard({ dest, votes, onVote, isOpen, onToggle, plans, onAddPlan,
             {E("name", dest.name, { className: "text-lg font-extrabold text-stone-800" })}
             {isTopPick && <span className="flex items-center gap-0.5 rounded-full bg-amber-100 px-1.5 py-0.5 text-[9px] font-extrabold uppercase text-amber-600"><Crown size={9} strokeWidth={3} fill="#FCD34D" />Top</span>}
             {planCount > 0 && <span className="flex items-center gap-0.5 rounded-full px-1.5 py-0.5 text-[9px] font-extrabold" style={{ backgroundColor: accent.soft, color: accent.text }}><NotebookPen size={9} strokeWidth={3} />{planCount}</span>}
+            {!isOpen && unread > 0 && <span key={unread} className="flex animate-pop items-center gap-0.5 rounded-full bg-rose-500 px-1.5 py-0.5 text-[9px] font-extrabold text-white"><MessageCircle size={9} strokeWidth={3} />{unread} new</span>}
           </div>
           <p className="mt-0.5 text-xs text-stone-400"><span className="font-bold" style={{ color: accent.text }}>{t("flightPrice", dest.flight.price)}</span> · {t("weatherRange", dest.weather.range)} · sunset {t("sunset", dest.sunset)}</p>
         </div>
@@ -562,7 +567,7 @@ const emptyVotes = () => DESTINATIONS.reduce((acc, d) => ({ ...acc, [d.id]: { ma
 const emptyPlans = () => DESTINATIONS.reduce((acc, d) => ({ ...acc, [d.id]: [] }), {});
 const mergeVotes = (raw) => { const base = emptyVotes(); if (raw) for (const id of Object.keys(base)) if (raw[id]) base[id] = { max: raw[id].max || 0, partner: raw[id].partner || 0 }; return base; };
 const mergePlans = (raw) => { const base = emptyPlans(); if (raw) for (const id of Object.keys(base)) if (Array.isArray(raw[id])) base[id] = raw[id]; return base; };
-const WHO_LABEL = { max: "Me", partner: "Baby" };
+const WHO_LABEL = { max: "Me", partner: "Ants" };
 
 const COPY_KEY = "maxbaby.copy.v1";
 const DEFAULT_COPY = {
@@ -624,8 +629,8 @@ function EditText({ value, onSave, className = "", multiline = false, placeholde
 // Photos & Memes wall (shared, realtime via Supabase Storage)
 // ---------------------------------------------------------------------------
 function MemeWall() {
+  const me = useContext(IdentityContext);
   const [items, setItems] = useState([]);
-  const [who, setWho] = useState("me");
   const [caption, setCaption] = useState("");
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
@@ -637,7 +642,7 @@ function MemeWall() {
   const onFile = async (file) => {
     if (!file) return;
     setBusy(true); setErr("");
-    try { await postImage(file, who, caption.trim()); setCaption(""); await refresh(); }
+    try { await postImage(file, me, caption.trim()); setCaption(""); await refresh(); }
     catch (e) { setErr(e?.message || "Upload failed"); }
     finally { setBusy(false); if (fileRef.current) fileRef.current.value = ""; }
   };
@@ -652,7 +657,7 @@ function MemeWall() {
       <p className="mt-1 text-center text-sm text-stone-400">Post pics &amp; silly memes — they pop up on both our screens in real time 💕</p>
 
       <div className="mx-auto mt-5 flex max-w-2xl flex-col gap-2 rounded-3xl border-2 border-rose-100 bg-white/85 p-4 shadow-sm backdrop-blur sm:flex-row sm:items-center">
-        <button onClick={() => setWho((w) => (w === "me" ? "baby" : "me"))} className="rounded-xl px-3 py-2.5 text-sm font-extrabold capitalize transition-colors" style={{ backgroundColor: (who === "baby" ? ACCENTS.blush : ACCENTS.winter).soft, color: (who === "baby" ? ACCENTS.blush : ACCENTS.winter).text }} title="Tap to switch who's posting">{who}</button>
+        <span className="rounded-xl px-3 py-2.5 text-sm font-extrabold" style={{ backgroundColor: (me === "baby" ? ACCENTS.blush : ACCENTS.winter).soft, color: (me === "baby" ? ACCENTS.blush : ACCENTS.winter).text }} title="Posting as you">{WHO_NAME[me]}</span>
         <input value={caption} onChange={(e) => setCaption(e.target.value)} placeholder="Add a caption (optional)…" className="flex-1 rounded-xl border-2 border-stone-200 px-3 py-2.5 text-sm outline-none focus:border-rose-200" />
         <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={(e) => onFile(e.target.files?.[0])} />
         <button onClick={() => fileRef.current?.click()} disabled={busy} className="flex items-center justify-center gap-1.5 rounded-xl px-4 py-2.5 text-sm font-extrabold text-rose-500 transition-all hover:scale-[1.02] active:scale-95 disabled:opacity-50" style={{ backgroundColor: ACCENTS.blush.hex, border: `1.5px solid ${ACCENTS.blush.border}` }}>
@@ -714,6 +719,26 @@ export default function App() {
   const [synced, setSynced] = useState(false);
   const hydrated = useRef(false);
   const lastSynced = useRef(null);
+
+  // Device identity — who is using this device
+  const [me, setMe] = useState(() => { try { return localStorage.getItem(IDENTITY_KEY) || null; } catch (e) { return null; } });
+  useEffect(() => { if (me) { try { localStorage.setItem(IDENTITY_KEY, me); } catch (e) {} } }, [me]);
+
+  // Unread chat badges — counts per destination vs. what this device has seen
+  const [msgCounts, setMsgCounts] = useState({});
+  const [seen, setSeen] = useState(() => { try { return JSON.parse(localStorage.getItem(SEEN_KEY) || "{}"); } catch (e) { return {}; } });
+  useEffect(() => { try { localStorage.setItem(SEEN_KEY, JSON.stringify(seen)); } catch (e) {} }, [seen]);
+  useEffect(() => {
+    if (!hasSupabase) return;
+    let unsub = () => {};
+    (async () => {
+      setMsgCounts(await loadMessageCounts());
+      unsub = subscribeAllMessages(async () => setMsgCounts(await loadMessageCounts()));
+    })();
+    return () => unsub();
+  }, []);
+  useEffect(() => { if (openId) setSeen((s) => ({ ...s, [openId]: msgCounts[openId] || 0 })); }, [openId, msgCounts]);
+  const unreadFor = (id) => Math.max(0, (msgCounts[id] || 0) - (seen[id] || 0));
 
   const [copy, setCopy] = useState(() => {
     try { const s = localStorage.getItem(COPY_KEY); if (s) return { ...DEFAULT_COPY, ...JSON.parse(s) }; } catch (e) {}
@@ -803,8 +828,22 @@ export default function App() {
   }, [totals]);
 
   const totalIdeas = useMemo(() => Object.values(plans).reduce((n, arr) => n + arr.length, 0), [plans]);
+  const totalUnread = DESTINATIONS.reduce((n, d) => n + unreadFor(d.id), 0);
 
   return (
+    <IdentityContext.Provider value={me || "me"}>
+    {!me && (
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-stone-900/20 p-4 backdrop-blur-sm">
+        <div className="w-full max-w-sm rounded-3xl border-2 border-rose-100 bg-white p-6 text-center shadow-xl">
+          <h2 className="text-xl font-black text-stone-800">Who's on this device? 💕</h2>
+          <p className="mt-1 text-sm text-stone-400">So your messages, comments &amp; memes get tagged as you. You can switch anytime.</p>
+          <div className="mt-5 grid grid-cols-2 gap-3">
+            <button onClick={() => setMe("me")} className="rounded-2xl px-4 py-5 text-lg font-extrabold transition-transform hover:scale-[1.03] active:scale-95" style={{ backgroundColor: ACCENTS.winter.soft, color: ACCENTS.winter.text, border: `2px solid ${ACCENTS.winter.border}` }}>{WHO_NAME.me}</button>
+            <button onClick={() => setMe("baby")} className="rounded-2xl px-4 py-5 text-lg font-extrabold transition-transform hover:scale-[1.03] active:scale-95" style={{ backgroundColor: ACCENTS.blush.hex, color: ACCENTS.blush.text, border: `2px solid ${ACCENTS.blush.border}` }}>{WHO_NAME.baby}</button>
+          </div>
+        </div>
+      </div>
+    )}
     <div className="min-h-screen w-full font-sans text-stone-800" style={{ backgroundColor: "#FFFDF9", backgroundImage: "radial-gradient(circle at 15% 10%, #FFF5F0 0, transparent 45%), radial-gradient(circle at 85% 90%, #EEF6F1 0, transparent 48%)" }}>
       <div className="pointer-events-none fixed inset-0 opacity-[0.18]" style={{ backgroundImage: "radial-gradient(#EEE8DE 1px, transparent 1px)", backgroundSize: "26px 26px" }} />
 
@@ -813,7 +852,7 @@ export default function App() {
           <div className="mx-auto inline-flex items-center gap-2 rounded-full border-2 border-rose-100 bg-white/80 px-4 py-1.5 text-xs font-extrabold uppercase tracking-[0.2em] text-rose-400 shadow-sm backdrop-blur">
             <Calendar size={13} strokeWidth={3} /> Nov 27 – Dec 4
           </div>
-          <h1 className="mt-5 text-4xl font-black tracking-tight text-stone-800 sm:text-5xl">Me &amp; Baby <span className="text-rose-300">♥</span> Travel Plans</h1>
+          <h1 className="mt-5 text-4xl font-black tracking-tight text-stone-800 sm:text-5xl">Me &amp; Ants <span className="text-rose-300">♥</span> Travel Plans</h1>
           <p className="mt-3 text-base font-semibold text-stone-500 sm:text-lg">
             <Editable value={copy.subtitle} onSave={(v) => updateCopy("subtitle", v)} rows={2} />
           </p>
@@ -828,8 +867,9 @@ export default function App() {
           ].map((t) => {
             const active = view === t.id;
             return (
-              <button key={t.id} onClick={() => setView(t.id)} className="flex flex-1 items-center justify-center gap-1.5 rounded-xl px-3 py-2 text-sm font-extrabold transition-all" style={{ backgroundColor: active ? ACCENTS.blush.hex : "transparent", color: active ? ACCENTS.blush.text : "#A8A29E" }}>
+              <button key={t.id} onClick={() => setView(t.id)} className="relative flex flex-1 items-center justify-center gap-1.5 rounded-xl px-3 py-2 text-sm font-extrabold transition-all" style={{ backgroundColor: active ? ACCENTS.blush.hex : "transparent", color: active ? ACCENTS.blush.text : "#A8A29E" }}>
                 <t.icon size={15} strokeWidth={2.8} /> {t.label}
+                {t.id === "plan" && totalUnread > 0 && <span key={totalUnread} className="animate-pop rounded-full bg-rose-500 px-1.5 text-[10px] font-extrabold text-white">{totalUnread}</span>}
               </button>
             );
           })}
@@ -858,6 +898,12 @@ export default function App() {
             {synced ? <Cloud size={16} strokeWidth={2.6} style={{ color: ACCENTS.mint.text }} /> : <CloudOff size={16} strokeWidth={2.6} className="text-stone-400" />}
             <span className="text-sm font-bold text-stone-500">{synced ? "Synced live" : "Local only"}</span>
           </div>
+          {me && (
+            <button onClick={() => setMe((x) => (x === "me" ? "baby" : "me"))} className="flex items-center gap-2 rounded-2xl border border-stone-200 bg-white/70 px-4 py-2.5 backdrop-blur transition-colors hover:border-rose-200" title="Switch who this device is">
+              <span className="h-3 w-3 rounded-full" style={{ backgroundColor: (me === "baby" ? ACCENTS.blush : ACCENTS.winter).hex }} />
+              <span className="text-sm font-bold text-stone-500">You: {WHO_NAME[me]}</span>
+            </button>
+          )}
           <div className="flex items-center gap-2 rounded-2xl border border-stone-200 bg-white/70 px-4 py-2.5 backdrop-blur">
             <Trophy size={16} strokeWidth={2.6} style={{ color: leader ? leader.accent.text : "#B8AE9E" }} /><span className="text-sm font-bold text-stone-500">{leader ? <>Leader {leader.name}</> : "Tap a heart to vote"}</span>
           </div>
@@ -869,7 +915,7 @@ export default function App() {
         <main className="mt-10 grid grid-cols-1 gap-6 lg:grid-cols-2">
           {DESTINATIONS.map((dest) => (
             <div key={dest.id} className={openId === dest.id ? "lg:col-span-2" : ""}>
-              <PassportCard dest={dest} votes={votes[dest.id]} onVote={handleVote} isOpen={openId === dest.id} onToggle={handleToggle} plans={plans[dest.id]} onAddPlan={addPlan} onDeletePlan={deletePlan} onAddComment={addComment} overrides={copy.dest?.[dest.id]} onEditField={(key, val) => updateDestField(dest.id, key, val)} />
+              <PassportCard dest={dest} votes={votes[dest.id]} onVote={handleVote} isOpen={openId === dest.id} onToggle={handleToggle} plans={plans[dest.id]} onAddPlan={addPlan} onDeletePlan={deletePlan} onAddComment={addComment} overrides={copy.dest?.[dest.id]} onEditField={(key, val) => updateDestField(dest.id, key, val)} unread={unreadFor(dest.id)} />
             </div>
           ))}
         </main>
@@ -884,7 +930,7 @@ export default function App() {
             <table className="w-full min-w-[760px] text-left text-sm">
               <thead>
                 <tr className="text-[11px] uppercase tracking-wide text-stone-400">
-                  <th className="px-5 py-4 font-extrabold">Destination</th><th className="px-4 py-4 font-extrabold">Flight</th><th className="px-4 py-4 font-extrabold">Weather</th><th className="px-4 py-4 font-extrabold">Sunset</th><th className="px-4 py-4 font-extrabold">Ideas</th><th className="px-4 py-4 font-extrabold">Me</th><th className="px-4 py-4 font-extrabold">Baby</th>
+                  <th className="px-5 py-4 font-extrabold">Destination</th><th className="px-4 py-4 font-extrabold">Flight</th><th className="px-4 py-4 font-extrabold">Weather</th><th className="px-4 py-4 font-extrabold">Sunset</th><th className="px-4 py-4 font-extrabold">Ideas</th><th className="px-4 py-4 font-extrabold">Me</th><th className="px-4 py-4 font-extrabold">Ants</th>
                 </tr>
               </thead>
               <tbody>
@@ -911,5 +957,6 @@ export default function App() {
         </footer>
       </div>
     </div>
+    </IdentityContext.Provider>
   );
 }

@@ -214,3 +214,27 @@ export function subscribeMessages(dest, onChange) {
     .subscribe();
   return () => supabase.removeChannel(channel);
 }
+
+// Message counts per destination (for unread badges), + a global subscription.
+export async function loadMessageCounts() {
+  if (!supabase) return {};
+  try {
+    const { data, error } = await supabase.from("messages").select("dest").limit(5000);
+    if (error) { console.warn("[supabase] loadMessageCounts:", error.message); return {}; }
+    const counts = {};
+    for (const r of data || []) counts[r.dest] = (counts[r.dest] || 0) + 1;
+    return counts;
+  } catch (e) {
+    console.warn("[supabase] loadMessageCounts failed:", e?.message || e);
+    return {};
+  }
+}
+
+export function subscribeAllMessages(onChange) {
+  if (!supabase) return () => {};
+  const channel = supabase
+    .channel("all_messages")
+    .on("postgres_changes", { event: "*", schema: "public", table: "messages" }, () => onChange())
+    .subscribe();
+  return () => supabase.removeChannel(channel);
+}
