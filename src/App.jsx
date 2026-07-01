@@ -35,10 +35,8 @@ import {
   ChevronLeft,
   ChevronRight,
   CalendarDays,
-  Clock,
-  ArrowUp,
-  ArrowDown,
   Bed,
+  Utensils,
 } from "lucide-react";
 import { hasSupabase, loadState, saveState, subscribe, loadGallery, postImage, deleteImage, subscribeGallery, loadCopy, saveCopy, subscribeCopy, loadMessages, postMessage, subscribeMessages, loadMessageCounts, subscribeAllMessages, uploadImage, loadItinerary, addItineraryItem, updateItineraryItem, deleteItineraryItem, subscribeItinerary } from "./lib/supabase";
 
