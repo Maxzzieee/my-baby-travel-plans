@@ -341,7 +341,7 @@ function SavedIdea({ plan, accent, onDelete, onAddComment, onEdit, onAddToItiner
             onPointerUp={endSlide}
             onTouchEnd={endSlide}
             onKeyUp={(e) => { if (e.key === "ArrowLeft" || e.key === "ArrowRight") endSlide(); }}
-            className="h-1.5 min-w-[110px] flex-1 cursor-pointer accent-rose-400"
+            className="h-1.5 min-w-[110px] flex-1 cursor-pointer accent-emerald-400"
             aria-label="Rate 1 to 5 septic fucks"
           />
           <span className="flex items-center gap-1.5 text-[10px] font-bold text-stone-400">
@@ -1023,29 +1023,81 @@ function GlaggleGame({ high, onHigh }) {
 // ---------------------------------------------------------------------------
 // Itinerary — day-by-day timed planner (per destination)
 // ---------------------------------------------------------------------------
-function ItineraryRow({ item, accent, onUpdate, onRemove }) {
-  const meta = KIND_META[item.kind] || KIND_META.activity;
-  const [f, setF] = useState({ title: item.title || "", place: item.place || "", notes: item.notes || "" });
-  useEffect(() => { setF({ title: item.title || "", place: item.place || "", notes: item.notes || "" }); }, [item.id]);
-  const commit = (key) => { if (f[key] !== (item[key] || "")) onUpdate(item.id, { [key]: f[key] }); };
-  const isStay = item.kind === "stay";
+// Calendar-grid helpers — Google-Calendar-style week view
+const DAY_START_H = 6;   // grid runs 06:00 → 24:00
+const DAY_END_H = 24;
+const HOUR_PX = 44;
+const toMin = (t) => { if (!t) return null; const [h, m] = String(t).split(":").map(Number); return (h || 0) * 60 + (m || 0); };
+const KIND_COLOR = {
+  stay: ACCENTS.winter,
+  activity: ACCENTS.blush,
+  food: ACCENTS.mint,
+  note: { soft: "#F5F5F4", border: "#D6D3D1", text: "#57534E", hex: "#E7E5E4" },
+};
 
+function TimeBlock({ item, onOpen }) {
+  const c = KIND_COLOR[item.kind] || KIND_COLOR.activity;
+  const meta = KIND_META[item.kind] || KIND_META.activity;
+  const s = toMin(item.start_time);
+  const e = toMin(item.end_time) ?? s + 60;
+  const top = Math.max(0, ((s - DAY_START_H * 60) / 60) * HOUR_PX);
+  const height = Math.max(22, ((Math.max(e, s + 15) - s) / 60) * HOUR_PX - 2);
   return (
-    <div className="rounded-2xl bg-white p-3 shadow-sm" style={{ border: `1.5px solid ${isStay ? accent.border : "#EBE5DB"}` }}>
-      <div className="flex items-start gap-3">
-        <div className="flex flex-col items-center gap-1">
-          <span className="text-lg leading-none">{meta.emoji}</span>
-          <input type="time" value={item.start_time || ""} onChange={(e) => onUpdate(item.id, { start_time: e.target.value })} className="w-[76px] rounded-lg border border-stone-200 px-1 py-1 text-xs outline-none focus:border-rose-200" />
+    <button
+      onClick={(ev) => { ev.stopPropagation(); onOpen(item.id); }}
+      className="absolute left-0.5 right-0.5 overflow-hidden rounded-lg border text-left shadow-sm transition-transform hover:z-10 hover:scale-[1.02]"
+      style={{ top, height, backgroundColor: c.soft, borderColor: c.border }}
+      title={`${item.title || meta.label} · tap to edit`}
+    >
+      <div className="px-1.5 pt-0.5 text-[9px] font-bold leading-tight" style={{ color: c.text }}>
+        {item.start_time}{item.end_time ? `–${item.end_time}` : ""}
+      </div>
+      <div className="truncate px-1.5 text-[10px] font-extrabold leading-tight text-stone-700">{meta.emoji} {item.title || "…"}</div>
+    </button>
+  );
+}
+
+// Bottom-sheet editor for one itinerary item (tap a block or unscheduled chip)
+function ItemEditor({ item, onUpdate, onRemove, onClose }) {
+  if (!item) return null;
+  const KINDS = [
+    { kind: "stay", icon: Bed },
+    { kind: "activity", icon: Sparkles },
+    { kind: "food", icon: Utensils },
+    { kind: "note", icon: NotebookPen },
+  ];
+  return (
+    <div className="fixed inset-0 z-[58] flex items-end justify-center bg-stone-900/30 p-3 backdrop-blur-sm sm:items-center" onClick={onClose}>
+      <div key={item.id} className="w-full max-w-md space-y-3 rounded-3xl bg-white p-5 shadow-xl" onClick={(e) => e.stopPropagation()}>
+        <div className="flex gap-2">
+          {KINDS.map((k) => {
+            const active = item.kind === k.kind;
+            const c = KIND_COLOR[k.kind];
+            return (
+              <button key={k.kind} onClick={() => onUpdate(item.id, { kind: k.kind })} className="flex flex-1 flex-col items-center gap-1 rounded-xl px-2 py-2 text-[10px] font-extrabold transition-all" style={{ backgroundColor: active ? c.hex : "#fff", color: active ? c.text : "#A8A29E", border: `1.5px solid ${active ? c.border : "#E7E1D8"}` }}>
+                <k.icon size={15} strokeWidth={2.6} /> {KIND_META[k.kind].label}
+              </button>
+            );
+          })}
         </div>
-        <div className="min-w-0 flex-1 space-y-1.5">
-          <input value={f.title} onChange={(e) => setF({ ...f, title: e.target.value })} onBlur={() => commit("title")} placeholder={isStay ? "Hotel / where you're staying" : "What are you doing?"} className="w-full rounded-lg border-2 border-stone-200 px-2 py-1.5 text-sm font-bold outline-none focus:border-rose-200" />
-          <div className="flex items-center gap-1">
-            <MapPin size={12} className="flex-shrink-0 text-stone-400" />
-            <input value={f.place} onChange={(e) => setF({ ...f, place: e.target.value })} onBlur={() => commit("place")} placeholder="place / area (for the map later)" className="w-full rounded-lg border border-stone-200 px-2 py-1 text-xs outline-none focus:border-rose-200" />
-          </div>
-          <textarea value={f.notes} onChange={(e) => setF({ ...f, notes: e.target.value })} onBlur={() => commit("notes")} placeholder="notes…" rows={1} className="w-full resize-y rounded-lg border border-stone-200 px-2 py-1 text-xs outline-none focus:border-rose-200" />
+        <input defaultValue={item.title || ""} onBlur={(e) => e.target.value !== (item.title || "") && onUpdate(item.id, { title: e.target.value })} placeholder={item.kind === "stay" ? "Hotel / where you're staying" : "What are you doing?"} className="w-full rounded-xl border-2 border-stone-200 px-3 py-2 text-sm font-bold outline-none focus:border-rose-200" />
+        <div className="flex flex-wrap items-center gap-2">
+          <select value={item.day} onChange={(e) => onUpdate(item.id, { day: Number(e.target.value) })} className="rounded-xl border-2 border-stone-200 px-2 py-2 text-xs font-bold text-stone-600 outline-none focus:border-rose-200">
+            {Array.from({ length: TRIP_DAYS }).map((_, dd) => (<option key={dd} value={dd}>Day {dd + 1} · {dayLabel(dd)}</option>))}
+          </select>
+          <input type="time" value={item.start_time || ""} onChange={(e) => onUpdate(item.id, { start_time: e.target.value })} className="rounded-xl border-2 border-stone-200 px-2 py-1.5 text-xs outline-none focus:border-rose-200" />
+          <span className="text-xs font-bold text-stone-400">→</span>
+          <input type="time" value={item.end_time || ""} onChange={(e) => onUpdate(item.id, { end_time: e.target.value })} className="rounded-xl border-2 border-stone-200 px-2 py-1.5 text-xs outline-none focus:border-rose-200" />
         </div>
-        <button onClick={() => onRemove(item.id)} className="flex-shrink-0 text-stone-300 transition-colors hover:text-rose-400" aria-label="Remove"><Trash2 size={14} /></button>
+        <div className="flex items-center gap-1.5">
+          <MapPin size={13} className="flex-shrink-0 text-stone-400" />
+          <input defaultValue={item.place || ""} onBlur={(e) => e.target.value !== (item.place || "") && onUpdate(item.id, { place: e.target.value })} placeholder="address / place (powers the movement map)" className="w-full rounded-xl border-2 border-stone-200 px-3 py-2 text-xs outline-none focus:border-rose-200" />
+        </div>
+        <textarea defaultValue={item.notes || ""} onBlur={(e) => e.target.value !== (item.notes || "") && onUpdate(item.id, { notes: e.target.value })} placeholder="notes…" rows={2} className="w-full resize-y rounded-xl border-2 border-stone-200 px-3 py-2 text-xs outline-none focus:border-rose-200" />
+        <div className="flex items-center justify-between">
+          <button onClick={() => { onRemove(item.id); onClose(); }} className="flex items-center gap-1.5 rounded-xl px-3 py-2 text-xs font-extrabold text-rose-400 transition-colors hover:bg-rose-50"><Trash2 size={14} /> Delete</button>
+          <button onClick={onClose} className="rounded-xl px-4 py-2 text-sm font-extrabold transition-all hover:scale-[1.03] active:scale-95" style={{ backgroundColor: ACCENTS.mint.hex, color: ACCENTS.mint.text, border: `1.5px solid ${ACCENTS.mint.border}` }}>Done</button>
+        </div>
       </div>
     </div>
   );
@@ -1053,20 +1105,30 @@ function ItineraryRow({ item, accent, onUpdate, onRemove }) {
 
 function ItineraryView({ chosenDest, onSetChosen }) {
   const [dest, setDest] = useState(chosenDest || DESTINATIONS[0].id);
-  const [day, setDay] = useState(0);
   const [items, setItems] = useState([]);
+  const [editing, setEditing] = useState(null); // item id open in the editor
   const accent = DEST_BY_ID[dest].accent;
 
   const refresh = useCallback(async () => setItems(await loadItinerary(dest)), [dest]);
   useEffect(() => { refresh(); const unsub = subscribeItinerary(dest, refresh); return () => unsub(); }, [dest, refresh]);
 
-  const dayItems = useMemo(
-    () => items.filter((it) => it.day === day).sort((a, b) => (a.start_time || "~").localeCompare(b.start_time || "~") || (a.position || 0) - (b.position || 0)),
-    [items, day]
-  );
-  const countForDay = (dd) => items.filter((it) => it.day === dd).length;
+  const timedFor = (dd) => items.filter((it) => it.day === dd && it.start_time);
+  const unscheduled = items.filter((it) => !it.start_time);
 
-  const add = async (kind) => { await addItineraryItem({ dest, day, kind, start_time: "", title: "", place: "", notes: "", position: items.filter((it) => it.day === day).length }); refresh(); };
+  // Tap an empty slot in a day column → create a 1h block right there
+  const createAt = async (dd, hour) => {
+    const pad = (n) => String(n).padStart(2, "0");
+    const payload = { dest, day: dd, kind: "activity", start_time: `${pad(hour)}:00`, end_time: hour + 1 >= 24 ? "23:59" : `${pad(hour + 1)}:00`, title: "", place: "", notes: "", position: 0 };
+    let row = await addItineraryItem(payload);
+    if (!row) { const { end_time, ...rest } = payload; row = await addItineraryItem(rest); } // tolerate missing end_time column
+    refresh();
+    if (row) setEditing(row.id);
+  };
+  const addUnscheduled = async (dd) => {
+    const row = await addItineraryItem({ dest, day: dd, kind: "activity", start_time: "", title: "", place: "", notes: "", position: 0 });
+    refresh();
+    if (row) setEditing(row.id);
+  };
   const update = (id, patch) => { setItems((xs) => xs.map((x) => (x.id === id ? { ...x, ...patch } : x))); updateItineraryItem(id, patch); };
   const remove = async (id) => { setItems((xs) => xs.filter((x) => x.id !== id)); await deleteItineraryItem(id); refresh(); };
 
@@ -1078,12 +1140,8 @@ function ItineraryView({ chosenDest, onSetChosen }) {
     );
   }
 
-  const ADD_BTNS = [
-    { kind: "stay", label: "Add stay", icon: Bed },
-    { kind: "activity", label: "Add activity", icon: Sparkles },
-    { kind: "food", label: "Add food", icon: Utensils },
-    { kind: "note", label: "Add note", icon: NotebookPen },
-  ];
+  const hours = Array.from({ length: DAY_END_H - DAY_START_H }, (_, i) => DAY_START_H + i);
+  const editingItem = editing ? items.find((x) => x.id === editing) || null : null;
 
   return (
     <section className="mt-8">
@@ -1104,32 +1162,59 @@ function ItineraryView({ chosenDest, onSetChosen }) {
         </button>
       </div>
 
-      {/* day tabs */}
-      <div className="mt-5 flex justify-start gap-2 overflow-x-auto pb-2 sm:justify-center">
-        {Array.from({ length: TRIP_DAYS }).map((_, dd) => {
-          const active = dd === day;
-          const c = countForDay(dd);
-          return (
-            <button key={dd} onClick={() => setDay(dd)} className="flex-shrink-0 rounded-2xl px-3.5 py-2 text-center transition-all" style={{ backgroundColor: active ? accent.hex : "#fff", border: `1.5px solid ${active ? accent.border : "#E7E1D8"}` }}>
-              <div className="text-[10px] font-bold uppercase" style={{ color: active ? accent.text : "#A8A29E" }}>Day {dd + 1}{c > 0 ? ` · ${c}` : ""}</div>
-              <div className="text-xs font-extrabold" style={{ color: active ? accent.text : "#78716C" }}>{dayLabel(dd)}</div>
-            </button>
-          );
-        })}
-      </div>
+      {/* unscheduled tray — ideas added without a time land here */}
+      {unscheduled.length > 0 && (
+        <div className="mx-auto mt-5 max-w-4xl rounded-2xl border border-dashed border-stone-300 bg-white/70 px-4 py-3">
+          <p className="text-[10px] font-bold uppercase tracking-wide text-stone-400">No time yet — tap to schedule</p>
+          <div className="mt-2 flex flex-wrap gap-1.5">
+            {unscheduled.map((it) => (
+              <button key={it.id} onClick={() => setEditing(it.id)} className="flex items-center gap-1 rounded-lg px-2 py-1 text-[11px] font-bold text-stone-600 transition-transform hover:scale-105" style={{ backgroundColor: (KIND_COLOR[it.kind] || KIND_COLOR.activity).soft, border: `1px solid ${(KIND_COLOR[it.kind] || KIND_COLOR.activity).border}` }}>
+                {(KIND_META[it.kind] || KIND_META.activity).emoji} {it.title || "untitled"} <span className="text-stone-400">· D{it.day + 1}</span>
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
 
-      {/* day content */}
-      <div className="mx-auto mt-4 max-w-3xl space-y-3">
-        {dayItems.map((it) => <ItineraryRow key={it.id} item={it} accent={accent} onUpdate={update} onRemove={remove} />)}
-        {dayItems.length === 0 && <p className="py-6 text-center text-sm text-stone-400">Nothing planned for {dayLabel(day)} yet — add your hotel & activities below, or use "+ Itinerary" on any saved idea.</p>}
-        <div className="flex flex-wrap justify-center gap-2 pt-1">
-          {ADD_BTNS.map((b) => (
-            <button key={b.kind} onClick={() => add(b.kind)} className="flex items-center gap-1.5 rounded-xl border-2 border-dashed border-stone-300 px-3 py-2 text-xs font-extrabold text-stone-400 transition-colors hover:border-rose-200 hover:text-rose-400">
-              <b.icon size={14} strokeWidth={2.6} /> {b.label}
-            </button>
+      {/* week grid — Google-Calendar style */}
+      <p className="mt-5 text-center text-xs text-stone-400">Tap an empty slot to add a block · tap a block to edit it</p>
+      <div className="mt-2 overflow-x-auto rounded-3xl border border-stone-200 bg-white/85 backdrop-blur">
+        <div className="flex min-w-[920px]">
+          {/* time gutter */}
+          <div className="sticky left-0 z-20 w-12 flex-shrink-0 border-r border-stone-100 bg-white">
+            <div className="h-12 border-b border-stone-100" />
+            {hours.map((h) => (
+              <div key={h} style={{ height: HOUR_PX }} className="pr-1.5 text-right text-[9px] font-bold text-stone-300">{String(h).padStart(2, "0")}:00</div>
+            ))}
+          </div>
+          {/* day columns */}
+          {Array.from({ length: TRIP_DAYS }).map((_, dd) => (
+            <div key={dd} className="min-w-[108px] flex-1 border-r border-stone-100 last:border-r-0">
+              <div className="flex h-12 items-center justify-between border-b border-stone-100 px-2">
+                <div>
+                  <div className="text-[9px] font-bold uppercase text-stone-400">Day {dd + 1}</div>
+                  <div className="text-[10px] font-extrabold text-stone-600">{dayLabel(dd)}</div>
+                </div>
+                <button onClick={() => addUnscheduled(dd)} className="rounded-md p-1 text-stone-300 transition-colors hover:text-rose-400" title="Add without a time" aria-label={`Add to day ${dd + 1}`}><Plus size={13} strokeWidth={3} /></button>
+              </div>
+              <div
+                className="relative cursor-copy"
+                style={{ height: (DAY_END_H - DAY_START_H) * HOUR_PX }}
+                onClick={(e) => {
+                  const rect = e.currentTarget.getBoundingClientRect();
+                  const hour = DAY_START_H + Math.floor((e.clientY - rect.top) / HOUR_PX);
+                  createAt(dd, Math.min(23, Math.max(DAY_START_H, hour)));
+                }}
+              >
+                {hours.map((h, i) => (<div key={h} className="pointer-events-none absolute left-0 right-0 border-t border-stone-100/70" style={{ top: i * HOUR_PX }} />))}
+                {timedFor(dd).map((it) => (<TimeBlock key={it.id} item={it} onOpen={setEditing} />))}
+              </div>
+            </div>
           ))}
         </div>
       </div>
+
+      <ItemEditor item={editingItem} onUpdate={update} onRemove={remove} onClose={() => setEditing(null)} />
     </section>
   );
 }
@@ -1312,7 +1397,7 @@ export default function App() {
           <div className="mx-auto inline-flex items-center gap-2 rounded-full border-2 border-rose-100 bg-white/80 px-4 py-1.5 text-xs font-extrabold uppercase tracking-[0.2em] text-rose-400 shadow-sm backdrop-blur">
             <Calendar size={13} strokeWidth={3} /> Nov 27 – Dec 4
           </div>
-          <h1 className="mt-5 text-4xl font-black tracking-tight text-stone-800 sm:text-5xl">Me &amp; Ants <span className="text-rose-300">♥</span> Travel Plans</h1>
+          <h1 className="mt-5 text-4xl font-black tracking-tight text-stone-800 sm:text-5xl">Me &amp; Ants <span className="text-emerald-300">♥</span> Travel Plans</h1>
           <p className="mt-3 text-base font-semibold text-stone-500 sm:text-lg">
             <Editable value={copy.subtitle} onSave={(v) => updateCopy("subtitle", v)} rows={2} />
           </p>

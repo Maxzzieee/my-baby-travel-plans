@@ -48,6 +48,7 @@ create table if not exists public.itinerary (
   day int not null default 0,
   position int not null default 0,
   start_time text,
+  end_time text,
   title text,
   place text,
   lat float8,
@@ -57,6 +58,7 @@ create table if not exists public.itinerary (
   idea_id text,
   created_at timestamptz default now()
 );
+alter table public.itinerary add column if not exists end_time text; -- calendar-grid upgrade
 alter table public.itinerary enable row level security;
 drop policy if exists "itinerary anon all" on public.itinerary;
 create policy "itinerary anon all" on public.itinerary for all using (true) with check (true);
