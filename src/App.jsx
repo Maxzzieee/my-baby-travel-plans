@@ -873,6 +873,109 @@ function Lightbox({ data, onClose }) {
 }
 
 // ---------------------------------------------------------------------------
+// Glaggle Game — whack-the-glaggle. Timer shrinks as you score; at the end he
+// darts around on his own. High score is shared (synced) with who holds it.
+// ---------------------------------------------------------------------------
+const glaggleTier = (score) => (score >= 20 ? 1 : score >= 15 ? 3 : score >= 10 ? 5 : 10);
+
+function GlaggleGame({ high, onHigh }) {
+  const me = useContext(IdentityContext);
+  const [playing, setPlaying] = useState(false);
+  const [score, setScore] = useState(0);
+  const [timeLeft, setTimeLeft] = useState(10);
+  const [pos, setPos] = useState({ top: 45, left: 45 });
+  const [ended, setEnded] = useState(null); // final score after a loss
+  const deadline = useRef(0);
+  const scoreRef = useRef(0);
+
+  const move = () => setPos({ top: 12 + Math.random() * 70, left: 4 + Math.random() * 80 });
+
+  const start = () => {
+    scoreRef.current = 0;
+    setScore(0); setEnded(null); setPlaying(true);
+    deadline.current = Date.now() + 10000; setTimeLeft(10);
+    move();
+  };
+
+  // countdown — lose when it hits 0
+  useEffect(() => {
+    if (!playing) return;
+    const t = setInterval(() => {
+      const left = deadline.current - Date.now();
+      setTimeLeft(Math.max(0, Math.ceil(left / 1000)));
+      if (left <= 0) { setPlaying(false); setEnded(scoreRef.current); }
+    }, 100);
+    return () => clearInterval(t);
+  }, [playing]);
+
+  // final tier: glaggle darts around on his own
+  useEffect(() => {
+    if (!playing || score < 20) return;
+    const d = setInterval(move, 650);
+    return () => clearInterval(d);
+  }, [playing, score]);
+
+  // record shared high score on loss
+  useEffect(() => {
+    if (ended == null) return;
+    if (ended > (high?.score || 0)) onHigh({ score: ended, who: me, at: Date.now() });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ended]);
+
+  const bop = (e) => {
+    e.stopPropagation();
+    const s = scoreRef.current + 1;
+    scoreRef.current = s;
+    setScore(s);
+    const secs = glaggleTier(s);
+    deadline.current = Date.now() + secs * 1000;
+    setTimeLeft(secs);
+    move();
+  };
+
+  return (
+    <>
+      {/* high-score chip — top of the site */}
+      <div className="mx-auto mt-4 flex max-w-md items-center justify-center gap-2 rounded-2xl border border-stone-200 bg-white/70 px-4 py-2 backdrop-blur">
+        <img src="/glaggle.png" alt="Glaggle" className="h-6 w-6 object-contain" />
+        <span className="text-xs font-extrabold uppercase tracking-wide text-stone-400">Glaggle Game</span>
+        <span className="text-sm font-extrabold text-stone-600">
+          {high?.score ? <>🏆 {high.score} · {WHO_NAME[high.who] || "?"}</> : "no high score yet"}
+        </span>
+        {!playing && (
+          <button onClick={start} className="ml-1 rounded-full px-3 py-1 text-xs font-extrabold transition-all hover:scale-105 active:scale-95" style={{ backgroundColor: ACCENTS.blush.hex, color: ACCENTS.blush.text, border: `1.5px solid ${ACCENTS.blush.border}` }}>
+            {ended != null ? "Play again" : "Play"}
+          </button>
+        )}
+      </div>
+      {ended != null && !playing && (
+        <p className="mt-1.5 text-center text-xs font-bold text-stone-400">Glaggle escaped! You scored {ended}{ended > 0 && ended >= (high?.score || 0) ? " — new high score! 🎉" : ""}</p>
+      )}
+
+      {/* live game overlay */}
+      {playing && (
+        <>
+          <div className="fixed left-1/2 top-3 z-[55] flex -translate-x-1/2 items-center gap-3 rounded-full border-2 border-rose-200 bg-white px-4 py-2 shadow-lg">
+            <span className="text-sm font-extrabold text-stone-600">Score {score}</span>
+            <span className={`text-sm font-extrabold tabular-nums ${timeLeft <= 3 ? "animate-pop text-rose-500" : "text-stone-500"}`} key={timeLeft}>⏱ {timeLeft}s</span>
+            {score >= 20 && <span className="text-xs font-extrabold text-rose-500">HE'S LOOSE!!</span>}
+            <button onClick={() => { setPlaying(false); setEnded(scoreRef.current); }} className="text-stone-300 hover:text-rose-400" aria-label="Give up"><X size={14} /></button>
+          </div>
+          <button
+            onClick={bop}
+            className="fixed z-[55] transition-all duration-200 ease-out hover:scale-110 active:scale-90"
+            style={{ top: `${pos.top}%`, left: `${pos.left}%` }}
+            aria-label="Bop the glaggle!"
+          >
+            <img src="/glaggle.png" alt="Glaggle" draggable={false} className="h-20 w-20 object-contain drop-shadow-lg sm:h-24 sm:w-24" />
+          </button>
+        </>
+      )}
+    </>
+  );
+}
+
+// ---------------------------------------------------------------------------
 // Itinerary — day-by-day timed planner (per destination)
 // ---------------------------------------------------------------------------
 function ItineraryRow({ item, accent, onUpdate, onRemove }) {
@@ -1169,6 +1272,9 @@ export default function App() {
             <Editable value={copy.subtitle} onSave={(v) => updateCopy("subtitle", v)} rows={2} />
           </p>
         </header>
+
+        {/* Glaggle Game — shared high score + play */}
+        <GlaggleGame high={copy.glaggleHigh} onHigh={(h) => updateCopy("glaggleHigh", h)} />
 
         {/* Tabs — show one section at a time */}
         <div className="mx-auto mt-8 flex max-w-xl items-center justify-center gap-1 rounded-2xl border border-stone-200 bg-white/70 p-1.5 backdrop-blur">
