@@ -921,7 +921,8 @@ function Lightbox({ data, onClose }) {
 // Glaggle Game — whack-the-glaggle. Timer shrinks as you score; at the end he
 // darts around on his own. High score is shared (synced) with who holds it.
 // ---------------------------------------------------------------------------
-const glaggleTier = (score) => (score >= 20 ? 1 : score >= 15 ? 3 : score >= 10 ? 5 : 10);
+const glaggleTier = (score) => (score >= 35 ? 2 : score >= 22 ? 4 : score >= 12 ? 6 : 10);
+const GLAGGLE_LOOSE_AT = 35; // score where he starts darting on his own
 
 function GlaggleGame({ high, onHigh }) {
   const me = useContext(IdentityContext);
@@ -953,10 +954,10 @@ function GlaggleGame({ high, onHigh }) {
     return () => clearInterval(t);
   }, [playing]);
 
-  // final tier: glaggle darts around on his own
+  // final tier: glaggle darts around on his own (slower hops than before)
   useEffect(() => {
-    if (!playing || score < 20) return;
-    const d = setInterval(move, 650);
+    if (!playing || score < GLAGGLE_LOOSE_AT) return;
+    const d = setInterval(move, 1000);
     return () => clearInterval(d);
   }, [playing, score]);
 
@@ -1003,7 +1004,7 @@ function GlaggleGame({ high, onHigh }) {
           <div className="fixed left-1/2 top-3 z-[55] flex -translate-x-1/2 items-center gap-3 rounded-full border-2 border-rose-200 bg-white px-4 py-2 shadow-lg">
             <span className="text-sm font-extrabold text-stone-600">Score {score}</span>
             <span className={`text-sm font-extrabold tabular-nums ${timeLeft <= 3 ? "animate-pop text-rose-500" : "text-stone-500"}`} key={timeLeft}>⏱ {timeLeft}s</span>
-            {score >= 20 && <span className="text-xs font-extrabold text-rose-500">HE'S LOOSE!!</span>}
+            {score >= GLAGGLE_LOOSE_AT && <span className="text-xs font-extrabold text-rose-500">HE'S LOOSE!!</span>}
             <button onClick={() => { setPlaying(false); setEnded(scoreRef.current); }} className="text-stone-300 hover:text-rose-400" aria-label="Give up"><X size={14} /></button>
           </div>
           <button
@@ -1012,7 +1013,7 @@ function GlaggleGame({ high, onHigh }) {
             style={{ top: `${pos.top}%`, left: `${pos.left}%` }}
             aria-label="Bop the glaggle!"
           >
-            <img src="/glaggle.png" alt="Glaggle" draggable={false} className="h-20 w-20 object-contain drop-shadow-lg sm:h-24 sm:w-24" />
+            <img src="/glaggle.png" alt="Glaggle" draggable={false} className="h-24 w-24 object-contain drop-shadow-lg sm:h-28 sm:w-28" />
           </button>
         </>
       )}
