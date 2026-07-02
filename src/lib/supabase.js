@@ -304,9 +304,11 @@ export async function deleteItineraryItem(id) {
 
 export function subscribeItinerary(dest, onChange) {
   if (!supabase) return () => {};
+  // No dest filter: Supabase DELETE events only carry the primary key, so a
+  // dest filter silently drops them and deletions never reach the other device.
   const channel = supabase
     .channel(`itinerary_${dest}`)
-    .on("postgres_changes", { event: "*", schema: "public", table: "itinerary", filter: `dest=eq.${dest}` }, () => onChange())
+    .on("postgres_changes", { event: "*", schema: "public", table: "itinerary" }, () => onChange())
     .subscribe();
   return () => supabase.removeChannel(channel);
 }

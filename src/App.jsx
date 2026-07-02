@@ -224,6 +224,19 @@ function SavedIdea({ plan, accent, onDelete, onAddComment, onEdit, onAddToItiner
   const [addedDay, setAddedDay] = useState(null);
   const photoRef = useRef(null);
 
+  // septic-fuck rating (1–5), stored per person and synced with the plan
+  const partnerKey = me === "me" ? "baby" : "me";
+  const myRating = plan.ratings?.[me] || 0;
+  const partnerRating = plan.ratings?.[partnerKey] || 0;
+  const [drag, setDrag] = useState(null); // live value while sliding
+  const [floater, setFloater] = useState(null); // { v, key } — float-up feedback
+  const commitRating = (v) => {
+    onEdit(plan.id, { ratings: { ...(plan.ratings || {}), [me]: v } });
+    setFloater({ v, key: Date.now() });
+    setTimeout(() => setFloater(null), 1400);
+  };
+  const endSlide = () => { if (drag != null) { commitRating(drag); setDrag(null); } };
+
   const pickDay = (dd) => {
     onAddToItinerary(dd);
     setShowDays(false);
@@ -304,6 +317,38 @@ function SavedIdea({ plan, accent, onDelete, onAddComment, onEdit, onAddToItiner
         <span className="rounded-lg px-2 py-1 text-[11px] font-semibold" style={{ backgroundColor: ACCENTS.mint.soft, color: ACCENTS.mint.text }}>🎯 <EditText value={plan.want || ""} onSave={(v) => onEdit(plan.id, { want: v })} placeholder="what to do…" className="text-[11px]" /></span>
         <span className="rounded-lg px-2 py-1 text-[11px] text-stone-500" style={{ backgroundColor: accent.soft }}>💬 <EditText value={plan.comment || ""} onSave={(v) => onEdit(plan.id, { comment: v })} placeholder="note…" className="text-[11px]" /></span>
         {plan.sourceUrl && <a href={plan.sourceUrl} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 rounded-lg bg-stone-100 px-2 py-1 text-[11px] font-semibold text-stone-400 hover:text-rose-400"><ExternalLink size={11} /> source</a>}
+      </div>
+
+      {/* septic-fuck rating slider */}
+      <div className="relative mt-2.5 rounded-xl border border-stone-100 bg-stone-50/70 px-3 py-2">
+        {floater && (
+          <img key={floater.key} src="/septic-fuck.png" alt="" className="septic-float pointer-events-none absolute bottom-2 left-1/2 z-10 object-contain" style={{ width: 22 + floater.v * 22 }} />
+        )}
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5">
+          <span className="text-[10px] font-bold uppercase tracking-wide text-stone-400">Septic rating</span>
+          <div className="flex items-end gap-1">
+            {[1, 2, 3, 4, 5].map((n) => {
+              const active = (drag ?? myRating) >= n;
+              return (
+                <img key={n} src="/septic-fuck.png" alt="" className="object-contain transition-all duration-150" style={{ width: 14 + n * 5, opacity: active ? 1 : 0.25, filter: active ? "none" : "grayscale(1)" }} />
+              );
+            })}
+          </div>
+          <input
+            type="range" min="1" max="5" step="1"
+            value={drag ?? (myRating || 3)}
+            onChange={(e) => setDrag(Number(e.target.value))}
+            onPointerUp={endSlide}
+            onTouchEnd={endSlide}
+            onKeyUp={(e) => { if (e.key === "ArrowLeft" || e.key === "ArrowRight") endSlide(); }}
+            className="h-1.5 min-w-[110px] flex-1 cursor-pointer accent-rose-400"
+            aria-label="Rate 1 to 5 septic fucks"
+          />
+          <span className="flex items-center gap-1.5 text-[10px] font-bold text-stone-400">
+            {myRating > 0 && <>{WHO_NAME[me]}: {drag ?? myRating}</>}
+            {partnerRating > 0 && <span className="flex items-center gap-0.5">{WHO_NAME[partnerKey]}: {partnerRating}<img src="/septic-fuck.png" alt="" className="w-4 object-contain" /></span>}
+          </span>
+        </div>
       </div>
 
       {hasSupabase && (
@@ -806,7 +851,7 @@ function MemeWall() {
             return (
               <div key={it.id} className="group relative break-inside-avoid overflow-hidden rounded-2xl border-2 border-white bg-white shadow-sm">
                 <img src={it.url} alt={it.caption || "meme"} onClick={() => openLightbox(items.map((x) => x.url), idx)} className="w-full cursor-zoom-in object-cover" loading="lazy" />
-                <button onClick={() => deleteImage(it).then(refresh)} className="absolute right-2 top-2 rounded-full bg-white/80 p-1.5 text-stone-400 opacity-0 shadow transition-opacity hover:text-rose-500 group-hover:opacity-100" aria-label="Delete"><Trash2 size={14} /></button>
+                <button onClick={() => deleteImage(it).then(refresh)} className="absolute right-2 top-2 rounded-full bg-white/80 p-1.5 text-stone-400 opacity-100 shadow transition-opacity hover:text-rose-500 sm:opacity-0 sm:group-hover:opacity-100" aria-label="Delete"><Trash2 size={14} /></button>
                 <div className="flex items-center gap-2 px-3 py-2">
                   <span className="rounded-md px-1.5 py-0.5 text-[10px] font-extrabold capitalize" style={{ backgroundColor: wa.soft, color: wa.text }}>{it.who || "?"}</span>
                   {it.caption && <span className="truncate text-xs text-stone-500">{it.caption}</span>}
@@ -1023,7 +1068,7 @@ function ItineraryView({ chosenDest, onSetChosen }) {
 
   const add = async (kind) => { await addItineraryItem({ dest, day, kind, start_time: "", title: "", place: "", notes: "", position: items.filter((it) => it.day === day).length }); refresh(); };
   const update = (id, patch) => { setItems((xs) => xs.map((x) => (x.id === id ? { ...x, ...patch } : x))); updateItineraryItem(id, patch); };
-  const remove = (id) => { setItems((xs) => xs.filter((x) => x.id !== id)); deleteItineraryItem(id); };
+  const remove = async (id) => { setItems((xs) => xs.filter((x) => x.id !== id)); await deleteItineraryItem(id); refresh(); };
 
   if (!hasSupabase) {
     return (
