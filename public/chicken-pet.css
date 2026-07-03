@@ -65,6 +65,21 @@
 .cpet-actions button:active:not(:disabled) { transform: scale(0.94); }
 .cpet-actions button:disabled { opacity: 0.4; cursor: default; }
 
+.cpet-actions .cpet-wide { flex: 1 1 100%; padding: 8px; font-size: 12px; }
+.cpet-actions .cpet-run {
+  flex: 1 1 100%; padding: 12px; font-size: 14px; font-weight: 800;
+  background: #e5484d; border-color: #b23a48; color: #fff;
+  animation: cpet-run-pulse 0.35s ease-in-out infinite alternate;
+}
+@keyframes cpet-run-pulse { from { transform: scale(1); } to { transform: scale(1.04); } }
+
+.cpet-fxrow { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 4px; }
+.cpet-fx {
+  background: #edfaf2; border: 1px solid #a2dcba; color: #3f7c5c;
+  border-radius: 8px; padding: 1px 6px; font-size: 10px; font-weight: 700;
+}
+.cpet-fx-bad { background: #fdeeee; border-color: #eeb4b4; color: #b34040; }
+
 .cpet-career { min-height: 18px; font-size: 11px; margin-bottom: 4px; color: #78716c; }
 .cpet-career small { color: #a8a29e; }
 .cpet-choosecareer {
