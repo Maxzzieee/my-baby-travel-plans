@@ -1,0 +1,119 @@
+/* ============================================================================
+   Rogue-lite Chicken Life Simulator — widget styles
+   Fully namespaced (.cpet-*) so it can't leak into the site's styling.
+============================================================================ */
+
+.cpet-card {
+  position: fixed;
+  bottom: 20px;
+  right: 20px;
+  width: 340px;
+  max-width: calc(100vw - 32px);
+  z-index: 9999;
+  box-sizing: border-box;
+  background: #fffdf9;
+  border: 2px solid #f6c3b2;
+  border-radius: 20px;
+  box-shadow: 0 10px 30px rgba(87, 63, 40, 0.18);
+  padding: 12px 14px 10px;
+  font-family: "Courier New", ui-monospace, monospace;
+  font-size: 12px;
+  color: #57534e;
+}
+.cpet-card * { box-sizing: border-box; }
+.cpet-card[hidden], .cpet-egg[hidden] { display: none !important; }
+
+.cpet-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.cpet-title { font-weight: 700; font-size: 13px; color: #44403c; }
+.cpet-gen { color: #a8a29e; font-weight: 600; font-size: 11px; }
+.cpet-collapse {
+  border: 1.5px solid #e7e1d8; background: #fff; border-radius: 10px;
+  padding: 2px 8px; cursor: pointer; font-size: 13px; line-height: 1.4;
+  transition: transform 0.15s ease;
+}
+.cpet-collapse:hover { transform: scale(1.1); }
+
+.cpet-canvas {
+  display: block;
+  width: 100%;
+  margin: 8px 0 6px;
+  border-radius: 14px;
+  background: linear-gradient(180deg, #eaf5fa 0%, #fdf3ec 100%);
+  image-rendering: pixelated;
+  image-rendering: crisp-edges;
+}
+
+.cpet-stats { display: grid; gap: 3px; margin-bottom: 8px; }
+.cpet-stat { display: flex; align-items: center; gap: 6px; }
+.cpet-stat > span { width: 18px; text-align: center; font-size: 11px; }
+.cpet-stat > em { width: 24px; font-style: normal; font-size: 10px; color: #a8a29e; text-align: right; }
+.cpet-bar {
+  flex: 1; height: 8px; border-radius: 99px;
+  background: #f1ece2; overflow: hidden; border: 1px solid #eee5d8;
+}
+.cpet-bar i { display: block; height: 100%; border-radius: 99px; transition: width 0.4s ease, background 0.4s ease; }
+
+.cpet-actions { display: flex; flex-wrap: wrap; gap: 5px; margin-bottom: 8px; }
+.cpet-actions button {
+  flex: 1 1 30%;
+  border: 1.5px solid #e7e1d8; background: #fff; color: #57534e;
+  border-radius: 12px; padding: 5px 4px; cursor: pointer;
+  font-family: inherit; font-size: 11px; font-weight: 700;
+  transition: transform 0.12s ease, border-color 0.12s ease;
+}
+.cpet-actions button:hover:not(:disabled) { transform: scale(1.05); border-color: #f6c3b2; }
+.cpet-actions button:active:not(:disabled) { transform: scale(0.94); }
+.cpet-actions button:disabled { opacity: 0.4; cursor: default; }
+
+.cpet-career { min-height: 18px; font-size: 11px; margin-bottom: 4px; color: #78716c; }
+.cpet-career small { color: #a8a29e; }
+.cpet-choosecareer {
+  border: 1.5px dashed #d6d3d1; background: transparent; color: #a8a29e;
+  border-radius: 10px; padding: 4px 10px; cursor: pointer;
+  font-family: inherit; font-size: 11px; font-weight: 700;
+}
+.cpet-choosecareer:hover { color: #e0837a; border-color: #f6c3b2; }
+
+.cpet-log { font-size: 10.5px; font-style: italic; color: #a8a29e; min-height: 14px; }
+
+/* Overlay: fate events / career choice / death & dynasty screen */
+.cpet-overlay {
+  position: absolute; inset: 0; border-radius: 18px; /* anchored by the fixed card */
+  background: rgba(255, 253, 249, 0.97);
+  padding: 16px 14px; overflow-y: auto;
+  display: flex; flex-direction: column; gap: 7px;
+}
+.cpet-ov-title { font-size: 13px; font-weight: 700; color: #44403c; }
+.cpet-ov-text { font-size: 11px; color: #78716c; line-height: 1.45; }
+.cpet-choice {
+  border: 1.5px solid #f6c3b2; background: #fff3ee; color: #a65a45;
+  border-radius: 12px; padding: 7px 10px; cursor: pointer; text-align: left;
+  font-family: inherit; font-size: 11px; font-weight: 700;
+  transition: transform 0.12s ease;
+}
+.cpet-choice:hover:not(:disabled) { transform: scale(1.03); }
+.cpet-choice:disabled { opacity: 0.45; cursor: default; border-color: #e7e1d8; background: #faf7f2; color: #a8a29e; }
+.cpet-choice small { color: #c9a292; font-weight: 600; }
+.cpet-cancel { border-color: #e7e1d8; background: #fff; color: #a8a29e; }
+.cpet-ancestor { font-size: 10.5px; color: #a8a29e; }
+
+/* Collapsed: tiny pixel egg icon */
+.cpet-egg {
+  position: fixed; bottom: 20px; right: 20px; z-index: 9999;
+  width: 48px; height: 48px; border-radius: 999px;
+  background: #fffdf9; border: 2px solid #f6c3b2;
+  box-shadow: 0 6px 18px rgba(87, 63, 40, 0.2);
+  cursor: pointer; display: flex; align-items: center; justify-content: center;
+  animation: cpet-egg-wobble 3.2s ease-in-out infinite;
+}
+.cpet-egg canvas { width: 28px; height: 28px; image-rendering: pixelated; }
+@keyframes cpet-egg-wobble {
+  0%, 84%, 100% { transform: rotate(0deg); }
+  88% { transform: rotate(-8deg); }
+  92% { transform: rotate(8deg); }
+  96% { transform: rotate(-4deg); }
+}
+
+@media (max-width: 480px) {
+  .cpet-card { bottom: 12px; right: 12px; padding: 10px 11px 8px; }
+}
