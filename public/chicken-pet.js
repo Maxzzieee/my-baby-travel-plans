@@ -149,6 +149,9 @@
     var raw = localStorage.getItem(SAVE_KEY);
     if (raw) { var parsed = JSON.parse(raw); if (parsed && parsed.v === 2 && parsed.stats) S = Object.assign(defaultState(), parsed); }
   } catch (e) { /* corrupt save → fresh egg */ }
+  // self-heal: a fetch that never finished (tab closed mid-load) leaves a stuck
+  // {loading:true} placeholder that would freeze the widget forever. Drop it.
+  if (S.pendingEvent && S.pendingEvent.loading) S.pendingEvent = null;
   var chase = null;      // { progress, escape } — not persisted; a refresh forfeits the chase… cheeky but fair
   var cutscene = null;   // { start, done }
   var eventInFlight = false;
@@ -167,6 +170,9 @@
     pushTimer = setTimeout(function () {
       var snap = {};
       for (var k in S) if (!LOCAL_ONLY[k]) snap[k] = S[k];
+      // never sync a transient loading placeholder — a partner who adopts it
+      // (or reloads) would be stuck on the spinner with no way to resolve it.
+      if (snap.pendingEvent && snap.pendingEvent.loading) snap.pendingEvent = null;
       window.ChickenSync.save(snap, clientId);
     }, 350);
   }
@@ -175,6 +181,8 @@
     applyingRemote = true;
     for (var k in data) if (!LOCAL_ONLY[k]) S[k] = data[k];
     applyingRemote = false;
+    // guard against ever adopting a stuck loading placeholder from a partner
+    if (S.pendingEvent && S.pendingEvent.loading) S.pendingEvent = null;
     // a partner-driven fate/chase resets local-only overlays
     if (!S.pendingEvent) { /* keep local chase/cutscene as-is */ }
     try { localStorage.setItem(SAVE_KEY, JSON.stringify(S)); } catch (e) {}
