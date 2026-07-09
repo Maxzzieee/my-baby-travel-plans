@@ -10,6 +10,7 @@ import {
   Thermometer,
   ChevronDown,
   Moon,
+  Sun,
   Star,
   Calendar,
   Trophy,
@@ -69,6 +70,30 @@ const ACCENTS = {
   blush: { name: "Soft Blush Pink", hex: "#FFDFD3", soft: "#FFF3EE", border: "#F6C3B2", text: "#A65A45" },
   mint: { name: "Minty Pastel Green", hex: "#C5EBD5", soft: "#EDFAF2", border: "#A2DCBA", text: "#3F7C5C" },
 };
+
+// Night-sky starfield — only mounted in dark mode. Sits at z-index:-1 behind all
+// content (the root div is `isolate`, so this paints above its bg but below cards).
+function StarField() {
+  const stars = React.useMemo(() => Array.from({ length: 90 }, () => ({
+    top: Math.random() * 100,
+    left: Math.random() * 100,
+    size: +(Math.random() * 2 + 0.6).toFixed(2),
+    dur: +(Math.random() * 3 + 2).toFixed(2),
+    delay: +(Math.random() * 4).toFixed(2),
+    min: +(Math.random() * 0.3 + 0.08).toFixed(2),
+    max: +(Math.random() * 0.35 + 0.6).toFixed(2),
+  })), []);
+  return (
+    <div className="starfield" aria-hidden="true">
+      {stars.map((s, i) => (
+        <span key={i} className="star" style={{ top: s.top + "%", left: s.left + "%", width: s.size, height: s.size, "--dur": s.dur + "s", "--delay": s.delay + "s", "--min": s.min, "--max": s.max }} />
+      ))}
+      <span className="shooting-star" />
+      <span className="shooting-star shooting-star-2" />
+      <div className="moon-glow" />
+    </div>
+  );
+}
 
 const BUDGET_TONE = {
   under: { label: "Well Under Budget", emoji: "🌿", chip: ACCENTS.mint },
@@ -511,7 +536,7 @@ function IdeaBoard({ dest, plans, onAdd, onDelete, onAddComment, onEdit, onAddTo
           const active = mode === t.id;
           return (
             <button key={t.id} onClick={() => { setMode(t.id); setError(""); }} className="flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-extrabold transition-all hover:scale-[1.03] active:scale-95"
-              style={{ backgroundColor: active ? accent.hex : "#fff", color: active ? accent.text : "#A8A29E", border: `1.5px solid ${active ? accent.border : "#E7E1D8"}` }}>
+              style={{ backgroundColor: active ? accent.hex : "var(--surface)", color: active ? accent.text : "#A8A29E", border: `1.5px solid ${active ? accent.border : "#E7E1D8"}` }}>
               <t.icon size={13} strokeWidth={2.8} /> {t.label}
             </button>
           );
@@ -783,7 +808,7 @@ function PassportCard({ dest, votes, onVote, isOpen, onToggle, plans, onAddPlan,
               <p className="mb-2 text-[11px] font-bold uppercase tracking-wide text-stone-400">Who wants it?</p>
               <div className="grid grid-cols-2 gap-2">
                 {["max", "partner"].map((who) => (
-                  <button key={who} onClick={(e) => { e.stopPropagation(); onVote(dest.id, who); }} className="flex items-center justify-center gap-2 rounded-2xl px-3 py-2.5 transition-all hover:scale-[1.02] active:scale-95" style={{ backgroundColor: "#fff", border: `1.5px solid ${accent.border}` }}>
+                  <button key={who} onClick={(e) => { e.stopPropagation(); onVote(dest.id, who); }} className="flex items-center justify-center gap-2 rounded-2xl px-3 py-2.5 transition-all hover:scale-[1.02] active:scale-95" style={{ backgroundColor: "var(--surface)", border: `1.5px solid ${accent.border}` }}>
                     <span className="text-xs font-extrabold text-stone-500">{WHO_LABEL[who]}</span>
                     <Heart size={15} strokeWidth={2.6} style={{ color: accent.text, fill: votes[who] > 0 ? accent.hex : "transparent" }} className={votes[who] > 0 ? "animate-pop" : ""} key={votes[who]} />
                     <span className="text-sm font-extrabold tabular-nums" style={{ color: accent.text }}>{votes[who]}</span>
@@ -1223,7 +1248,7 @@ function PackingRow({ item, onToggle, onChange, onRemove }) {
   useEffect(() => { setText(item.text || ""); }, [item.id]);
   return (
     <div className="flex items-center gap-2">
-      <button onClick={() => onToggle(item.id)} className="flex h-5 w-5 flex-shrink-0 items-center justify-center rounded-md border-2 transition-colors" style={{ borderColor: item.done ? ACCENTS.mint.border : "#D6D3D1", backgroundColor: item.done ? ACCENTS.mint.hex : "#fff", color: ACCENTS.mint.text }}>{item.done && <Check size={12} strokeWidth={3.5} />}</button>
+      <button onClick={() => onToggle(item.id)} className="flex h-5 w-5 flex-shrink-0 items-center justify-center rounded-md border-2 transition-colors" style={{ borderColor: item.done ? ACCENTS.mint.border : "#D6D3D1", backgroundColor: item.done ? ACCENTS.mint.hex : "var(--surface)", color: ACCENTS.mint.text }}>{item.done && <Check size={12} strokeWidth={3.5} />}</button>
       <input value={text} onChange={(e) => setText(e.target.value)} onBlur={() => text !== item.text && onChange(item.id, { text })} placeholder="item…" className={`min-w-0 flex-1 rounded-lg border border-stone-200 px-2 py-1.5 text-sm outline-none focus:border-rose-200 ${item.done ? "text-stone-400 line-through" : ""}`} />
       <button onClick={() => onRemove(item.id)} className="text-stone-300 hover:text-rose-400" aria-label="Remove"><X size={13} /></button>
     </div>
@@ -1406,7 +1431,7 @@ function ItemEditor({ item, onUpdate, onRemove, onClose }) {
             const active = item.kind === k.kind;
             const c = KIND_COLOR[k.kind];
             return (
-              <button key={k.kind} onClick={() => onUpdate(item.id, { kind: k.kind })} className="flex flex-1 flex-col items-center gap-1 rounded-xl px-2 py-2 text-[10px] font-extrabold transition-all" style={{ backgroundColor: active ? c.hex : "#fff", color: active ? c.text : "#A8A29E", border: `1.5px solid ${active ? c.border : "#E7E1D8"}` }}>
+              <button key={k.kind} onClick={() => onUpdate(item.id, { kind: k.kind })} className="flex flex-1 flex-col items-center gap-1 rounded-xl px-2 py-2 text-[10px] font-extrabold transition-all" style={{ backgroundColor: active ? c.hex : "var(--surface)", color: active ? c.text : "#A8A29E", border: `1.5px solid ${active ? c.border : "#E7E1D8"}` }}>
                 <k.icon size={15} strokeWidth={2.6} /> {KIND_META[k.kind].label}
               </button>
             );
@@ -1482,7 +1507,7 @@ function ItineraryView({ chosenDest, onSetChosen }) {
         {DESTINATIONS.map((x) => {
           const active = x.id === dest;
           return (
-            <button key={x.id} onClick={() => { setDest(x.id); setDay(0); }} className="flex items-center gap-1.5 rounded-full px-3 py-2 text-sm font-extrabold transition-all" style={{ backgroundColor: active ? x.accent.hex : "#fff", color: active ? x.accent.text : "#A8A29E", border: `1.5px solid ${active ? x.accent.border : "#E7E1D8"}` }}>
+            <button key={x.id} onClick={() => { setDest(x.id); setDay(0); }} className="flex items-center gap-1.5 rounded-full px-3 py-2 text-sm font-extrabold transition-all" style={{ backgroundColor: active ? x.accent.hex : "var(--surface)", color: active ? x.accent.text : "#A8A29E", border: `1.5px solid ${active ? x.accent.border : "#E7E1D8"}` }}>
               {chosenDest === x.id && "⭐"} {x.emoji} {x.name}
             </button>
           );
@@ -1584,6 +1609,8 @@ export default function App() {
   const [lightbox, setLightbox] = useState(null); // { images, index } | null
   const openLightbox = useCallback((images, index = 0) => setLightbox({ images: images.filter(Boolean), index }), []);
   const [muted, setMuted] = useState(sound.muted);
+  const [dark, setDark] = useState(() => { try { const s = localStorage.getItem("site.theme"); if (s) return s === "dark"; return !!(window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches); } catch (e) { return false; } });
+  useEffect(() => { try { document.documentElement.classList.toggle("dark", dark); localStorage.setItem("site.theme", dark ? "dark" : "light"); } catch (e) {} }, [dark]);
   const hydrated = useRef(false);
   const lastSynced = useRef(null);
 
@@ -1746,7 +1773,8 @@ export default function App() {
         </div>
       </div>
     )}
-    <div className="min-h-screen w-full font-sans text-stone-800" style={{ backgroundColor: "#FFFDF9", backgroundImage: "radial-gradient(circle at 15% 10%, #FFF5F0 0, transparent 45%), radial-gradient(circle at 85% 90%, #EEF6F1 0, transparent 48%)" }}>
+    <div className="relative isolate min-h-screen w-full font-sans text-stone-800" style={{ backgroundColor: dark ? "#0b0b12" : "#FFFDF9", backgroundImage: dark ? "radial-gradient(circle at 50% -5%, #1c1830 0, transparent 40%), radial-gradient(circle at 15% 12%, #141024 0, transparent 45%), radial-gradient(circle at 85% 88%, #0d1622 0, transparent 48%)" : "radial-gradient(circle at 15% 10%, #FFF5F0 0, transparent 45%), radial-gradient(circle at 85% 90%, #EEF6F1 0, transparent 48%)" }}>
+      {dark && <StarField />}
       <div className="pointer-events-none fixed inset-0 opacity-[0.18]" style={{ backgroundImage: "radial-gradient(#EEE8DE 1px, transparent 1px)", backgroundSize: "26px 26px" }} />
 
       <div className="relative mx-auto max-w-6xl px-4 py-10 sm:px-6 lg:py-14">
@@ -1823,6 +1851,9 @@ export default function App() {
               <span className="text-sm font-bold text-stone-500">You: {WHO_NAME[me]}</span>
             </button>
           )}
+          <button onClick={() => { setDark((d) => !d); sound.pop(); }} className="flex items-center gap-2 rounded-2xl border border-stone-200 bg-white/70 px-4 py-2.5 backdrop-blur transition-colors hover:border-rose-200" title={dark ? "Light mode" : "Dark mode"}>
+            {dark ? <Sun size={16} strokeWidth={2.6} style={{ color: "#E0A94A" }} /> : <Moon size={16} strokeWidth={2.6} className="text-stone-400" />}
+          </button>
           <button onClick={() => { const m = sound.toggle(); setMuted(m); if (!m) sound.pop(); }} className="flex items-center gap-2 rounded-2xl border border-stone-200 bg-white/70 px-4 py-2.5 backdrop-blur transition-colors hover:border-rose-200" title={muted ? "Sound off" : "Sound on"}>
             {muted ? <VolumeX size={16} strokeWidth={2.6} className="text-stone-400" /> : <Volume2 size={16} strokeWidth={2.6} style={{ color: ACCENTS.mint.text }} />}
             <span className="text-sm font-bold text-stone-500">{muted ? "Muted" : "Sound"}</span>
