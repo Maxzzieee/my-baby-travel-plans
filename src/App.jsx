@@ -71,26 +71,74 @@ const ACCENTS = {
   mint: { name: "Minty Pastel Green", hex: "#C5EBD5", soft: "#EDFAF2", border: "#A2DCBA", text: "#3F7C5C" },
 };
 
-// Night-sky starfield — only mounted in dark mode. Sits at z-index:-1 behind all
-// content (the root div is `isolate`, so this paints above its bg but below cards).
-function StarField() {
-  const stars = React.useMemo(() => Array.from({ length: 90 }, () => ({
+// 8-bit sky behind everything (z-index:-1; the root div is `isolate`, so this
+// paints above its bg but below the cards). Night = pixel stars + sparkles +
+// crescent moon + shooting stars. Day = pixel sun + drifting clouds.
+function Sky({ dark }) {
+  const stars = React.useMemo(() => Array.from({ length: 70 }, () => ({
     top: Math.random() * 100,
     left: Math.random() * 100,
-    size: +(Math.random() * 2 + 0.6).toFixed(2),
+    size: Math.round(Math.random() * 2) + 1, // 1–3px crisp squares
     dur: +(Math.random() * 3 + 2).toFixed(2),
     delay: +(Math.random() * 4).toFixed(2),
-    min: +(Math.random() * 0.3 + 0.08).toFixed(2),
+    min: +(Math.random() * 0.3 + 0.1).toFixed(2),
     max: +(Math.random() * 0.35 + 0.6).toFixed(2),
   })), []);
-  return (
-    <div className="starfield" aria-hidden="true">
+  const sparkles = React.useMemo(() => {
+    const tints = ["#ffffff", "#fff3b0", "#ffd6e8", "#bfefff", "#d6c8ff"];
+    return Array.from({ length: 15 }, () => ({
+      top: Math.random() * 92,
+      left: Math.random() * 95,
+      s: +(Math.random() * 0.8 + 0.7).toFixed(2),
+      color: tints[Math.floor(Math.random() * tints.length)],
+      dur: +(Math.random() * 2.5 + 1.8).toFixed(2),
+      delay: +(Math.random() * 4).toFixed(2),
+    }));
+  }, []);
+
+  if (dark) return (
+    <div className="skyfield sky-night" aria-hidden="true">
       {stars.map((s, i) => (
-        <span key={i} className="star" style={{ top: s.top + "%", left: s.left + "%", width: s.size, height: s.size, "--dur": s.dur + "s", "--delay": s.delay + "s", "--min": s.min, "--max": s.max }} />
+        <span key={i} className="pxstar" style={{ top: s.top + "%", left: s.left + "%", width: s.size, height: s.size, "--dur": s.dur + "s", "--delay": s.delay + "s", "--min": s.min, "--max": s.max }} />
       ))}
+      {sparkles.map((s, i) => (
+        <span key={i} className="sparkle" style={{ top: s.top + "%", left: s.left + "%", color: s.color, "--s": s.s, "--dur": s.dur + "s", "--delay": s.delay + "s" }} />
+      ))}
+      {/* pixel crescent moon */}
+      <svg className="pixel-moon" viewBox="0 0 8 8" shapeRendering="crispEdges">
+        <g fill="#F5ECC0">
+          <rect x="3" y="0" width="3" height="1" /><rect x="2" y="1" width="3" height="1" />
+          <rect x="1" y="2" width="3" height="4" /><rect x="2" y="6" width="3" height="1" />
+          <rect x="3" y="7" width="3" height="1" />
+        </g>
+      </svg>
       <span className="shooting-star" />
       <span className="shooting-star shooting-star-2" />
-      <div className="moon-glow" />
+    </div>
+  );
+
+  return (
+    <div className="skyfield sky-day" aria-hidden="true">
+      {/* pixel sun with rays */}
+      <svg className="pixel-sun" viewBox="0 0 16 16" shapeRendering="crispEdges">
+        <g fill="#FFD24A">
+          <rect x="7" y="1" width="2" height="2" /><rect x="7" y="13" width="2" height="2" />
+          <rect x="1" y="7" width="2" height="2" /><rect x="13" y="7" width="2" height="2" />
+          <rect x="3" y="3" width="2" height="2" /><rect x="11" y="3" width="2" height="2" />
+          <rect x="3" y="11" width="2" height="2" /><rect x="11" y="11" width="2" height="2" />
+        </g>
+        <g fill="#FFC93C">
+          <rect x="6" y="5" width="4" height="1" /><rect x="5" y="6" width="6" height="4" />
+          <rect x="6" y="10" width="4" height="1" />
+        </g>
+        <rect x="6" y="6" width="4" height="3" fill="#FFE28A" />
+      </svg>
+      <svg className="pxcloud pxcloud-1" viewBox="0 0 24 12" shapeRendering="crispEdges" fill="#ffffff">
+        <rect x="6" y="3" width="6" height="3" /><rect x="9" y="5" width="8" height="2" /><rect x="4" y="6" width="16" height="3" />
+      </svg>
+      <svg className="pxcloud pxcloud-2" viewBox="0 0 24 12" shapeRendering="crispEdges" fill="#ffffff">
+        <rect x="6" y="3" width="6" height="3" /><rect x="9" y="5" width="8" height="2" /><rect x="4" y="6" width="16" height="3" />
+      </svg>
     </div>
   );
 }
@@ -1774,7 +1822,7 @@ export default function App() {
       </div>
     )}
     <div className="relative isolate min-h-screen w-full font-sans text-stone-800" style={{ backgroundColor: dark ? "#0b0b12" : "#FFFDF9", backgroundImage: dark ? "radial-gradient(circle at 50% -5%, #1c1830 0, transparent 40%), radial-gradient(circle at 15% 12%, #141024 0, transparent 45%), radial-gradient(circle at 85% 88%, #0d1622 0, transparent 48%)" : "radial-gradient(circle at 15% 10%, #FFF5F0 0, transparent 45%), radial-gradient(circle at 85% 90%, #EEF6F1 0, transparent 48%)" }}>
-      {dark && <StarField />}
+      <Sky dark={dark} />
       <div className="pointer-events-none fixed inset-0 opacity-[0.18]" style={{ backgroundImage: "radial-gradient(#EEE8DE 1px, transparent 1px)", backgroundSize: "26px 26px" }} />
 
       <div className="relative mx-auto max-w-6xl px-4 py-10 sm:px-6 lg:py-14">
