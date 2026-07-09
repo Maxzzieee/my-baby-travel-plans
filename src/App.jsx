@@ -37,8 +37,13 @@ import {
   CalendarDays,
   Bed,
   Utensils,
+  Volume2,
+  VolumeX,
+  Plane as PlaneIcon,
 } from "lucide-react";
 import { hasSupabase, loadState, saveState, subscribe, loadGallery, postImage, deleteImage, subscribeGallery, loadCopy, saveCopy, subscribeCopy, loadMessages, postMessage, subscribeMessages, loadMessageCounts, subscribeAllMessages, uploadImage, loadItinerary, addItineraryItem, updateItineraryItem, deleteItineraryItem, subscribeItinerary } from "./lib/supabase";
+import { burstConfetti, sound } from "./fx";
+import SeedRush from "./SeedRush";
 
 // Which person is on THIS device ("me" | "baby"). Set once, stored locally.
 const IDENTITY_KEY = "maxbaby.identity.v1";
@@ -745,6 +750,29 @@ const mergeVotes = (raw) => { const base = emptyVotes(); if (raw) for (const id 
 const mergePlans = (raw) => { const base = emptyPlans(); if (raw) for (const id of Object.keys(base)) if (Array.isArray(raw[id])) base[id] = raw[id]; return base; };
 const WHO_LABEL = { max: "Me", partner: "Ants" };
 
+// Trip countdown + shared anniversary counter
+function TripBits({ anniversary, onSetAnn }) {
+  const [edit, setEdit] = useState(false);
+  const days = Math.ceil((TRIP_START.getTime() - Date.now()) / 86400000);
+  const together = anniversary ? Math.floor((Date.now() - new Date(anniversary).getTime()) / 86400000) : null;
+  return (
+    <div className="mx-auto mt-3 flex flex-wrap items-center justify-center gap-2">
+      <span className="inline-flex items-center gap-1 rounded-full border border-stone-200 bg-white/70 px-3 py-1 text-xs font-extrabold text-stone-500 backdrop-blur">
+        <PlaneIcon size={12} strokeWidth={2.6} />
+        {days > 1 ? `${days} days to go` : days === 1 ? "1 day to go!" : days === 0 ? "🎉 trip day!" : "we're on the trip!"}
+      </span>
+      <span className="inline-flex items-center gap-1 rounded-full border border-emerald-100 bg-white/70 px-3 py-1 text-xs font-extrabold text-emerald-500 backdrop-blur">
+        💚
+        {edit ? (
+          <input type="date" defaultValue={anniversary || ""} autoFocus onBlur={(e) => { onSetAnn(e.target.value); setEdit(false); }} className="bg-transparent text-emerald-600 outline-none" />
+        ) : (
+          <button onClick={() => setEdit(true)} title="Set the day you got together">{together != null ? `together ${together.toLocaleString()} days` : "set our date"}</button>
+        )}
+      </span>
+    </div>
+  );
+}
+
 const COPY_KEY = "maxbaby.copy.v1";
 const DEFAULT_COPY = {
   subtitle: "Our cozy year-end trip planner",
@@ -1252,6 +1280,7 @@ export default function App() {
   const [synced, setSynced] = useState(false);
   const [lightbox, setLightbox] = useState(null); // { images, index } | null
   const openLightbox = useCallback((images, index = 0) => setLightbox({ images: images.filter(Boolean), index }), []);
+  const [muted, setMuted] = useState(sound.muted);
   const hydrated = useRef(false);
   const lastSynced = useRef(null);
 
@@ -1340,7 +1369,7 @@ export default function App() {
     return () => clearTimeout(t);
   }, [votes, plans]);
 
-  const handleVote = (id, who) => setVotes((v) => ({ ...v, [id]: { ...v[id], [who]: v[id][who] + 1 } }));
+  const handleVote = (id, who) => { setVotes((v) => ({ ...v, [id]: { ...v[id], [who]: v[id][who] + 1 } })); sound.pop(); };
   const handleToggle = (id) => setOpenId((cur) => (cur === id ? null : id));
   const resetVotes = () => setVotes(emptyVotes());
   const addPlan = (destId, plan) => setPlans((p) => ({ ...p, [destId]: [plan, ...p[destId]] }));
@@ -1402,10 +1431,12 @@ export default function App() {
           <p className="mt-3 text-base font-semibold text-stone-500 sm:text-lg">
             <Editable value={copy.subtitle} onSave={(v) => updateCopy("subtitle", v)} rows={2} />
           </p>
+          <TripBits anniversary={copy.anniversary} onSetAnn={(v) => updateCopy("anniversary", v)} />
         </header>
 
-        {/* Glaggle Game — shared high score + play */}
+        {/* Games — shared high scores */}
         <GlaggleGame high={copy.glaggleHigh} onHigh={(h) => updateCopy("glaggleHigh", h)} />
+        <SeedRush high={copy.seedRushHigh} onHigh={(h) => updateCopy("seedRushHigh", h)} sound={sound} />
 
         {/* Tabs — show one section at a time */}
         <div className="mx-auto mt-8 flex max-w-xl items-center justify-center gap-1 rounded-2xl border border-stone-200 bg-white/70 p-1.5 backdrop-blur">
@@ -1454,6 +1485,10 @@ export default function App() {
               <span className="text-sm font-bold text-stone-500">You: {WHO_NAME[me]}</span>
             </button>
           )}
+          <button onClick={() => { const m = sound.toggle(); setMuted(m); if (!m) sound.pop(); }} className="flex items-center gap-2 rounded-2xl border border-stone-200 bg-white/70 px-4 py-2.5 backdrop-blur transition-colors hover:border-rose-200" title={muted ? "Sound off" : "Sound on"}>
+            {muted ? <VolumeX size={16} strokeWidth={2.6} className="text-stone-400" /> : <Volume2 size={16} strokeWidth={2.6} style={{ color: ACCENTS.mint.text }} />}
+            <span className="text-sm font-bold text-stone-500">{muted ? "Muted" : "Sound"}</span>
+          </button>
           <div className="flex items-center gap-2 rounded-2xl border border-stone-200 bg-white/70 px-4 py-2.5 backdrop-blur">
             <Trophy size={16} strokeWidth={2.6} style={{ color: leader ? leader.accent.text : "#B8AE9E" }} /><span className="text-sm font-bold text-stone-500">{leader ? <>Leader {leader.name}</> : "Tap a heart to vote"}</span>
           </div>
@@ -1501,7 +1536,7 @@ export default function App() {
         </section>
         )}
 
-        {view === "itinerary" && <ItineraryView chosenDest={copy.chosenDest} onSetChosen={(id) => updateCopy("chosenDest", id)} />}
+        {view === "itinerary" && <ItineraryView chosenDest={copy.chosenDest} onSetChosen={(id) => { updateCopy("chosenDest", id); if (id) { burstConfetti(); sound.yay(); } }} />}
 
         <footer className="mt-12 text-center text-xs text-stone-400">
           <p className="font-semibold">Made with ❄️ 🍱 🦦 🧸 ✨ for a very specific kind of cozy winter trip.</p>
