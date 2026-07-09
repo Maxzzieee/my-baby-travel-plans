@@ -63,12 +63,25 @@ alter table public.itinerary enable row level security;
 drop policy if exists "itinerary anon all" on public.itinerary;
 create policy "itinerary anon all" on public.itinerary for all using (true) with check (true);
 
+-- 2d) Joint chicken — one shared chick raised together ------------------------
+create table if not exists public.chicken (
+  id text primary key,
+  data jsonb,
+  last_client text,
+  updated_at timestamptz default now()
+);
+insert into public.chicken (id) values ('shared') on conflict (id) do nothing;
+alter table public.chicken enable row level security;
+drop policy if exists "chicken anon all" on public.chicken;
+create policy "chicken anon all" on public.chicken for all using (true) with check (true);
+
 -- 3) Realtime (ignore "already member" if you re-run) ---------------------------
 do $$ begin
   begin alter publication supabase_realtime add table public.trip_state; exception when others then null; end;
   begin alter publication supabase_realtime add table public.gallery;    exception when others then null; end;
   begin alter publication supabase_realtime add table public.messages;   exception when others then null; end;
   begin alter publication supabase_realtime add table public.itinerary;  exception when others then null; end;
+  begin alter publication supabase_realtime add table public.chicken;    exception when others then null; end;
 end $$;
 
 -- 4) Storage bucket for uploaded images ----------------------------------------

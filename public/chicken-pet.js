@@ -153,7 +153,48 @@
   var cutscene = null;   // { start, done }
   var eventInFlight = false;
 
-  function save() { try { localStorage.setItem(SAVE_KEY, JSON.stringify(S)); } catch (e) {} }
+  // --- Joint chicken: raise the SAME chick together, synced in realtime -----
+  var clientId = Math.random().toString(36).slice(2) + Date.now().toString(36);
+  var joint = false;         // true once Supabase sync is attached
+  var applyingRemote = false; // suppress re-push while adopting a partner's update
+  var pushTimer = null;
+  // fields that are ambient/local-only (per-device) and shouldn't sync
+  var LOCAL_ONLY = { collapsed: 1, log: 1 };
+
+  function pushRemote() {
+    if (!joint || !window.ChickenSync) return;
+    if (pushTimer) clearTimeout(pushTimer);
+    pushTimer = setTimeout(function () {
+      var snap = {};
+      for (var k in S) if (!LOCAL_ONLY[k]) snap[k] = S[k];
+      window.ChickenSync.save(snap, clientId);
+    }, 350);
+  }
+  function adoptRemote(data) {
+    if (!data || typeof data !== "object" || !data.stats) return;
+    applyingRemote = true;
+    for (var k in data) if (!LOCAL_ONLY[k]) S[k] = data[k];
+    applyingRemote = false;
+    // a partner-driven fate/chase resets local-only overlays
+    if (!S.pendingEvent) { /* keep local chase/cutscene as-is */ }
+    try { localStorage.setItem(SAVE_KEY, JSON.stringify(S)); } catch (e) {}
+    careerOpen = false;
+    renderUI();
+  }
+  function initJoint() {
+    if (!window.ChickenSync || !window.ChickenSync.hasSupabase) return;
+    joint = true;
+    window.ChickenSync.load().then(function (remote) {
+      if (remote && remote.stats) adoptRemote(remote);
+      else pushRemote(); // seed the shared chick with our local one
+      window.ChickenSync.subscribe(clientId, function (data) { adoptRemote(data); });
+    }).catch(function () {});
+  }
+
+  function save() {
+    try { localStorage.setItem(SAVE_KEY, JSON.stringify(S)); } catch (e) {}
+    if (joint && !applyingRemote) pushRemote();
+  }
   function clamp(n) { return Math.max(0, Math.min(100, Math.round(n))); }
   function hasPerk(p) { return S.perks.indexOf(p) >= 0; }
   function hasTrait(t) { return S.traits.indexOf(t) >= 0; }
@@ -615,7 +656,7 @@
     root.innerHTML = "";
 
     var card = el('<div class="cpet-card"></div>');
-    card.appendChild(el('<div class="cpet-head"><span class="cpet-title">🐣 <b class="cpet-name"></b> <span class="cpet-gen"></span></span><button class="cpet-collapse" title="Shrink to egg">🥚</button></div>'));
+    card.appendChild(el('<div class="cpet-head"><span class="cpet-title">🐣 <b class="cpet-name" title="Tap to rename"></b> <span class="cpet-gen"></span> <span class="cpet-joint" hidden>🤝</span></span><button class="cpet-collapse" title="Shrink to egg">🥚</button></div>'));
     canvas = el('<canvas class="cpet-canvas" width="' + GW * C + '" height="' + GH * C + '"></canvas>');
     card.appendChild(canvas);
     ctx = canvas.getContext("2d");
@@ -644,12 +685,19 @@
     refs = {
       card: card, egg: egg,
       name: card.querySelector(".cpet-name"), gen: card.querySelector(".cpet-gen"),
+      joint: card.querySelector(".cpet-joint"),
       actions: card.querySelector(".cpet-actions"),
       career: card.querySelector(".cpet-career"), log: card.querySelector(".cpet-log"),
       overlay: card.querySelector(".cpet-overlay")
     };
     card.querySelector(".cpet-collapse").addEventListener("click", function () { S.collapsed = true; save(); renderUI(); });
     egg.addEventListener("click", function () { S.collapsed = false; save(); renderUI(); });
+    // tap the name to rename the chick (syncs when joint)
+    refs.name.style.cursor = "pointer";
+    refs.name.addEventListener("click", function () {
+      var nm = window.prompt("Name your chick:", S.name);
+      if (nm && nm.trim()) { S.name = nm.trim().slice(0, 16); log("✏️ Renamed to " + S.name + "."); save(); renderUI(); }
+    });
   }
 
   function renderActions() {
@@ -724,6 +772,10 @@
     if (!refs.card) return;
     refs.card.hidden = S.collapsed;
     refs.egg.hidden = !S.collapsed;
+    if (refs.joint) { refs.joint.hidden = !joint; refs.joint.title = joint ? "Joint chick — you're raising it together" : ""; }
+    // pulse the collapsed egg when something needs attention
+    var needs = !!(S.pendingEvent || !S.alive || chase);
+    if (refs.egg) refs.egg.className = "cpet-egg" + (S.collapsed && needs ? " cpet-egg-alert" : "");
     if (S.collapsed) return;
 
     var stage = stageOf(S.age);
@@ -783,6 +835,9 @@
     build();
     renderUI();
     requestAnimationFrame(loop);
+    // attach joint sync now, or as soon as the React bridge appears
+    if (window.ChickenSync) initJoint();
+    else { var tries = 0; var iv = setInterval(function () { if (window.ChickenSync || tries++ > 40) { clearInterval(iv); if (window.ChickenSync) initJoint(); } }, 150); }
     window.ChickenPet = { state: S, save: save, reset: function () { localStorage.removeItem(SAVE_KEY); location.reload(); } };
     console.log("[chicken-pet] initialized — Gen " + S.gen + " " + S.name + " (" + stageOf(S.age) + ")");
   }

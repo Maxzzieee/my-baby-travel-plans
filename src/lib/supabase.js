@@ -325,6 +325,38 @@ export function joinRoom(me, handlers) {
   };
 }
 
+// ---------------------------------------------------------------------------
+// Joint chicken — one shared chick raised together, realtime
+// ---------------------------------------------------------------------------
+const CHICKEN_ID = "shared";
+export async function loadChicken() {
+  if (!supabase) return null;
+  try {
+    const { data, error } = await supabase.from("chicken").select("data").eq("id", CHICKEN_ID).maybeSingle();
+    if (error) { console.warn("[supabase] loadChicken:", error.message); return null; }
+    return data ? data.data : null;
+  } catch (e) { console.warn("[supabase] loadChicken failed:", e?.message || e); return null; }
+}
+export async function saveChicken(state, client) {
+  if (!supabase) return;
+  try {
+    const { error } = await supabase.from("chicken").upsert({ id: CHICKEN_ID, data: state, last_client: client, updated_at: new Date().toISOString() });
+    if (error) console.warn("[supabase] saveChicken:", error.message);
+  } catch (e) { console.warn("[supabase] saveChicken failed:", e?.message || e); }
+}
+export function subscribeChicken(client, onRemote) {
+  if (!supabase) return () => {};
+  const channel = supabase
+    .channel("chicken_changes")
+    .on("postgres_changes", { event: "*", schema: "public", table: "chicken", filter: `id=eq.${CHICKEN_ID}` }, (payload) => {
+      const row = payload.new;
+      if (!row || row.last_client === client) return;
+      onRemote(row.data);
+    })
+    .subscribe();
+  return () => supabase.removeChannel(channel);
+}
+
 export function subscribeItinerary(dest, onChange) {
   if (!supabase) return () => {};
   // No dest filter: Supabase DELETE events only carry the primary key, so a
