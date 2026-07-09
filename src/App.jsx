@@ -1022,6 +1022,79 @@ function Lightbox({ data, onClose }) {
 }
 
 // ---------------------------------------------------------------------------
+// Spin the Wheel — tie-breaker that lands on a random destination
+// ---------------------------------------------------------------------------
+function SpinWheel() {
+  const [open, setOpen] = useState(false);
+  const [spinning, setSpinning] = useState(false);
+  const [winner, setWinner] = useState(null);
+  const [rot, setRot] = useState(0);
+  const canvasRef = useRef(null);
+  const N = DESTINATIONS.length;
+  const slice = 360 / N;
+
+  const drawWheel = useCallback(() => {
+    const cv = canvasRef.current; if (!cv) return;
+    const ctx = cv.getContext("2d");
+    const S = 260, cx = S / 2, cy = S / 2, R = S / 2 - 4;
+    ctx.clearRect(0, 0, S, S);
+    DESTINATIONS.forEach((d, i) => {
+      const a0 = (-90 + i * slice) * Math.PI / 180;
+      const a1 = (-90 + (i + 1) * slice) * Math.PI / 180;
+      ctx.beginPath(); ctx.moveTo(cx, cy); ctx.arc(cx, cy, R, a0, a1); ctx.closePath();
+      ctx.fillStyle = d.accent.hex; ctx.fill();
+      ctx.strokeStyle = "#fff"; ctx.lineWidth = 2; ctx.stroke();
+      ctx.save();
+      ctx.translate(cx, cy); ctx.rotate((a0 + a1) / 2); ctx.textAlign = "right";
+      ctx.fillStyle = d.accent.text; ctx.font = "bold 13px ui-rounded, system-ui, sans-serif";
+      ctx.fillText(d.emoji + " " + d.name, R - 12, 5);
+      ctx.restore();
+    });
+    ctx.beginPath(); ctx.arc(cx, cy, 16, 0, 7); ctx.fillStyle = "#fff"; ctx.fill(); ctx.strokeStyle = "#EBE5DB"; ctx.lineWidth = 2; ctx.stroke();
+  }, [slice]);
+
+  useEffect(() => { if (open) drawWheel(); }, [open, drawWheel]);
+
+  const spin = () => {
+    if (spinning) return;
+    setWinner(null); setSpinning(true);
+    const idx = Math.floor(Math.random() * N);
+    const finalOrient = (360 - (idx * slice + slice / 2) + 360) % 360;
+    const delta = ((finalOrient - (rot % 360)) + 360) % 360 + (5 + Math.floor(Math.random() * 3)) * 360;
+    setRot((r) => r + delta);
+    setTimeout(() => { setSpinning(false); setWinner(DESTINATIONS[idx]); burstConfetti(); sound.yay(); }, 4300);
+  };
+
+  return (
+    <>
+      <div className="mx-auto mt-3 flex max-w-md items-center justify-center gap-2 rounded-2xl border border-stone-200 bg-white/70 px-4 py-2 backdrop-blur">
+        <span className="text-base">🎡</span>
+        <span className="text-xs font-extrabold uppercase tracking-wide text-stone-400">Can't decide?</span>
+        <button onClick={() => { setOpen(true); setWinner(null); }} className="ml-1 rounded-full px-3 py-1 text-xs font-extrabold transition-all hover:scale-105 active:scale-95" style={{ backgroundColor: ACCENTS.blush.hex, color: ACCENTS.blush.text, border: `1.5px solid ${ACCENTS.blush.border}` }}>Spin the wheel</button>
+      </div>
+      {open && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-stone-900/45 p-4 backdrop-blur-sm" onClick={() => setOpen(false)}>
+          <div className="flex flex-col items-center rounded-3xl bg-white p-6 shadow-xl" onClick={(e) => e.stopPropagation()}>
+            <div className="mb-1 flex w-full items-center justify-between">
+              <span className="text-sm font-black text-stone-700">🎡 Where to?!</span>
+              <button onClick={() => setOpen(false)} className="text-stone-400 hover:text-rose-400" aria-label="Close"><X size={18} /></button>
+            </div>
+            <div className="relative mt-2" style={{ width: 260, height: 260 }}>
+              <div className="absolute left-1/2 top-[-6px] z-10 -translate-x-1/2" style={{ width: 0, height: 0, borderLeft: "10px solid transparent", borderRight: "10px solid transparent", borderTop: "16px solid #E5484D" }} />
+              <canvas ref={canvasRef} width={260} height={260} style={{ transform: `rotate(${rot}deg)`, transition: "transform 4.2s cubic-bezier(.15,.9,.25,1)" }} />
+            </div>
+            <div className="mt-4 h-8 text-center">
+              {winner ? <p className="animate-pop text-lg font-black" style={{ color: winner.accent.text }}>{winner.emoji} {winner.name}!</p> : spinning ? <p className="text-sm font-bold text-stone-400">spinning…</p> : <p className="text-sm font-bold text-stone-400">give it a spin 👇</p>}
+            </div>
+            <button onClick={spin} disabled={spinning} className="rounded-full px-6 py-2.5 text-sm font-extrabold transition-all hover:scale-105 active:scale-95 disabled:opacity-50" style={{ backgroundColor: ACCENTS.blush.hex, color: ACCENTS.blush.text, border: `1.5px solid ${ACCENTS.blush.border}` }}>{spinning ? "…" : winner ? "Spin again" : "SPIN"}</button>
+          </div>
+        </div>
+      )}
+    </>
+  );
+}
+
+// ---------------------------------------------------------------------------
 // Glaggle Game — whack-the-glaggle. Timer shrinks as you score; at the end he
 // darts around on his own. High score is shared (synced) with who holds it.
 // ---------------------------------------------------------------------------
@@ -1691,6 +1764,8 @@ export default function App() {
         {/* Games — shared high scores */}
         <GlaggleGame high={copy.glaggleHigh} onHigh={(h) => updateCopy("glaggleHigh", h)} />
         <SeedRush high={copy.seedRushHigh} onHigh={(h) => updateCopy("seedRushHigh", h)} sound={sound} />
+
+        <SpinWheel />
 
         {/* Live reactions dock — floats on both screens */}
         <div className="mx-auto mt-3 flex max-w-md items-center justify-center gap-1 rounded-2xl border border-stone-200 bg-white/70 px-3 py-1.5 backdrop-blur">
