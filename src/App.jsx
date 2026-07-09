@@ -695,6 +695,49 @@ function DestChat({ dest, isOpen }) {
 }
 
 // ---------------------------------------------------------------------------
+// Flight prices — Amadeus live top-5 (when a key is set) + Google Flights link
+// ---------------------------------------------------------------------------
+function FlightPrices({ dest }) {
+  const [st, setSt] = useState({ status: "idle" });
+  const gf = "https://www.google.com/travel/flights?q=" + encodeURIComponent("Flights from Singapore to " + dest.name + " on 2026-11-27 through 2026-12-04");
+  const load = async () => {
+    setSt({ status: "loading" });
+    try {
+      const r = await fetch("/api/flights?to=" + dest.id);
+      const j = await r.json();
+      if (j.configured === false) setSt({ status: "unconfigured" });
+      else setSt({ status: "ok", offers: j.offers || [], note: j.note || "" });
+    } catch (e) { setSt({ status: "error" }); }
+  };
+  const mint = ACCENTS.mint;
+  return (
+    <div className="rounded-2xl p-4" style={{ backgroundColor: mint.soft, border: `1.5px solid ${mint.border}` }}>
+      <p className="flex items-center gap-1.5 text-xs font-extrabold uppercase tracking-wide" style={{ color: mint.text }}><PlaneIcon size={13} strokeWidth={2.8} /> Flights · SIN → {dest.name}</p>
+      <div className="mt-2 flex flex-wrap gap-2">
+        <button onClick={load} disabled={st.status === "loading"} className="flex items-center gap-1.5 rounded-xl px-3 py-1.5 text-xs font-extrabold transition-all hover:scale-[1.03] active:scale-95 disabled:opacity-50" style={{ backgroundColor: mint.hex, color: mint.text, border: `1.5px solid ${mint.border}` }}>
+          {st.status === "loading" ? <Loader2 size={13} className="animate-spin" /> : <RefreshCw size={13} strokeWidth={2.8} />} {st.status === "loading" ? "Checking…" : "Live prices"}
+        </button>
+        <a href={gf} target="_blank" rel="noreferrer" className="flex items-center gap-1 rounded-xl bg-white px-3 py-1.5 text-xs font-extrabold text-stone-500 transition-colors hover:text-rose-400" style={{ border: "1.5px solid #E7E1D8" }}><ExternalLink size={12} /> Open in Google Flights</a>
+      </div>
+      {st.status === "unconfigured" && <p className="mt-2 text-xs text-stone-400">Live prices need an Amadeus key (add it in Vercel). Google Flights works now ↑</p>}
+      {st.status === "error" && <p className="mt-2 text-xs text-stone-400">Couldn't reach the price service — use Google Flights ↑ (live prices work once deployed with a key)</p>}
+      {st.status === "ok" && (!st.offers || st.offers.length === 0) && <p className="mt-2 text-xs text-stone-400">No live offers for these dates{st.note ? ` (${st.note})` : ""} — try Google Flights ↑</p>}
+      {st.status === "ok" && st.offers && st.offers.length > 0 && (
+        <div className="mt-2 space-y-1.5">
+          <p className="text-[10px] font-bold uppercase tracking-wide text-stone-400">Top {st.offers.length} cheapest (round-trip)</p>
+          {st.offers.map((o, i) => (
+            <a key={i} href={gf} target="_blank" rel="noreferrer" className="flex items-center justify-between gap-2 rounded-xl bg-white px-3 py-2 text-xs transition-transform hover:scale-[1.01]" style={{ border: "1px solid #EBE5DB" }}>
+              <span className="font-bold text-stone-700">S${o.price.toFixed(0)} <span className="font-semibold text-stone-500">· {o.airlines.join(" / ")}</span></span>
+              <span className="text-[11px] text-stone-400">{o.outStops === 0 ? "direct" : o.outStops + " stop"} · 🧳 {o.bags}</span>
+            </a>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
 // Passport card
 // ---------------------------------------------------------------------------
 function PassportCard({ dest, votes, onVote, isOpen, onToggle, plans, onAddPlan, onDeletePlan, onAddComment, overrides, onEditField, unread = 0, onEditPlan, onAddToItinerary }) {
@@ -757,6 +800,7 @@ function PassportCard({ dest, votes, onVote, isOpen, onToggle, plans, onAddPlan,
             </div>
             <p className="text-xs text-stone-400">{budget.emoji} {budget.label} · {E("carrier", dest.flight.carrier, { className: "text-xs" })} · {E("weatherLabel", dest.weather.label, { className: "text-xs" })}, {E("weatherSnow", dest.weather.snow, { multiline: true, className: "text-xs" })}</p>
 
+            <FlightPrices dest={dest} />
             <LiveWeather coords={dest.coords} accent={accent} />
             <div className="rounded-2xl p-4" style={{ backgroundColor: accent.soft, border: `1.5px solid ${accent.border}` }}>
               <p className="flex items-center gap-1.5 text-xs font-extrabold uppercase tracking-wide" style={{ color: accent.text }}><Train size={14} strokeWidth={2.8} /> Basecamp</p>

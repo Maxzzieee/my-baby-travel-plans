@@ -183,6 +183,49 @@ app.post("/api/fate", async (req, res) => {
   }
 });
 
+// Flight prices via Amadeus Self-Service (mirrors api/flights.js on Vercel)
+const FL_CITY = { sapporo: "CTS", seoul: "ICN", tokyo: "TYO", taipei: "TPE", fukuoka: "FUK", sydney: "SYD" };
+const FL_ORIGIN = "SIN", FL_DEPART = "2026-11-27", FL_RETURN = "2026-12-04";
+const flBase = () => (process.env.AMADEUS_ENV === "production" ? "https://api.amadeus.com" : "https://test.api.amadeus.com");
+let flToken = { token: null, exp: 0 };
+async function flGetToken() {
+  if (flToken.token && Date.now() < flToken.exp) return flToken.token;
+  const r = await fetch(flBase() + "/v1/security/oauth2/token", {
+    method: "POST", headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body: new URLSearchParams({ grant_type: "client_credentials", client_id: process.env.AMADEUS_KEY, client_secret: process.env.AMADEUS_SECRET }),
+  });
+  const j = await r.json();
+  if (!j.access_token) throw new Error(j.error_description || "Amadeus auth failed");
+  flToken = { token: j.access_token, exp: Date.now() + (j.expires_in - 60) * 1000 };
+  return flToken.token;
+}
+app.get("/api/flights", async (req, res) => {
+  const to = String(req.query.to || "").toLowerCase();
+  const dest = FL_CITY[to];
+  if (!dest) return res.status(400).json({ error: "unknown destination" });
+  if (!process.env.AMADEUS_KEY || !process.env.AMADEUS_SECRET) return res.json({ configured: false, dest });
+  try {
+    const token = await flGetToken();
+    const url = `${flBase()}/v2/shopping/flight-offers?originLocationCode=${FL_ORIGIN}&destinationLocationCode=${dest}&departureDate=${FL_DEPART}&returnDate=${FL_RETURN}&adults=1&currencyCode=SGD&max=15`;
+    const r = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
+    const j = await r.json();
+    if (j.errors) return res.json({ configured: true, offers: [], note: j.errors[0]?.detail || "no offers" });
+    const carriers = (j.dictionaries && j.dictionaries.carriers) || {};
+    const dur = (d) => (d || "").replace("PT", "").replace("H", "h ").replace("M", "m").toLowerCase().trim();
+    const offers = (j.data || []).map((o) => {
+      const out = o.itineraries[0], back = o.itineraries[1], segs = out.segments;
+      const bi = o.travelerPricings?.[0]?.fareDetailsBySegment?.[0]?.includedCheckedBags;
+      const bags = bi ? (bi.quantity != null ? `${bi.quantity} bag${bi.quantity !== 1 ? "s" : ""}` : bi.weight ? `${bi.weight}${bi.weightUnit || "kg"}` : "included") : "none / add-on";
+      const codes = [...new Set(segs.map((s) => s.carrierCode))];
+      return { price: Number(o.price.grandTotal), currency: o.price.currency || "SGD", airlines: codes.map((c) => carriers[c] || c), outStops: segs.length - 1, outDur: dur(out.duration), backStops: back ? back.segments.length - 1 : null, depTime: segs[0].departure.at, bags };
+    }).sort((a, b) => a.price - b.price).slice(0, 5);
+    res.json({ configured: true, offers });
+  } catch (err) {
+    console.error("flights error:", err?.message || err);
+    res.json({ configured: true, offers: [], note: err?.message || "lookup failed" });
+  }
+});
+
 app.get("/api/health", (_req, res) => res.json({ ok: true }));
 
 const PORT = process.env.PORT || 8787;
