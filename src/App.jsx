@@ -41,9 +41,12 @@ import {
   VolumeX,
   Plane as PlaneIcon,
 } from "lucide-react";
-import { hasSupabase, loadState, saveState, subscribe, loadGallery, postImage, deleteImage, subscribeGallery, loadCopy, saveCopy, subscribeCopy, loadMessages, postMessage, subscribeMessages, loadMessageCounts, subscribeAllMessages, uploadImage, loadItinerary, addItineraryItem, updateItineraryItem, deleteItineraryItem, subscribeItinerary } from "./lib/supabase";
-import { burstConfetti, sound } from "./fx";
+import { hasSupabase, loadState, saveState, subscribe, loadGallery, postImage, deleteImage, subscribeGallery, loadCopy, saveCopy, subscribeCopy, loadMessages, postMessage, subscribeMessages, loadMessageCounts, subscribeAllMessages, uploadImage, loadItinerary, addItineraryItem, updateItineraryItem, deleteItineraryItem, subscribeItinerary, joinRoom } from "./lib/supabase";
+import { burstConfetti, floatEmoji, sound } from "./fx";
 import SeedRush from "./SeedRush";
+
+const RoomContext = React.createContext({ sendTyping: function () {}, typingByDest: {} });
+const REACTIONS = ["💕", "😂", "🔥", "😍", "🥺", "🐔"];
 
 // Which person is on THIS device ("me" | "baby"). Set once, stored locally.
 const IDENTITY_KEY = "maxbaby.identity.v1";
@@ -110,6 +113,14 @@ const DESTINATIONS = [
     weather: { range: "15°C to 20°C", label: "Cool & mild", snow: "Needs a Cingjing / Alishan mountain day for sub-10°C cold", snowIcon: false },
     sunset: "5:05 PM", sunsetNote: "Soft warm evenings, lightest jacket of the lot",
     basecamp: { station: "Shuanglian Station", logic: "1 stop on Red Line to Taipei Main", vibe: "Right next to Ningxia Night Market food rows", price: "S$70–S$90 / night" },
+  },
+  {
+    id: "sydney", emoji: "🦘", name: "Sydney", region: "Australia", tagline: "Summer down under & harbour city",
+    accent: ACCENTS.mint, cozyScore: 2, coords: { lat: -33.8688, lon: 151.2093 }, recommendation: { rank: 6 },
+    flight: { price: "S$748", per: "per pax", carrier: "Scoot / Jetstar", budget: "onbudget", note: "Decent fare (~S$748) — but it's Aussie summer, the opposite of a cozy-cold trip." },
+    weather: { range: "18°C to 26°C", label: "Warm summer", snow: "Sunny beach weather — the opposite of cozy-cold", snowIcon: false },
+    sunset: "7:50 PM", sunsetNote: "Long bright evenings — no early cozy dark",
+    basecamp: { station: "Newtown Station", logic: "a few stops on the T2 line into Central", vibe: "Cafés, indie shops, walkable inner-west", price: "S$110–S$140 / night" },
   },
   {
     id: "fukuoka", emoji: "🍱", name: "Fukuoka", region: "Kyushu, Japan", tagline: "Yatai stalls & coastal calm",
@@ -595,10 +606,20 @@ function IdeaBoard({ dest, plans, onAdd, onDelete, onAddComment, onEdit, onAddTo
 function DestChat({ dest, isOpen }) {
   const accent = dest.accent;
   const me = useContext(IdentityContext);
+  const roomCtx = useContext(RoomContext);
   const [msgs, setMsgs] = useState([]);
   const [text, setText] = useState("");
   const [sending, setSending] = useState(false);
   const endRef = useRef(null);
+  const typingTimer = useRef(null);
+  const typerWho = roomCtx.typingByDest && roomCtx.typingByDest[dest.id];
+  const onType = () => {
+    if (!roomCtx.sendTyping) return;
+    roomCtx.sendTyping(dest.id, true);
+    if (typingTimer.current) clearTimeout(typingTimer.current);
+    typingTimer.current = setTimeout(() => roomCtx.sendTyping(dest.id, false), 1800);
+  };
+  const stopTyping = () => { if (typingTimer.current) clearTimeout(typingTimer.current); if (roomCtx.sendTyping) roomCtx.sendTyping(dest.id, false); };
 
   const refresh = useCallback(async () => { setMsgs(await loadMessages(dest.id)); }, [dest.id]);
 
@@ -614,7 +635,7 @@ function DestChat({ dest, isOpen }) {
   const send = async () => {
     const body = text.trim();
     if (!body || sending) return;
-    setText(""); setSending(true);
+    setText(""); setSending(true); stopTyping();
     // optimistic — show instantly for the sender
     const optimistic = { id: `tmp_${Date.now()}`, dest: dest.id, who: me, body, created_at: new Date().toISOString(), _optimistic: true };
     setMsgs((m) => [...m, optimistic]);
@@ -654,8 +675,19 @@ function DestChat({ dest, isOpen }) {
         <div ref={endRef} />
       </div>
 
+      {typerWho && typerWho !== me && (
+        <p className="mt-1 flex items-center gap-1 px-1 text-[11px] font-semibold italic text-stone-400">
+          <span className="inline-flex gap-0.5">
+            <span className="h-1 w-1 animate-bounce rounded-full bg-stone-400" style={{ animationDelay: "0ms" }} />
+            <span className="h-1 w-1 animate-bounce rounded-full bg-stone-400" style={{ animationDelay: "120ms" }} />
+            <span className="h-1 w-1 animate-bounce rounded-full bg-stone-400" style={{ animationDelay: "240ms" }} />
+          </span>
+          {WHO_NAME[typerWho] || "Someone"} is typing…
+        </p>
+      )}
+
       <div className="mt-3 flex items-center gap-1.5">
-        <input value={text} onChange={(e) => setText(e.target.value)} onKeyDown={(e) => e.key === "Enter" && send()} placeholder={`Message as ${WHO_NAME[me]}…`} className="flex-1 rounded-xl border-2 border-stone-200 px-3 py-2 text-sm outline-none focus:border-rose-200" />
+        <input value={text} onChange={(e) => { setText(e.target.value); onType(); }} onKeyDown={(e) => e.key === "Enter" && send()} onBlur={stopTyping} placeholder={`Message as ${WHO_NAME[me]}…`} className="flex-1 rounded-xl border-2 border-stone-200 px-3 py-2 text-sm outline-none focus:border-rose-200" />
         <button onClick={send} disabled={!text.trim() || sending} className="rounded-xl p-2 transition-all hover:scale-105 active:scale-95 disabled:opacity-40" style={{ backgroundColor: accent.hex, color: accent.text }} aria-label="Send"><Send size={15} strokeWidth={2.8} /></button>
       </div>
     </div>
@@ -1288,6 +1320,29 @@ export default function App() {
   const [me, setMe] = useState(() => { try { return localStorage.getItem(IDENTITY_KEY) || null; } catch (e) { return null; } });
   useEffect(() => { if (me) { try { localStorage.setItem(IDENTITY_KEY, me); } catch (e) {} } }, [me]);
 
+  // Live room: presence + typing + floating reactions (must come AFTER `me`)
+  const [online, setOnline] = useState([]);
+  const [typingByDest, setTypingByDest] = useState({});
+  const room = useRef(null);
+  useEffect(() => {
+    if (!hasSupabase || !me) return;
+    const r = joinRoom(me, {
+      onPresence: setOnline,
+      onReaction: (p) => { if (p && p.emoji) floatEmoji(p.emoji); },
+      onTyping: (p) => {
+        if (!p || p.who === me) return;
+        setTypingByDest((s) => { const n = { ...s }; if (p.on) n[p.dest] = p.who; else delete n[p.dest]; return n; });
+      },
+    });
+    room.current = r;
+    return () => { r.leave(); room.current = null; };
+  }, [me]);
+  const roomValue = useMemo(() => ({
+    sendTyping: (dest, on) => { if (room.current) room.current.setTyping(dest, on); },
+    typingByDest,
+  }), [typingByDest]);
+  const sendReaction = (emoji) => { floatEmoji(emoji); if (room.current) room.current.sendReaction(emoji); };
+
   // Unread chat badges — counts per destination vs. what this device has seen
   const [msgCounts, setMsgCounts] = useState({});
   const [seen, setSeen] = useState(() => { try { return JSON.parse(localStorage.getItem(SEEN_KEY) || "{}"); } catch (e) { return {}; } });
@@ -1406,6 +1461,7 @@ export default function App() {
   return (
     <IdentityContext.Provider value={me || "me"}>
     <LightboxContext.Provider value={openLightbox}>
+    <RoomContext.Provider value={roomValue}>
     <Lightbox data={lightbox} onClose={() => setLightbox(null)} />
     {!me && (
       <div className="fixed inset-0 z-50 flex items-center justify-center bg-stone-900/20 p-4 backdrop-blur-sm">
@@ -1437,6 +1493,14 @@ export default function App() {
         {/* Games — shared high scores */}
         <GlaggleGame high={copy.glaggleHigh} onHigh={(h) => updateCopy("glaggleHigh", h)} />
         <SeedRush high={copy.seedRushHigh} onHigh={(h) => updateCopy("seedRushHigh", h)} sound={sound} />
+
+        {/* Live reactions dock — floats on both screens */}
+        <div className="mx-auto mt-3 flex max-w-md items-center justify-center gap-1 rounded-2xl border border-stone-200 bg-white/70 px-3 py-1.5 backdrop-blur">
+          <span className="mr-1 text-[10px] font-bold uppercase tracking-wide text-stone-400">send love →</span>
+          {REACTIONS.map((e) => (
+            <button key={e} onClick={() => sendReaction(e)} className="rounded-lg px-1.5 py-0.5 text-lg transition-transform hover:scale-125 active:scale-90" aria-label={"react " + e}>{e}</button>
+          ))}
+        </div>
 
         {/* Tabs — show one section at a time */}
         <div className="mx-auto mt-8 flex max-w-xl items-center justify-center gap-1 rounded-2xl border border-stone-200 bg-white/70 p-1.5 backdrop-blur">
@@ -1489,6 +1553,19 @@ export default function App() {
             {muted ? <VolumeX size={16} strokeWidth={2.6} className="text-stone-400" /> : <Volume2 size={16} strokeWidth={2.6} style={{ color: ACCENTS.mint.text }} />}
             <span className="text-sm font-bold text-stone-500">{muted ? "Muted" : "Sound"}</span>
           </button>
+          {hasSupabase && me && (() => {
+            const partner = me === "me" ? "baby" : "me";
+            const herePartner = online.indexOf(partner) >= 0;
+            return (
+              <div className="flex items-center gap-2 rounded-2xl border border-stone-200 bg-white/70 px-4 py-2.5 backdrop-blur" title={herePartner ? WHO_NAME[partner] + " is online" : WHO_NAME[partner] + " is away"}>
+                <span className="relative flex h-2.5 w-2.5">
+                  {herePartner && <span className="absolute inline-flex h-full w-full animate-ping rounded-full opacity-60" style={{ backgroundColor: ACCENTS.mint.hex }} />}
+                  <span className="relative inline-flex h-2.5 w-2.5 rounded-full" style={{ backgroundColor: herePartner ? "#34C759" : "#D6D3D1" }} />
+                </span>
+                <span className="text-sm font-bold text-stone-500">{herePartner ? WHO_NAME[partner] + " is here" : WHO_NAME[partner] + " away"}</span>
+              </div>
+            );
+          })()}
           <div className="flex items-center gap-2 rounded-2xl border border-stone-200 bg-white/70 px-4 py-2.5 backdrop-blur">
             <Trophy size={16} strokeWidth={2.6} style={{ color: leader ? leader.accent.text : "#B8AE9E" }} /><span className="text-sm font-bold text-stone-500">{leader ? <>Leader {leader.name}</> : "Tap a heart to vote"}</span>
           </div>
@@ -1544,6 +1621,7 @@ export default function App() {
         </footer>
       </div>
     </div>
+    </RoomContext.Provider>
     </LightboxContext.Provider>
     </IdentityContext.Provider>
   );

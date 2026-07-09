@@ -12,6 +12,14 @@ html {
 * {
   cursor: url("/custom-cursor.png") 4 4, auto;
 }
+/* live reaction — floats up across the screen and fades */
+@keyframes react-float {
+  0% { opacity: 0; transform: translateY(24px) scale(0.5); }
+  14% { opacity: 1; }
+  100% { opacity: 0; transform: translateY(-46vh) scale(1.35) rotate(10deg); }
+}
+.react-float { animation: react-float 2.5s ease-out forwards; }
+
 /* septic-fuck rating feedback — floats up and fades away */
 @keyframes septic-float {
   0% { opacity: 0; transform: translate(-50%, 12px) scale(0.4) rotate(-10deg); }

@@ -44,6 +44,18 @@ export function burstConfetti(x, y) {
   raf = requestAnimationFrame(frame);
 }
 
+// ---- Floating reaction ----------------------------------------------------
+export function floatEmoji(emoji) {
+  if (typeof document === "undefined") return;
+  var s = document.createElement("div");
+  s.textContent = emoji;
+  var x = 8 + Math.random() * 78;
+  s.className = "react-float";
+  s.style.cssText = "position:fixed;left:" + x + "vw;bottom:70px;font-size:36px;z-index:9998;pointer-events:none;will-change:transform,opacity;";
+  document.body.appendChild(s);
+  setTimeout(function () { s.remove(); }, 2600);
+}
+
 // ---- Sound ----------------------------------------------------------------
 var SND_KEY = "site.sound.muted";
 var ac = null;

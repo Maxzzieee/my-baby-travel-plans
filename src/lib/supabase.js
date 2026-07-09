@@ -302,6 +302,29 @@ export async function deleteItineraryItem(id) {
   }
 }
 
+// ---------------------------------------------------------------------------
+// Live room — presence (who's online), typing + floating-reaction broadcasts
+// ---------------------------------------------------------------------------
+export function joinRoom(me, handlers) {
+  handlers = handlers || {};
+  if (!supabase) return { setTyping: function () {}, sendReaction: function () {}, leave: function () {} };
+  var ch = supabase.channel("room-1", { config: { presence: { key: clientId } } });
+  ch.on("presence", { event: "sync" }, function () {
+    var st = ch.presenceState();
+    var whos = {};
+    Object.keys(st).forEach(function (k) { (st[k] || []).forEach(function (m) { if (m && m.who) whos[m.who] = true; }); });
+    if (handlers.onPresence) handlers.onPresence(Object.keys(whos));
+  });
+  ch.on("broadcast", { event: "reaction" }, function (m) { if (handlers.onReaction) handlers.onReaction(m.payload || {}); });
+  ch.on("broadcast", { event: "typing" }, function (m) { if (handlers.onTyping) handlers.onTyping(m.payload || {}); });
+  ch.subscribe(function (status) { if (status === "SUBSCRIBED") ch.track({ who: me, at: Date.now() }); });
+  return {
+    setTyping: function (dest, on) { try { ch.send({ type: "broadcast", event: "typing", payload: { who: me, dest: dest, on: !!on } }); } catch (e) {} },
+    sendReaction: function (emoji) { try { ch.send({ type: "broadcast", event: "reaction", payload: { who: me, emoji: emoji } }); } catch (e) {} },
+    leave: function () { try { supabase.removeChannel(ch); } catch (e) {} },
+  };
+}
+
 export function subscribeItinerary(dest, onChange) {
   if (!supabase) return () => {};
   // No dest filter: Supabase DELETE events only carry the primary key, so a
