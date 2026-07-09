@@ -1126,6 +1126,160 @@ function GlaggleGame({ high, onHigh }) {
 }
 
 // ---------------------------------------------------------------------------
+// Prep hub — budget, packing, booking vault, currency (all shared via copy)
+// ---------------------------------------------------------------------------
+function BudgetRow({ item, onChange, onRemove }) {
+  const [label, setLabel] = useState(item.label || "");
+  const [amount, setAmount] = useState(item.amount || "");
+  useEffect(() => { setLabel(item.label || ""); setAmount(item.amount || ""); }, [item.id]);
+  return (
+    <div className="flex items-center gap-2">
+      <input value={label} onChange={(e) => setLabel(e.target.value)} onBlur={() => label !== item.label && onChange(item.id, { label })} placeholder="e.g. Hotel, flights, food…" className="min-w-0 flex-1 rounded-lg border border-stone-200 px-2 py-1.5 text-sm outline-none focus:border-rose-200" />
+      <div className="flex items-center gap-1"><span className="text-xs font-bold text-stone-400">S$</span>
+        <input type="number" inputMode="decimal" value={amount} onChange={(e) => setAmount(e.target.value)} onBlur={() => (Number(amount) || 0) !== item.amount && onChange(item.id, { amount: Number(amount) || 0 })} className="w-16 rounded-lg border border-stone-200 px-2 py-1.5 text-sm outline-none focus:border-rose-200" /></div>
+      <select value={item.who || "shared"} onChange={(e) => onChange(item.id, { who: e.target.value })} className="rounded-lg border border-stone-200 px-1 py-1.5 text-xs font-bold text-stone-500 outline-none focus:border-rose-200">
+        <option value="shared">Split</option><option value="me">Me</option><option value="baby">Ants</option>
+      </select>
+      <button onClick={() => onRemove(item.id)} className="text-stone-300 hover:text-rose-400" aria-label="Remove"><Trash2 size={13} /></button>
+    </div>
+  );
+}
+
+function PackingRow({ item, onToggle, onChange, onRemove }) {
+  const [text, setText] = useState(item.text || "");
+  useEffect(() => { setText(item.text || ""); }, [item.id]);
+  return (
+    <div className="flex items-center gap-2">
+      <button onClick={() => onToggle(item.id)} className="flex h-5 w-5 flex-shrink-0 items-center justify-center rounded-md border-2 transition-colors" style={{ borderColor: item.done ? ACCENTS.mint.border : "#D6D3D1", backgroundColor: item.done ? ACCENTS.mint.hex : "#fff", color: ACCENTS.mint.text }}>{item.done && <Check size={12} strokeWidth={3.5} />}</button>
+      <input value={text} onChange={(e) => setText(e.target.value)} onBlur={() => text !== item.text && onChange(item.id, { text })} placeholder="item…" className={`min-w-0 flex-1 rounded-lg border border-stone-200 px-2 py-1.5 text-sm outline-none focus:border-rose-200 ${item.done ? "text-stone-400 line-through" : ""}`} />
+      <button onClick={() => onRemove(item.id)} className="text-stone-300 hover:text-rose-400" aria-label="Remove"><X size={13} /></button>
+    </div>
+  );
+}
+
+function BookingRow({ item, onChange, onRemove }) {
+  const [label, setLabel] = useState(item.label || "");
+  const [value, setValue] = useState(item.value || "");
+  useEffect(() => { setLabel(item.label || ""); setValue(item.value || ""); }, [item.id]);
+  return (
+    <div className="flex items-center gap-2">
+      <input value={label} onChange={(e) => setLabel(e.target.value)} onBlur={() => label !== item.label && onChange(item.id, { label })} placeholder="e.g. Flight PNR" className="w-1/3 min-w-0 rounded-lg border border-stone-200 px-2 py-1.5 text-xs font-bold outline-none focus:border-rose-200" />
+      <input value={value} onChange={(e) => setValue(e.target.value)} onBlur={() => value !== item.value && onChange(item.id, { value })} placeholder="confirmation # / details" className="min-w-0 flex-1 rounded-lg border border-stone-200 px-2 py-1.5 text-sm outline-none focus:border-rose-200" />
+      <button onClick={() => onRemove(item.id)} className="text-stone-300 hover:text-rose-400" aria-label="Remove"><Trash2 size={13} /></button>
+    </div>
+  );
+}
+
+function CurrencyCard() {
+  const [rates, setRates] = useState(null);
+  const [amt, setAmt] = useState(100);
+  const [status, setStatus] = useState("loading");
+  const TARGETS = [["KRW", "🇰🇷", "Korea"], ["JPY", "🇯🇵", "Japan"], ["TWD", "🇹🇼", "Taiwan"], ["AUD", "🇦🇺", "Australia"]];
+  const FALLBACK = { KRW: 1080, JPY: 118, TWD: 24, AUD: 1.15 };
+  const load = useCallback(() => {
+    setStatus("loading");
+    fetch("https://open.er-api.com/v6/latest/SGD")
+      .then((r) => r.json())
+      .then((j) => { if (j && j.rates) { setRates(j.rates); setStatus("ok"); } else { setRates(FALLBACK); setStatus("fallback"); } })
+      .catch(() => { setRates(FALLBACK); setStatus("fallback"); });
+  }, []);
+  useEffect(() => { load(); }, [load]);
+  const r = rates || FALLBACK;
+  return (
+    <div className="rounded-3xl border-2 border-stone-100 bg-white/85 p-5 shadow-sm backdrop-blur">
+      <div className="flex items-center justify-between">
+        <h3 className="flex items-center gap-2 text-base font-black text-stone-700">💱 Currency</h3>
+        <button onClick={load} className="rounded-full p-1.5 text-stone-300 transition-transform hover:rotate-90 hover:text-rose-400" aria-label="Refresh rates"><RefreshCw size={14} strokeWidth={2.6} /></button>
+      </div>
+      <div className="mt-3 flex items-center gap-2">
+        <span className="text-sm font-extrabold text-stone-500">S$</span>
+        <input type="number" inputMode="decimal" value={amt} onChange={(e) => setAmt(e.target.value)} className="w-28 rounded-xl border-2 border-stone-200 px-3 py-2 text-sm font-bold outline-none focus:border-rose-200" />
+        <span className="text-xs text-stone-400">SGD equals…</span>
+      </div>
+      <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-4">
+        {TARGETS.map(([code, flag, name]) => (
+          <div key={code} className="rounded-2xl p-3 text-center" style={{ backgroundColor: ACCENTS.mint.soft }}>
+            <div className="text-lg">{flag}</div>
+            <div className="text-sm font-extrabold text-stone-700">{(((Number(amt) || 0) * (r[code] || 0))).toLocaleString(undefined, { maximumFractionDigits: 0 })}</div>
+            <div className="text-[10px] font-bold uppercase text-stone-400">{code} · {name}</div>
+          </div>
+        ))}
+      </div>
+      <p className="mt-2 text-center text-[10px] text-stone-400">{status === "loading" ? "fetching live rates…" : status === "fallback" ? "approx rates (offline) — tap ↻ to retry" : "live rates via open.er-api.com"}</p>
+    </div>
+  );
+}
+
+const PACKING_PRESET = ["Passport 🛂", "Winter coat 🧥", "Thermals", "Gloves & beanie", "Portable charger 🔋", "Universal adapter 🔌", "Meds 💊", "Camera 📷", "Comfy shoes 👟", "Reusable tote"];
+
+function EssentialsView({ copy, updateCopy }) {
+  const budget = copy.budget || [];
+  const packing = copy.packing || [];
+  const bookings = copy.bookings || [];
+  const uid = (p) => p + Date.now() + Math.random().toString(36).slice(2, 6);
+
+  const total = budget.reduce((n, b) => n + (b.amount || 0), 0);
+  const meOwe = budget.reduce((n, b) => n + (b.who === "me" ? (b.amount || 0) : b.who === "shared" || !b.who ? (b.amount || 0) / 2 : 0), 0);
+  const antsOwe = total - meOwe;
+  const packedCount = packing.filter((p) => p.done).length;
+
+  return (
+    <section className="mx-auto mt-8 max-w-3xl space-y-6">
+      {/* Budget */}
+      <div className="rounded-3xl border-2 border-stone-100 bg-white/85 p-5 shadow-sm backdrop-blur">
+        <h3 className="flex items-center gap-2 text-base font-black text-stone-700">💰 Budget</h3>
+        <div className="mt-3 space-y-2">
+          {budget.map((b) => (
+            <BudgetRow key={b.id} item={b} onChange={(id, patch) => updateCopy("budget", budget.map((x) => (x.id === id ? { ...x, ...patch } : x)))} onRemove={(id) => updateCopy("budget", budget.filter((x) => x.id !== id))} />
+          ))}
+          {budget.length === 0 && <p className="py-2 text-center text-xs text-stone-400">No costs yet — add flights, hotel, food, activities…</p>}
+        </div>
+        <button onClick={() => updateCopy("budget", [...budget, { id: uid("b"), label: "", amount: 0, who: "shared" }])} className="mt-2 flex items-center gap-1.5 rounded-xl border-2 border-dashed border-stone-300 px-3 py-1.5 text-xs font-extrabold text-stone-400 transition-colors hover:border-rose-200 hover:text-rose-400"><Plus size={13} strokeWidth={2.8} /> Add cost</button>
+        {total > 0 && (
+          <div className="mt-3 grid grid-cols-3 gap-2 border-t border-stone-100 pt-3 text-center">
+            <div><div className="text-lg font-black text-stone-700">S${total.toLocaleString(undefined, { maximumFractionDigits: 0 })}</div><div className="text-[10px] font-bold uppercase text-stone-400">total</div></div>
+            <div style={{ color: ACCENTS.winter.text }}><div className="text-lg font-black">S${meOwe.toLocaleString(undefined, { maximumFractionDigits: 0 })}</div><div className="text-[10px] font-bold uppercase opacity-70">Me pays</div></div>
+            <div style={{ color: ACCENTS.blush.text }}><div className="text-lg font-black">S${antsOwe.toLocaleString(undefined, { maximumFractionDigits: 0 })}</div><div className="text-[10px] font-bold uppercase opacity-70">Ants pays</div></div>
+          </div>
+        )}
+      </div>
+
+      {/* Packing */}
+      <div className="rounded-3xl border-2 border-stone-100 bg-white/85 p-5 shadow-sm backdrop-blur">
+        <div className="flex items-center justify-between">
+          <h3 className="flex items-center gap-2 text-base font-black text-stone-700">🧳 Packing</h3>
+          {packing.length > 0 && <span className="text-xs font-bold text-stone-400">{packedCount}/{packing.length} packed</span>}
+        </div>
+        <div className="mt-3 space-y-2">
+          {packing.map((p) => (
+            <PackingRow key={p.id} item={p} onToggle={(id) => updateCopy("packing", packing.map((x) => (x.id === id ? { ...x, done: !x.done } : x)))} onChange={(id, patch) => updateCopy("packing", packing.map((x) => (x.id === id ? { ...x, ...patch } : x)))} onRemove={(id) => updateCopy("packing", packing.filter((x) => x.id !== id))} />
+          ))}
+        </div>
+        <div className="mt-2 flex flex-wrap gap-2">
+          <button onClick={() => updateCopy("packing", [...packing, { id: uid("p"), text: "", done: false }])} className="flex items-center gap-1.5 rounded-xl border-2 border-dashed border-stone-300 px-3 py-1.5 text-xs font-extrabold text-stone-400 transition-colors hover:border-rose-200 hover:text-rose-400"><Plus size={13} strokeWidth={2.8} /> Add item</button>
+          {packing.length === 0 && <button onClick={() => updateCopy("packing", PACKING_PRESET.map((t) => ({ id: uid("p"), text: t, done: false })))} className="rounded-xl px-3 py-1.5 text-xs font-extrabold" style={{ backgroundColor: ACCENTS.mint.soft, color: ACCENTS.mint.text }}>✨ Start with a winter list</button>}
+        </div>
+      </div>
+
+      {/* Booking vault */}
+      <div className="rounded-3xl border-2 border-stone-100 bg-white/85 p-5 shadow-sm backdrop-blur">
+        <h3 className="flex items-center gap-2 text-base font-black text-stone-700">🔑 Booking vault</h3>
+        <p className="mt-0.5 text-xs text-stone-400">Flight PNRs, hotel confirmations, e-sim codes — kept together, synced.</p>
+        <div className="mt-3 space-y-2">
+          {bookings.map((bk) => (
+            <BookingRow key={bk.id} item={bk} onChange={(id, patch) => updateCopy("bookings", bookings.map((x) => (x.id === id ? { ...x, ...patch } : x)))} onRemove={(id) => updateCopy("bookings", bookings.filter((x) => x.id !== id))} />
+          ))}
+          {bookings.length === 0 && <p className="py-2 text-center text-xs text-stone-400">Nothing saved yet.</p>}
+        </div>
+        <button onClick={() => updateCopy("bookings", [...bookings, { id: uid("k"), label: "", value: "" }])} className="mt-2 flex items-center gap-1.5 rounded-xl border-2 border-dashed border-stone-300 px-3 py-1.5 text-xs font-extrabold text-stone-400 transition-colors hover:border-rose-200 hover:text-rose-400"><Plus size={13} strokeWidth={2.8} /> Add booking</button>
+      </div>
+
+      <CurrencyCard />
+    </section>
+  );
+}
+
+// ---------------------------------------------------------------------------
 // Itinerary — day-by-day timed planner (per destination)
 // ---------------------------------------------------------------------------
 // Calendar-grid helpers — Google-Calendar-style week view
@@ -1547,16 +1701,17 @@ export default function App() {
         </div>
 
         {/* Tabs — show one section at a time */}
-        <div className="mx-auto mt-8 flex max-w-xl items-center justify-center gap-1 rounded-2xl border border-stone-200 bg-white/70 p-1.5 backdrop-blur">
+        <div className="mx-auto mt-8 flex max-w-2xl items-center justify-start gap-1 overflow-x-auto rounded-2xl border border-stone-200 bg-white/70 p-1.5 backdrop-blur sm:justify-center">
           {[
             { id: "plan", label: "Decide", icon: MapPin },
             { id: "itinerary", label: "Itinerary", icon: CalendarDays },
+            { id: "essentials", label: "Prep", icon: Wallet },
             { id: "photos", label: "Photos", icon: ImageIcon },
             { id: "compare", label: "Compare", icon: Star },
           ].map((t) => {
             const active = view === t.id;
             return (
-              <button key={t.id} onClick={() => setView(t.id)} className="relative flex flex-1 items-center justify-center gap-1.5 rounded-xl px-3 py-2 text-sm font-extrabold transition-all" style={{ backgroundColor: active ? ACCENTS.blush.hex : "transparent", color: active ? ACCENTS.blush.text : "#A8A29E" }}>
+              <button key={t.id} onClick={() => setView(t.id)} className="relative flex flex-shrink-0 items-center justify-center gap-1.5 whitespace-nowrap rounded-xl px-3 py-2 text-sm font-extrabold transition-all" style={{ backgroundColor: active ? ACCENTS.blush.hex : "transparent", color: active ? ACCENTS.blush.text : "#A8A29E" }}>
                 <t.icon size={15} strokeWidth={2.8} /> {t.label}
                 {t.id === "plan" && totalUnread > 0 && <span key={totalUnread} className="animate-pop rounded-full bg-rose-500 px-1.5 text-[10px] font-extrabold text-white">{totalUnread}</span>}
               </button>
@@ -1658,6 +1813,8 @@ export default function App() {
         )}
 
         {view === "itinerary" && <ItineraryView chosenDest={copy.chosenDest} onSetChosen={(id) => { updateCopy("chosenDest", id); if (id) { burstConfetti(); sound.yay(); } }} />}
+
+        {view === "essentials" && <EssentialsView copy={copy} updateCopy={updateCopy} />}
 
         <footer className="mt-12 text-center text-xs text-stone-400">
           <p className="font-semibold">Made with ❄️ 🍱 🦦 🧸 ✨ for a very specific kind of cozy winter trip.</p>
