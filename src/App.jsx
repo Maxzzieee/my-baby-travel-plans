@@ -343,7 +343,9 @@ function SavedIdea({ plan, accent, onDelete, onAddComment, onEdit, onAddToItiner
     setUploading(true);
     try {
       const src = hasSupabase ? await uploadImage(file) : await fileToBase64(file);
-      if (src) onEdit(plan.id, { photos: [...photos, src] });
+      // append to the LATEST photos (not the stale render-time `photos`), and
+      // dedupe — otherwise a photo added during the upload wait gets clobbered.
+      if (src) onEdit(plan.id, (x) => ({ photos: [...(x.photos || []), src].filter((v, i, a) => a.indexOf(v) === i) }));
     } catch (e) {
       console.warn("add photo failed:", e?.message || e);
     } finally {
@@ -379,7 +381,7 @@ function SavedIdea({ plan, accent, onDelete, onAddComment, onEdit, onAddToItiner
             <button onClick={() => openLightbox(allPhotos, lbBase + i)} className="block overflow-hidden rounded-xl border border-stone-200" aria-label="View photo">
               <img src={src} alt="" className="h-28 w-28 object-cover transition-transform hover:scale-105 sm:h-32 sm:w-32" />
             </button>
-            <button onClick={() => onEdit(plan.id, { photos: photos.filter((_, j) => j !== i) })} className="absolute -right-1.5 -top-1.5 rounded-full bg-white p-0.5 text-stone-400 shadow hover:text-rose-500" aria-label="Remove photo"><X size={12} /></button>
+            <button onClick={() => onEdit(plan.id, (x) => ({ photos: (x.photos || []).filter((s) => s !== src) }))} className="absolute -right-1.5 -top-1.5 rounded-full bg-white p-0.5 text-stone-400 shadow hover:text-rose-500" aria-label="Remove photo"><X size={12} /></button>
           </div>
         ))}
         <input ref={photoRef} type="file" accept="image/*" className="hidden" onChange={(e) => addPhoto(e.target.files?.[0])} />
@@ -1779,9 +1781,12 @@ export default function App() {
     ...p,
     [destId]: p[destId].map((x) => (x.id === planId ? { ...x, comments: [...(x.comments || []), comment] } : x)),
   }));
+  // patch may be an object OR a function (x) => partial. The function form reads
+  // the LATEST plan, so async work (e.g. a slow photo upload) can't overwrite the
+  // array with a stale render-time snapshot and silently drop photos.
   const editPlan = (destId, planId, patch) => setPlans((p) => ({
     ...p,
-    [destId]: p[destId].map((x) => (x.id === planId ? { ...x, ...patch } : x)),
+    [destId]: p[destId].map((x) => (x.id === planId ? { ...x, ...(typeof patch === "function" ? patch(x) : patch) } : x)),
   }));
   const addToItinerary = (destId, day, idea) => addItineraryItem({
     dest: destId, day, kind: "activity", start_time: "",
