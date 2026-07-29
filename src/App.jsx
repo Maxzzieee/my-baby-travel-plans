@@ -42,7 +42,7 @@ import {
   VolumeX,
   Plane as PlaneIcon,
 } from "lucide-react";
-import { hasSupabase, loadState, saveState, subscribe, loadGallery, postImage, deleteImage, subscribeGallery, loadCopy, saveCopy, subscribeCopy, loadMessages, postMessage, subscribeMessages, loadMessageCounts, subscribeAllMessages, uploadImage, loadItinerary, addItineraryItem, updateItineraryItem, deleteItineraryItem, subscribeItinerary, joinRoom } from "./lib/supabase";
+import { hasSupabase, loadState, LOAD_FAILED, saveState, subscribe, loadGallery, postImage, deleteImage, subscribeGallery, loadCopy, saveCopy, subscribeCopy, loadMessages, postMessage, subscribeMessages, loadMessageCounts, subscribeAllMessages, uploadImage, loadItinerary, addItineraryItem, updateItineraryItem, deleteItineraryItem, subscribeItinerary, joinRoom } from "./lib/supabase";
 import { burstConfetti, floatEmoji, sound } from "./fx";
 import SeedRush from "./SeedRush";
 
@@ -1742,11 +1742,18 @@ export default function App() {
     let unsub = () => {};
     (async () => {
       const remote = await loadState();
-      if (remote && (remote.votes || remote.plans)) {
+      if (remote === LOAD_FAILED) {
+        // Load failed after retries. DO NOT seed local→server (that would wipe
+        // the shared board with this device's possibly-stale copy). Keep local
+        // in memory, suppress the mount auto-push, and rely on realtime + the
+        // next successful load to reconcile.
+        lastSynced.current = JSON.stringify({ v: votes, p: plans });
+      } else if (remote && (remote.votes || remote.plans)) {
         const v = mergeVotes(remote.votes); const p = mergePlans(remote.plans);
         lastSynced.current = JSON.stringify({ v, p });
         setVotes(v); setPlans(p);
       } else if (hasSupabase) {
+        // Query succeeded and the row is genuinely empty → safe to seed.
         lastSynced.current = JSON.stringify({ v: votes, p: plans });
         saveState(votes, plans);
       }

@@ -19,24 +19,28 @@ export const clientId =
   (typeof crypto !== "undefined" && crypto.randomUUID && crypto.randomUUID()) ||
   Math.random().toString(36).slice(2);
 
-// Read the shared state once on load. Returns { votes, plans } or null.
+// Read the shared state once on load. Retries a few times on transient errors.
+// Returns { votes, plans } on success, null when the row genuinely doesn't
+// exist yet, or the FAILED sentinel when every attempt errored — callers MUST
+// NOT overwrite the server on FAILED, or a flaky connection would wipe the board.
+export const LOAD_FAILED = Symbol("load-failed");
 export async function loadState() {
   if (!supabase) return null;
-  try {
-    const { data, error } = await supabase
-      .from("trip_state")
-      .select("votes,plans")
-      .eq("id", ROW_ID)
-      .maybeSingle();
-    if (error) {
-      console.warn("[supabase] loadState:", error.message);
-      return null;
+  for (let attempt = 0; attempt < 3; attempt++) {
+    try {
+      const { data, error } = await supabase
+        .from("trip_state")
+        .select("votes,plans")
+        .eq("id", ROW_ID)
+        .maybeSingle();
+      if (error) throw new Error(error.message);
+      return data || null; // null = row absent (genuine first run)
+    } catch (e) {
+      console.warn(`[supabase] loadState attempt ${attempt + 1} failed:`, e?.message || e);
+      if (attempt < 2) await new Promise((r) => setTimeout(r, 600 * (attempt + 1)));
     }
-    return data || null;
-  } catch (e) {
-    console.warn("[supabase] loadState failed:", e?.message || e);
-    return null;
   }
+  return LOAD_FAILED; // every attempt errored — do NOT treat as "empty"
 }
 
 // Upsert the shared state. last_client lets clients ignore their own echoes.
