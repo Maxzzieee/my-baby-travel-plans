@@ -299,6 +299,19 @@ function fileToBase64(file) {
   });
 }
 
+// Pull an image File out of a clipboard paste (⌘/Ctrl+V). Returns null if the
+// clipboard has no image (so normal text paste is never intercepted).
+function imageFromPaste(e) {
+  const items = (e.clipboardData || window.clipboardData)?.items || [];
+  for (const it of items) {
+    if (it.kind === "file" && it.type && it.type.startsWith("image/")) {
+      const f = it.getAsFile();
+      if (f) return f;
+    }
+  }
+  return null;
+}
+
 const EMPTY_DRAFT = { title: "", summary: "", activities: [], location: "", comment: "", want: "", sourceUrl: "", thumb: "", photos: [] };
 
 // ---------------------------------------------------------------------------
@@ -360,8 +373,10 @@ function SavedIdea({ plan, accent, onDelete, onAddComment, onEdit, onAddToItiner
     setText("");
   };
 
+  const onPaste = (e) => { const f = imageFromPaste(e); if (f) { e.preventDefault(); addPhoto(f); } };
+
   return (
-    <div className="rounded-xl bg-white p-3" style={{ border: `1.5px solid ${accent.border}` }}>
+    <div className="rounded-xl bg-white p-3 outline-none focus-within:ring-2 focus-within:ring-rose-200/60" style={{ border: `1.5px solid ${accent.border}` }} tabIndex={0} onPaste={onPaste}>
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0">
           <EditText value={plan.title || ""} onSave={(v) => onEdit(plan.id, { title: v })} placeholder="Untitled" className="text-sm font-extrabold text-stone-800" />
@@ -388,6 +403,7 @@ function SavedIdea({ plan, accent, onDelete, onAddComment, onEdit, onAddToItiner
         <button onClick={() => photoRef.current?.click()} disabled={uploading} className="flex h-28 w-28 flex-col items-center justify-center gap-1 rounded-xl border-2 border-dashed border-stone-300 text-stone-400 transition-colors hover:border-rose-200 hover:text-rose-400 disabled:opacity-50 sm:h-32 sm:w-32">
           {uploading ? <Loader2 size={18} className="animate-spin" /> : <ImageIcon size={18} strokeWidth={2.2} />}
           <span className="text-[11px] font-bold">Add photo</span>
+          <span className="text-[9px] font-semibold text-stone-300">or paste ⌘V</span>
         </button>
       </div>
 
@@ -573,8 +589,10 @@ function IdeaBoard({ dest, plans, onAdd, onDelete, onAddComment, onEdit, onAddTo
     { id: "manual", label: "Write it", icon: PenLine },
   ];
 
+  const onPaste = (e) => { const f = imageFromPaste(e); if (f) { e.preventDefault(); addPhoto(f); } };
+
   return (
-    <div className="rounded-2xl bg-white p-4" style={{ border: `1.5px solid ${accent.border}` }}>
+    <div className="rounded-2xl bg-white p-4 outline-none" style={{ border: `1.5px solid ${accent.border}` }} tabIndex={0} onPaste={onPaste}>
       <p className="flex items-center gap-1.5 text-xs font-extrabold uppercase tracking-wide" style={{ color: accent.text }}>
         <NotebookPen size={14} strokeWidth={2.8} /> Idea Board · {dest.name}
       </p>
@@ -1004,6 +1022,15 @@ function MemeWall() {
     finally { setBusy(false); if (fileRef.current) fileRef.current.value = ""; }
   };
 
+  // Paste an image anywhere on the Photos tab (⌘/Ctrl+V) → posts it to the wall.
+  // Only images trigger it, so pasting text into the caption still works.
+  const onFileRef = useRef(onFile); onFileRef.current = onFile;
+  useEffect(() => {
+    const h = (e) => { const f = imageFromPaste(e); if (f) onFileRef.current(f); };
+    window.addEventListener("paste", h);
+    return () => window.removeEventListener("paste", h);
+  }, []);
+
   if (!hasSupabase) return null;
 
   return (
@@ -1011,7 +1038,7 @@ function MemeWall() {
       <h2 className="flex items-center justify-center gap-2 text-center text-xl font-black text-stone-700">
         <ImageIcon size={18} strokeWidth={2.8} className="text-rose-300" /> Photos &amp; Memes
       </h2>
-      <p className="mt-1 text-center text-sm text-stone-400">Post pics &amp; silly memes — they pop up on both our screens in real time 💕</p>
+      <p className="mt-1 text-center text-sm text-stone-400">Post pics &amp; silly memes — or just paste (⌘/Ctrl+V) — they pop up on both our screens in real time 💕</p>
 
       <div className="mx-auto mt-5 flex max-w-2xl flex-col gap-2 rounded-3xl border-2 border-rose-100 bg-white/85 p-4 shadow-sm backdrop-blur sm:flex-row sm:items-center">
         <span className="rounded-xl px-3 py-2.5 text-sm font-extrabold" style={{ backgroundColor: (me === "baby" ? ACCENTS.blush : ACCENTS.winter).soft, color: (me === "baby" ? ACCENTS.blush : ACCENTS.winter).text }} title="Posting as you">{WHO_NAME[me]}</span>
