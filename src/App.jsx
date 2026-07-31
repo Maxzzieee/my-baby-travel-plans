@@ -373,7 +373,7 @@ function SavedIdea({ plan, accent, onDelete, onAddComment, onEdit, onAddToItiner
     setText("");
   };
 
-  const onPaste = (e) => { const f = imageFromPaste(e); if (f) { e.preventDefault(); addPhoto(f); } };
+  const onPaste = (e) => { const f = imageFromPaste(e); if (f) { e.preventDefault(); e.stopPropagation(); addPhoto(f); } };
 
   return (
     <div className="rounded-xl bg-white p-3 outline-none focus-within:ring-2 focus-within:ring-rose-200/60" style={{ border: `1.5px solid ${accent.border}` }} tabIndex={0} onPaste={onPaste}>
@@ -589,10 +589,8 @@ function IdeaBoard({ dest, plans, onAdd, onDelete, onAddComment, onEdit, onAddTo
     { id: "manual", label: "Write it", icon: PenLine },
   ];
 
-  const onPaste = (e) => { const f = imageFromPaste(e); if (f) { e.preventDefault(); addPhoto(f); } };
-
   return (
-    <div className="rounded-2xl bg-white p-4 outline-none" style={{ border: `1.5px solid ${accent.border}` }} tabIndex={0} onPaste={onPaste}>
+    <div className="rounded-2xl bg-white p-4" style={{ border: `1.5px solid ${accent.border}` }}>
       <p className="flex items-center gap-1.5 text-xs font-extrabold uppercase tracking-wide" style={{ color: accent.text }}>
         <NotebookPen size={14} strokeWidth={2.8} /> Idea Board · {dest.name}
       </p>
@@ -621,11 +619,11 @@ function IdeaBoard({ dest, plans, onAdd, onDelete, onAddComment, onEdit, onAddTo
         </div>
       )}
       {mode === "screenshot" && (
-        <div className="mt-3">
+        <div className="mt-3 outline-none" tabIndex={0} onPaste={(e) => { const f = imageFromPaste(e); if (f) { e.preventDefault(); readScreenshot(f); } }}>
           <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={(e) => readScreenshot(e.target.files?.[0])} />
           <button onClick={() => fileRef.current?.click()} disabled={busy} className="flex w-full flex-col items-center justify-center gap-1.5 rounded-xl border-2 border-dashed border-stone-300 bg-stone-50/60 px-4 py-5 text-stone-400 transition-colors hover:border-rose-200 hover:text-rose-400 disabled:opacity-60">
             {busy ? <Loader2 size={20} className="animate-spin" /> : <ImageIcon size={20} strokeWidth={2.2} />}
-            <span className="text-sm font-bold">{busy ? "Scrubbing screenshot…" : "Upload a screenshot"}</span>
+            <span className="text-sm font-bold">{busy ? "Scrubbing screenshot…" : "Upload or paste a screenshot"}</span>
           </button>
         </div>
       )}
@@ -639,7 +637,8 @@ function IdeaBoard({ dest, plans, onAdd, onDelete, onAddComment, onEdit, onAddTo
 
       {/* editable draft */}
       {hasDraft && (
-        <div className="mt-4 space-y-3 rounded-xl border-2 border-stone-100 bg-stone-50/50 p-3">
+        <div className="mt-4 space-y-3 rounded-xl border-2 border-stone-100 bg-stone-50/50 p-3 outline-none" tabIndex={0} onPaste={(e) => { const f = imageFromPaste(e); if (f) { e.preventDefault(); e.stopPropagation(); addPhoto(f); } }}>
+          <p className="text-[10px] font-semibold text-stone-300">Tip: paste ⌘V to drop an image straight in</p>
           {/* photos */}
           <div className="flex flex-wrap gap-2">
             {draft.thumb && <img src={draft.thumb} alt="" className="h-20 w-20 rounded-lg border border-stone-200 object-cover" />}
