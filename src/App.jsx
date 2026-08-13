@@ -11,6 +11,10 @@ import {
   ChevronDown,
   Moon,
   Sun,
+  ChevronUp,
+  List,
+  Map as MapIcon,
+  Navigation,
   Star,
   Calendar,
   Trophy,
@@ -42,7 +46,11 @@ import {
   VolumeX,
   Plane as PlaneIcon,
 } from "lucide-react";
-import { hasSupabase, loadState, LOAD_FAILED, saveState, subscribe, loadGallery, postImage, deleteImage, subscribeGallery, loadCopy, saveCopy, subscribeCopy, loadMessages, postMessage, subscribeMessages, loadMessageCounts, subscribeAllMessages, uploadImage, loadItinerary, addItineraryItem, updateItineraryItem, deleteItineraryItem, subscribeItinerary, joinRoom } from "./lib/supabase";
+import { hasSupabase, loadState, LOAD_FAILED, saveState, subscribe, loadGallery, postImage, deleteImage, subscribeGallery, loadCopy, saveCopy, subscribeCopy, loadMessages, postMessage, subscribeMessages, loadMessageCounts, subscribeAllMessages, uploadImage, loadItinerary, addItineraryItem, updateItineraryItem, deleteItineraryItem, reorderItinerary, subscribeItinerary, joinRoom } from "./lib/supabase";
+import { geocodePlace, legLabel, SEOUL_CENTER } from "./lib/geo";
+import "leaflet/dist/leaflet.css";
+import L from "leaflet";
+import { MapContainer, TileLayer, Marker, Polyline, useMap } from "react-leaflet";
 import { burstConfetti, floatEmoji, sound } from "./fx";
 import SeedRush from "./SeedRush";
 
@@ -1456,41 +1464,118 @@ function EssentialsView({ copy, updateCopy }) {
 // ---------------------------------------------------------------------------
 // Itinerary — day-by-day timed planner (per destination)
 // ---------------------------------------------------------------------------
-// Calendar-grid helpers — Google-Calendar-style week view
-const DAY_START_H = 6;   // grid runs 06:00 → 24:00
-const DAY_END_H = 24;
-const HOUR_PX = 44;
-const toMin = (t) => { if (!t) return null; const [h, m] = String(t).split(":").map(Number); return (h || 0) * 60 + (m || 0); };
 const KIND_COLOR = {
   stay: ACCENTS.winter,
   activity: ACCENTS.blush,
   food: ACCENTS.mint,
   note: { soft: "#F5F5F4", border: "#D6D3D1", text: "#57534E", hex: "#E7E5E4" },
 };
+// Solid pin colors per kind for map markers (match KIND_COLOR accents).
+const KIND_PIN = { stay: "#3D6B7D", activity: "#A65A45", food: "#3F7C5C", note: "#78716C" };
 
-function TimeBlock({ item, onOpen }) {
-  const c = KIND_COLOR[item.kind] || KIND_COLOR.activity;
-  const meta = KIND_META[item.kind] || KIND_META.activity;
-  const s = toMin(item.start_time);
-  const e = toMin(item.end_time) ?? s + 60;
-  const top = Math.max(0, ((s - DAY_START_H * 60) / 60) * HOUR_PX);
-  const height = Math.max(22, ((Math.max(e, s + 15) - s) / 60) * HOUR_PX - 2);
+// Responsive: wide (desktop) → split list+map; narrow → List/Map toggle.
+function useWide() {
+  const [w, setW] = useState(() => typeof window !== "undefined" && window.matchMedia("(min-width:768px)").matches);
+  useEffect(() => {
+    const m = window.matchMedia("(min-width:768px)");
+    const h = () => setW(m.matches);
+    m.addEventListener("change", h);
+    return () => m.removeEventListener("change", h);
+  }, []);
+  return w;
+}
+
+// A numbered map pin (plain-HTML divIcon, so it sits outside the dark tile filter).
+function pinIcon(n, color, selected) {
+  return L.divIcon({
+    className: "",
+    html: `<div class="rt-pin ${selected ? "rt-pin-sel" : ""}" style="background:${color}"><span>${n}</span></div>`,
+    iconSize: [26, 26],
+    iconAnchor: [13, 26],
+  });
+}
+
+function FitBounds({ points }) {
+  const map = useMap();
+  useEffect(() => {
+    if (!points.length) return;
+    if (points.length === 1) { map.setView([points[0].lat, points[0].lng], 14); return; }
+    map.fitBounds(L.latLngBounds(points.map((p) => [p.lat, p.lng])), { padding: [42, 42], maxZoom: 15 });
+  }, [points, map]);
+  return null;
+}
+
+// Leaflet needs a real size; nudge it after mount so tiles fill the box.
+function MapReady() {
+  const map = useMap();
+  useEffect(() => { const t = setTimeout(() => map.invalidateSize(), 180); return () => clearTimeout(t); }, [map]);
+  return null;
+}
+
+// The day's live map: numbered pins in order + a dashed line connecting them.
+function DayMap({ stops, selectedId, onSelect }) {
+  const pts = stops.filter((s) => s.lat != null && s.lng != null);
+  const center = pts.length ? [pts[0].lat, pts[0].lng] : [SEOUL_CENTER.lat, SEOUL_CENTER.lng];
   return (
-    <button
-      onClick={(ev) => { ev.stopPropagation(); onOpen(item.id); }}
-      className="absolute left-0.5 right-0.5 overflow-hidden rounded-lg border text-left shadow-sm transition-transform hover:z-10 hover:scale-[1.02]"
-      style={{ top, height, backgroundColor: c.soft, borderColor: c.border }}
-      title={`${item.title || meta.label} · tap to edit`}
-    >
-      <div className="px-1.5 pt-0.5 text-[9px] font-bold leading-tight" style={{ color: c.text }}>
-        {item.start_time}{item.end_time ? `–${item.end_time}` : ""}
-      </div>
-      <div className="truncate px-1.5 text-[10px] font-extrabold leading-tight text-stone-700">{meta.emoji} {item.title || "…"}</div>
-    </button>
+    <div className="rt-map h-full w-full border border-stone-200">
+      <MapContainer center={center} zoom={12} scrollWheelZoom className="h-full w-full">
+        <TileLayer attribution="&copy; OpenStreetMap contributors" url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
+        {pts.length > 1 && (
+          <Polyline positions={pts.map((p) => [p.lat, p.lng])} pathOptions={{ color: "#E0837A", weight: 3.5, opacity: 0.85, dashArray: "2 9", lineCap: "round" }} />
+        )}
+        {pts.map((s) => (
+          <Marker key={s.id} position={[s.lat, s.lng]} icon={pinIcon(s.n, KIND_PIN[s.kind] || KIND_PIN.activity, s.id === selectedId)} eventHandlers={{ click: () => onSelect(s.id) }} />
+        ))}
+        <FitBounds points={pts} />
+        <MapReady />
+      </MapContainer>
+    </div>
   );
 }
 
-// Bottom-sheet editor for one itinerary item (tap a block or unscheduled chip)
+// One stop in the day list — number badge matches its map pin.
+function StopCard({ item, index, total, selected, distanceToNext, onOpen, onMove, onSelect }) {
+  const c = KIND_COLOR[item.kind] || KIND_COLOR.activity;
+  const meta = KIND_META[item.kind] || KIND_META.activity;
+  const noGeo = item.place && (item.lat == null || item.lng == null);
+  return (
+    <div>
+      <div
+        onClick={() => onSelect(item.id)}
+        className="flex cursor-pointer items-start gap-2 rounded-2xl bg-white p-2.5 transition-shadow"
+        style={{ border: `1.5px solid ${selected ? c.border : "#EAE7E1"}`, boxShadow: selected ? `0 0 0 2px ${c.border}` : "none" }}
+      >
+        <div className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full text-xs font-black text-white" style={{ background: KIND_PIN[item.kind] || KIND_PIN.activity }}>{index + 1}</div>
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center gap-1.5">
+            {item.start_time && <span className="flex-shrink-0 text-[11px] font-bold" style={{ color: c.text }}>{item.start_time}{item.end_time ? `–${item.end_time}` : ""}</span>}
+            <span className="text-xs">{meta.emoji}</span>
+            <span className="truncate text-sm font-extrabold text-stone-800">{item.title || "Untitled stop"}</span>
+          </div>
+          {item.place && (
+            <div className="mt-0.5 flex items-center gap-1 text-[11px] text-stone-500">
+              <MapPin size={11} className="flex-shrink-0" /> <span className="truncate">{item.place}</span>
+              {noGeo && <span className="flex-shrink-0 text-amber-500">· locating…</span>}
+            </div>
+          )}
+          {item.notes && <div className="mt-0.5 truncate text-[11px] text-stone-400">{item.notes}</div>}
+        </div>
+        <div className="flex flex-shrink-0 flex-col">
+          <button onClick={(e) => { e.stopPropagation(); onMove(index, -1); }} disabled={index === 0} className="rounded p-0.5 text-stone-300 transition-colors hover:text-stone-600 disabled:opacity-25" aria-label="Move up"><ChevronUp size={16} /></button>
+          <button onClick={(e) => { e.stopPropagation(); onMove(index, 1); }} disabled={index === total - 1} className="rounded p-0.5 text-stone-300 transition-colors hover:text-stone-600 disabled:opacity-25" aria-label="Move down"><ChevronDown size={16} /></button>
+        </div>
+        <button onClick={(e) => { e.stopPropagation(); onOpen(item.id); }} className="flex-shrink-0 rounded p-1 text-stone-300 transition-colors hover:text-rose-400" aria-label="Edit stop"><PenLine size={14} /></button>
+      </div>
+      {distanceToNext && (
+        <div className="ml-3.5 flex items-center gap-1 py-1 text-[10px] font-semibold text-stone-400">
+          <Navigation size={10} /> {distanceToNext}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// Bottom-sheet editor for one itinerary stop (tap a card's pencil to edit)
 function ItemEditor({ item, onUpdate, onRemove, onClose }) {
   if (!item) return null;
   const KINDS = [
@@ -1536,115 +1621,166 @@ function ItemEditor({ item, onUpdate, onRemove, onClose }) {
   );
 }
 
-function ItineraryView({ chosenDest, onSetChosen }) {
-  const [dest, setDest] = useState(chosenDest || DESTINATIONS[0].id);
+function ItineraryView({ plans }) {
+  const dest = "seoul"; // trip is confirmed Seoul
+  const city = DEST_BY_ID[dest] || DESTINATIONS[0];
+  const accent = city.accent;
+  const ideas = (plans && plans[dest]) || [];
+
   const [items, setItems] = useState([]);
-  const [editing, setEditing] = useState(null); // item id open in the editor
-  const accent = DEST_BY_ID[dest].accent;
+  const [day, setDay] = useState(0);
+  const [editing, setEditing] = useState(null);
+  const [selected, setSelected] = useState(null);
+  const [tab, setTab] = useState("list"); // narrow screens: list | map
+  const [trayOpen, setTrayOpen] = useState(false);
+  const [newStop, setNewStop] = useState("");
+  const geocoding = useRef(new Set());
+  const isWide = useWide();
 
   const refresh = useCallback(async () => setItems(await loadItinerary(dest)), [dest]);
   useEffect(() => { refresh(); const unsub = subscribeItinerary(dest, refresh); return () => unsub(); }, [dest, refresh]);
 
-  const timedFor = (dd) => items.filter((it) => it.day === dd && it.start_time);
-  const unscheduled = items.filter((it) => !it.start_time);
+  // Geocode stops that have a place but no coordinates yet (throttled in geo.js).
+  useEffect(() => {
+    let cancelled = false;
+    items.forEach((it) => {
+      if (it.place && (it.lat == null || it.lng == null) && it._geo !== "fail" && !geocoding.current.has(it.id)) {
+        geocoding.current.add(it.id);
+        geocodePlace(it.place).then((g) => {
+          geocoding.current.delete(it.id);
+          if (cancelled) return;
+          if (g) { updateItineraryItem(it.id, { lat: g.lat, lng: g.lng }); setItems((xs) => xs.map((x) => (x.id === it.id ? { ...x, lat: g.lat, lng: g.lng } : x))); }
+          else { setItems((xs) => xs.map((x) => (x.id === it.id ? { ...x, _geo: "fail" } : x))); }
+        });
+      }
+    });
+    return () => { cancelled = true; };
+  }, [items]);
 
-  // Tap an empty slot in a day column → create a 1h block right there
-  const createAt = async (dd, hour) => {
-    const pad = (n) => String(n).padStart(2, "0");
-    const payload = { dest, day: dd, kind: "activity", start_time: `${pad(hour)}:00`, end_time: hour + 1 >= 24 ? "23:59" : `${pad(hour + 1)}:00`, title: "", place: "", notes: "", position: 0 };
-    let row = await addItineraryItem(payload);
-    if (!row) { const { end_time, ...rest } = payload; row = await addItineraryItem(rest); } // tolerate missing end_time column
+  const dayItems = items.filter((it) => it.day === day).sort((a, b) => (a.position ?? 0) - (b.position ?? 0));
+  const numbered = dayItems.map((it, i) => ({ ...it, n: i + 1 }));
+  const addedIdeaIds = new Set(items.filter((i) => i.idea_id).map((i) => i.idea_id));
+  const availIdeas = ideas.filter((p) => !addedIdeaIds.has(p.id));
+  const editingItem = editing ? items.find((x) => x.id === editing) || null : null;
+  const coordOf = (it) => (it && it.lat != null ? { lat: it.lat, lng: it.lng } : null);
+
+  const addStop = async (fields) => {
+    const nextPos = dayItems.length ? Math.max(...dayItems.map((x) => x.position ?? 0)) + 1 : 0;
+    await addItineraryItem({ dest, day, position: nextPos, kind: fields.kind || "activity", start_time: "", end_time: "", title: fields.title || "", place: fields.place || "", notes: fields.notes || "", idea_id: fields.idea_id || null });
     refresh();
-    if (row) setEditing(row.id);
   };
-  const addUnscheduled = async (dd) => {
-    const row = await addItineraryItem({ dest, day: dd, kind: "activity", start_time: "", title: "", place: "", notes: "", position: 0 });
-    refresh();
-    if (row) setEditing(row.id);
+  const addIdea = (idea) => addStop({ title: idea.title, place: idea.location || idea.title, notes: idea.summary, idea_id: idea.id });
+  const addFreeStop = async () => { const t = newStop.trim(); if (!t) return; setNewStop(""); await addStop({ title: t, place: t }); };
+  const update = (id, patch) => {
+    const clearGeo = "place" in patch ? { lat: null, lng: null, _geo: undefined } : {};
+    setItems((xs) => xs.map((x) => (x.id === id ? { ...x, ...patch, ...clearGeo } : x)));
+    updateItineraryItem(id, patch);
   };
-  const update = (id, patch) => { setItems((xs) => xs.map((x) => (x.id === id ? { ...x, ...patch } : x))); updateItineraryItem(id, patch); };
   const remove = async (id) => { setItems((xs) => xs.filter((x) => x.id !== id)); await deleteItineraryItem(id); refresh(); };
+  const move = async (idx, dir) => {
+    const arr = [...dayItems];
+    const j = idx + dir;
+    if (j < 0 || j >= arr.length) return;
+    [arr[idx], arr[j]] = [arr[j], arr[idx]];
+    const order = new Map(arr.map((a, i) => [a.id, i]));
+    setItems((xs) => xs.map((x) => (order.has(x.id) ? { ...x, position: order.get(x.id) } : x)));
+    await reorderItinerary(arr.map((a) => a.id));
+  };
 
   if (!hasSupabase) {
     return (
       <section className="mt-8">
-        <div className="mx-auto max-w-2xl rounded-3xl border border-dashed border-stone-300 bg-white/70 p-8 text-center text-sm text-stone-400">🗓️ The itinerary planner turns on once Supabase sync is connected.</div>
+        <div className="mx-auto max-w-2xl rounded-3xl border border-dashed border-stone-300 bg-white/70 p-8 text-center text-sm text-stone-400">🗓️ The trip planner turns on once Supabase sync is connected.</div>
       </section>
     );
   }
 
-  const hours = Array.from({ length: DAY_END_H - DAY_START_H }, (_, i) => DAY_START_H + i);
-  const editingItem = editing ? items.find((x) => x.id === editing) || null : null;
-
   return (
     <section className="mt-8">
-      {/* city selector */}
-      <div className="flex flex-wrap items-center justify-center gap-2">
-        {DESTINATIONS.map((x) => {
-          const active = x.id === dest;
+      <div className="text-center">
+        <h2 className="text-xl font-black text-stone-700">{city.emoji} Our {city.name} Trip</h2>
+        <p className="mt-1 text-sm text-stone-400">Nov 27 – Dec 4 · build each day so it flows — add a stop and watch it pin on the map 📍</p>
+      </div>
+
+      {/* day selector */}
+      <div className="mt-4 flex gap-1.5 overflow-x-auto pb-1">
+        {Array.from({ length: TRIP_DAYS }).map((_, dd) => {
+          const active = dd === day;
+          const count = items.filter((it) => it.day === dd).length;
           return (
-            <button key={x.id} onClick={() => { setDest(x.id); setDay(0); }} className="flex items-center gap-1.5 rounded-full px-3 py-2 text-sm font-extrabold transition-all" style={{ backgroundColor: active ? x.accent.hex : "var(--surface)", color: active ? x.accent.text : "#A8A29E", border: `1.5px solid ${active ? x.accent.border : "#E7E1D8"}` }}>
-              {chosenDest === x.id && "⭐"} {x.emoji} {x.name}
+            <button key={dd} onClick={() => { setDay(dd); setSelected(null); }} className="flex-shrink-0 rounded-2xl px-3 py-2 text-center transition-all" style={{ backgroundColor: active ? accent.hex : "var(--surface)", border: `1.5px solid ${active ? accent.border : "#E7E1D8"}`, color: active ? accent.text : "#A8A29E" }}>
+              <div className="text-[10px] font-bold uppercase">Day {dd + 1}</div>
+              <div className="text-xs font-extrabold">{dayLabel(dd)}</div>
+              <div className="text-[9px] font-bold opacity-70">{count > 0 ? `${count} stop${count > 1 ? "s" : ""}` : "—"}</div>
             </button>
           );
         })}
       </div>
-      <div className="mt-3 text-center">
-        <button onClick={() => onSetChosen(chosenDest === dest ? "" : dest)} className="rounded-full border px-3 py-1.5 text-xs font-extrabold transition-colors" style={{ borderColor: accent.border, color: accent.text, backgroundColor: chosenDest === dest ? accent.hex : accent.soft }}>
-          {chosenDest === dest ? "⭐ This is our trip" : "☆ Mark as our trip"}
-        </button>
-      </div>
 
-      {/* unscheduled tray — ideas added without a time land here */}
-      {unscheduled.length > 0 && (
-        <div className="mx-auto mt-5 max-w-4xl rounded-2xl border border-dashed border-stone-300 bg-white/70 px-4 py-3">
-          <p className="text-[10px] font-bold uppercase tracking-wide text-stone-400">No time yet — tap to schedule</p>
-          <div className="mt-2 flex flex-wrap gap-1.5">
-            {unscheduled.map((it) => (
-              <button key={it.id} onClick={() => setEditing(it.id)} className="flex items-center gap-1 rounded-lg px-2 py-1 text-[11px] font-bold text-stone-600 transition-transform hover:scale-105" style={{ backgroundColor: (KIND_COLOR[it.kind] || KIND_COLOR.activity).soft, border: `1px solid ${(KIND_COLOR[it.kind] || KIND_COLOR.activity).border}` }}>
-                {(KIND_META[it.kind] || KIND_META.activity).emoji} {it.title || "untitled"} <span className="text-stone-400">· D{it.day + 1}</span>
-              </button>
-            ))}
-          </div>
+      {/* mobile list/map toggle */}
+      {!isWide && (
+        <div className="mx-auto mt-3 flex w-44 gap-1 rounded-full bg-stone-100 p-1 text-xs font-extrabold">
+          {[{ id: "list", label: "List", Icon: List }, { id: "map", label: "Map", Icon: MapIcon }].map((t) => (
+            <button key={t.id} onClick={() => setTab(t.id)} className={`flex flex-1 items-center justify-center gap-1 rounded-full py-1.5 transition-colors ${tab === t.id ? "bg-white text-stone-700 shadow-sm" : "text-stone-400"}`}>
+              <t.Icon size={13} /> {t.label}
+            </button>
+          ))}
         </div>
       )}
 
-      {/* week grid — Google-Calendar style */}
-      <p className="mt-5 text-center text-xs text-stone-400">Tap an empty slot to add a block · tap a block to edit it</p>
-      <div className="mt-2 overflow-x-auto rounded-3xl border border-stone-200 bg-white/85 backdrop-blur">
-        <div className="flex min-w-[920px]">
-          {/* time gutter */}
-          <div className="sticky left-0 z-20 w-12 flex-shrink-0 border-r border-stone-100 bg-white">
-            <div className="h-12 border-b border-stone-100" />
-            {hours.map((h) => (
-              <div key={h} style={{ height: HOUR_PX }} className="pr-1.5 text-right text-[9px] font-bold text-stone-300">{String(h).padStart(2, "0")}:00</div>
-            ))}
-          </div>
-          {/* day columns */}
-          {Array.from({ length: TRIP_DAYS }).map((_, dd) => (
-            <div key={dd} className="min-w-[108px] flex-1 border-r border-stone-100 last:border-r-0">
-              <div className="flex h-12 items-center justify-between border-b border-stone-100 px-2">
+      <div className={isWide ? "mt-4 flex items-start gap-4" : "mt-4"}>
+        {/* LIST + add */}
+        {(isWide || tab === "list") && (
+          <div className={isWide ? "min-w-0 flex-1" : ""}>
+            {numbered.length === 0 ? (
+              <p className="rounded-2xl border border-dashed border-stone-300 bg-white/60 p-6 text-center text-sm text-stone-400">No stops yet for {dayLabel(day)}. Add one below 👇</p>
+            ) : (
+              <div className="space-y-0">
+                {numbered.map((it, i) => (
+                  <StopCard
+                    key={it.id}
+                    item={it}
+                    index={i}
+                    total={numbered.length}
+                    selected={selected === it.id}
+                    distanceToNext={i < numbered.length - 1 ? legLabel(coordOf(it), coordOf(numbered[i + 1])) : null}
+                    onOpen={setEditing}
+                    onMove={move}
+                    onSelect={setSelected}
+                  />
+                ))}
+              </div>
+            )}
+
+            <div className="mt-3 space-y-2">
+              <div className="flex gap-2">
+                <input value={newStop} onChange={(e) => setNewStop(e.target.value)} onKeyDown={(e) => e.key === "Enter" && addFreeStop()} placeholder="Add a stop (e.g. Gyeongbokgung Palace)…" className="flex-1 rounded-xl border-2 border-stone-200 bg-white px-3 py-2 text-sm outline-none focus:border-rose-200" />
+                <button onClick={addFreeStop} className="flex items-center rounded-xl px-3 py-2 text-sm font-extrabold" style={{ backgroundColor: accent.hex, color: accent.text, border: `1.5px solid ${accent.border}` }} aria-label="Add stop"><Plus size={16} strokeWidth={3} /></button>
+              </div>
+              {availIdeas.length > 0 && (
                 <div>
-                  <div className="text-[9px] font-bold uppercase text-stone-400">Day {dd + 1}</div>
-                  <div className="text-[10px] font-extrabold text-stone-600">{dayLabel(dd)}</div>
+                  <button onClick={() => setTrayOpen((o) => !o)} className="flex items-center gap-1 text-xs font-bold text-stone-500 transition-colors hover:text-stone-700">
+                    <ChevronDown size={13} className={trayOpen ? "" : "-rotate-90"} /> Add from your {city.name} ideas ({availIdeas.length})
+                  </button>
+                  {trayOpen && (
+                    <div className="mt-2 flex flex-wrap gap-1.5">
+                      {availIdeas.map((p) => (
+                        <button key={p.id} onClick={() => addIdea(p)} className="flex items-center gap-1 rounded-lg border border-stone-200 bg-white px-2 py-1 text-[11px] font-bold text-stone-600 transition-all hover:scale-105 hover:border-rose-200"><Plus size={11} /> {p.title || "Untitled idea"}</button>
+                      ))}
+                    </div>
+                  )}
                 </div>
-                <button onClick={() => addUnscheduled(dd)} className="rounded-md p-1 text-stone-300 transition-colors hover:text-rose-400" title="Add without a time" aria-label={`Add to day ${dd + 1}`}><Plus size={13} strokeWidth={3} /></button>
-              </div>
-              <div
-                className="relative cursor-copy"
-                style={{ height: (DAY_END_H - DAY_START_H) * HOUR_PX }}
-                onClick={(e) => {
-                  const rect = e.currentTarget.getBoundingClientRect();
-                  const hour = DAY_START_H + Math.floor((e.clientY - rect.top) / HOUR_PX);
-                  createAt(dd, Math.min(23, Math.max(DAY_START_H, hour)));
-                }}
-              >
-                {hours.map((h, i) => (<div key={h} className="pointer-events-none absolute left-0 right-0 border-t border-stone-100/70" style={{ top: i * HOUR_PX }} />))}
-                {timedFor(dd).map((it) => (<TimeBlock key={it.id} item={it} onOpen={setEditing} />))}
-              </div>
+              )}
             </div>
-          ))}
-        </div>
+          </div>
+        )}
+
+        {/* MAP */}
+        {(isWide || tab === "map") && (
+          <div className={isWide ? "sticky top-4 h-[70vh] w-[44%] flex-shrink-0" : "h-[58vh]"}>
+            <DayMap stops={numbered} selectedId={selected} onSelect={setSelected} />
+          </div>
+        )}
       </div>
 
       <ItemEditor item={editingItem} onUpdate={update} onRemove={remove} onClose={() => setEditing(null)} />
@@ -2004,7 +2140,7 @@ export default function App() {
         </section>
         )}
 
-        {view === "itinerary" && <ItineraryView chosenDest={copy.chosenDest} onSetChosen={(id) => { updateCopy("chosenDest", id); if (id) { burstConfetti(); sound.yay(); } }} />}
+        {view === "itinerary" && <ItineraryView plans={plans} />}
 
         {view === "essentials" && <EssentialsView copy={copy} updateCopy={updateCopy} />}
 

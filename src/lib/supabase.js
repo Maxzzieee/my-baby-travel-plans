@@ -265,8 +265,8 @@ export async function loadItinerary(dest) {
       .select("*")
       .eq("dest", dest)
       .order("day", { ascending: true })
-      .order("start_time", { ascending: true, nullsFirst: true })
-      .order("position", { ascending: true });
+      .order("position", { ascending: true })
+      .order("start_time", { ascending: true, nullsFirst: true });
     if (error) { console.warn("[supabase] loadItinerary:", error.message); return []; }
     return data || [];
   } catch (e) {
@@ -303,6 +303,18 @@ export async function deleteItineraryItem(id) {
     await supabase.from("itinerary").delete().eq("id", id);
   } catch (e) {
     console.warn("[supabase] deleteItineraryItem failed:", e?.message || e);
+  }
+}
+
+// Persist a manual reorder: write position = index for each id, in order.
+export async function reorderItinerary(orderedIds) {
+  if (!supabase || !orderedIds?.length) return;
+  try {
+    await Promise.all(
+      orderedIds.map((id, i) => supabase.from("itinerary").update({ position: i }).eq("id", id))
+    );
+  } catch (e) {
+    console.warn("[supabase] reorderItinerary failed:", e?.message || e);
   }
 }
 
