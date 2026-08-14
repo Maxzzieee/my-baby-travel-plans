@@ -33,15 +33,52 @@ const SCHEMA = {
       description: "2-4 concrete things the couple could do here, each a short phrase.",
     },
     location: { type: "string", description: "City / country / area this relates to, or 'Unknown' if unclear." },
+    venue: { type: "string", description: "The SPECIFIC place/venue name to look up on a map (Korean if given, else romanized). 'Unknown' if not a specific place." },
   },
-  required: ["title", "summary", "activities", "location"],
+  required: ["title", "summary", "activities", "location", "venue"],
   additionalProperties: false,
 };
+const KCAT = { FD6: "food", CE7: "food", MT1: "shop", CS2: "shop", AT4: "activity", CT1: "activity", AD5: "stay" };
+async function kakaoGeocode(q) {
+  const key = process.env.KAKAO_REST_KEY;
+  if (!key || !q || q === "Unknown") return null;
+  try {
+    const r = await fetch("https://dapi.kakao.com/v2/local/search/keyword.json?size=1&query=" + encodeURIComponent(q), { headers: { Authorization: "KakaoAK " + key } });
+    if (!r.ok) return null;
+    const d = await r.json();
+    const doc = d.documents && d.documents[0];
+    if (!doc) return null;
+    return { name: doc.place_name || "", address: doc.road_address_name || doc.address_name || "", lat: +doc.y, lng: +doc.x, kind: KCAT[doc.category_group_code] || null };
+  } catch { return null; }
+}
+function extractImages(html, baseUrl, max = 3) {
+  const out = [];
+  const bad = /(sprite|logo|icon|avatar|favicon|pixel|blank|spacer|1x1|placeholder|loading|advert|badge|button|emoji|share|social)/i;
+  const push = (u) => {
+    if (!u || out.length >= max) return;
+    try { u = new URL(u, baseUrl).href; } catch { return; }
+    if (!/^https?:\/\//i.test(u) || /\.svg(\?|$)/i.test(u) || u.startsWith("data:") || bad.test(u)) return;
+    if (!out.includes(u)) out.push(u);
+  };
+  for (const m of html.match(/<meta[^>]+>/gi) || []) {
+    if (/(?:property|name)=["'](?:og:image(?::secure_url)?|twitter:image(?::src)?)["']/i.test(m)) {
+      const c = m.match(/content=["']([^"']+)["']/i);
+      if (c) push(c[1]);
+    }
+  }
+  for (const tag of html.match(/<img[^>]+>/gi) || []) {
+    if (out.length >= max) break;
+    const s = tag.match(/(?:data-src|data-lazy-src|data-original|src)=["']([^"']+)["']/i);
+    if (s) push(s[1]);
+  }
+  return out.slice(0, max);
+}
 
 const PROMPT =
-  "You are helping a couple plan a cozy winter trip. From the provided content " +
-  "(a web page, social post, or screenshot), extract a single travel-plan idea. " +
-  "Be warm and concise. Focus on what the place is and what they could actually do there.";
+  "You are helping a couple plan a cozy winter trip to Seoul. From the provided content " +
+  "(a web page, social post, or screenshot), extract a single travel-plan idea. Be warm and " +
+  "concise. Focus on what the place is and what they could actually do there. For `venue`, give " +
+  "the exact business/place name so it can be found on a map (prefer the Korean name if present).";
 
 function stripHtml(html) {
   return html
@@ -57,6 +94,7 @@ app.post("/api/extract", async (req, res) => {
   try {
     const { url, image, mediaType } = req.body || {};
     let userContent;
+    let rawHtml = "";
 
     if (image) {
       userContent = [
@@ -73,7 +111,8 @@ app.post("/api/extract", async (req, res) => {
           headers: { "user-agent": "Mozilla/5.0 (compatible; BabyTravelPlans/1.0)" },
           signal: AbortSignal.timeout(8000),
         });
-        pageText = stripHtml(await r.text()).slice(0, 6000);
+        rawHtml = await r.text();
+        pageText = stripHtml(rawHtml).slice(0, 6000);
       } catch (e) {
         // Some pages block scraping or need JS — fall back to URL-only inference.
       }
@@ -102,6 +141,18 @@ app.post("/api/extract", async (req, res) => {
 
     const textBlock = response.content.find((b) => b.type === "text");
     const data = JSON.parse(textBlock?.text || "{}");
+
+    const geo = await kakaoGeocode(data.venue || data.title);
+    if (geo && Number.isFinite(geo.lat)) {
+      data.location = geo.name ? `${geo.name} · ${geo.address}` : geo.address || data.location;
+      data.lat = geo.lat; data.lng = geo.lng;
+      if (geo.kind) data.kind = geo.kind;
+    }
+    if (rawHtml) {
+      const photos = extractImages(rawHtml, url, 3);
+      if (photos.length) { data.photos = photos; data.thumb = photos[0]; }
+    }
+
     res.json(data);
   } catch (err) {
     console.error("extract error:", err?.message || err);

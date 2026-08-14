@@ -561,6 +561,13 @@ function IdeaBoard({ dest, plans, onAdd, onDelete, onAddComment, onEdit, onAddTo
       summary: data.summary || d.summary,
       activities: Array.isArray(data.activities) ? data.activities : d.activities,
       location: data.location || d.location,
+      // Kakao-derived exact address → coords + category so the idea pins itself
+      ...(data.lat != null && data.lng != null ? { lat: data.lat, lng: data.lng } : {}),
+      ...(data.kind ? { kind: data.kind } : {}),
+      // photos scraped from the page (dedupe against what's already there)
+      ...(Array.isArray(data.photos) && data.photos.length
+        ? { photos: [...(d.photos || []), ...data.photos].filter((v, i, a) => a.indexOf(v) === i), thumb: d.thumb || data.thumb }
+        : {}),
       ...extra,
     }));
     setHasDraft(true);
