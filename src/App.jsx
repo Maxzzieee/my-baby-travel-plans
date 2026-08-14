@@ -15,6 +15,7 @@ import {
   List,
   Map as MapIcon,
   Navigation,
+  ShoppingBag,
   Star,
   Calendar,
   Trophy,
@@ -224,6 +225,7 @@ const KIND_META = {
   stay: { label: "Stay", emoji: "🏨" },
   activity: { label: "Activity", emoji: "✨" },
   food: { label: "Food", emoji: "🍽️" },
+  shop: { label: "Shopping", emoji: "🛍️" },
   note: { label: "Note", emoji: "📝" },
 };
 
@@ -1474,10 +1476,11 @@ const KIND_COLOR = {
   stay: ACCENTS.winter,
   activity: ACCENTS.blush,
   food: ACCENTS.mint,
+  shop: { soft: "#FEF3C7", border: "#FCD34D", text: "#B45309", hex: "#FDE68A" },
   note: { soft: "#F5F5F4", border: "#D6D3D1", text: "#57534E", hex: "#E7E5E4" },
 };
 // Solid pin colors per kind for map markers (match KIND_COLOR accents).
-const KIND_PIN = { stay: "#3D6B7D", activity: "#A65A45", food: "#3F7C5C", note: "#78716C" };
+const KIND_PIN = { stay: "#3D6B7D", activity: "#A65A45", food: "#3F7C5C", shop: "#CA8A04", note: "#78716C" };
 
 // Responsive: wide (desktop) → split list+map; narrow → List/Map toggle.
 function useWide() {
@@ -1554,6 +1557,9 @@ function StopCard({ item, index, total, selected, distanceToNext, image, onOpen,
   const badge = (
     <span className="flex h-6 w-6 items-center justify-center rounded-full text-[11px] font-black text-white ring-2 ring-white" style={{ background: pinColor }}>{index + 1}</span>
   );
+  const kindChip = (
+    <span className="whitespace-nowrap rounded-full px-1.5 py-[1px] text-[9px] font-extrabold shadow-sm" style={{ background: c.soft, color: c.text }}>{meta.emoji} {meta.label}</span>
+  );
   return (
     <div>
       <div
@@ -1565,31 +1571,31 @@ function StopCard({ item, index, total, selected, distanceToNext, image, onOpen,
           // photo of the place (from the linked idea) — a picture is far easier to
           // recognise than a cryptic title. Number badge overlays it to match the pin.
           <div className="relative">
-            <img src={image} alt="" className="h-24 w-full object-cover" />
-            <span className="absolute left-2 top-2">{badge}</span>
+            <img src={image} alt="" className="h-20 w-full object-cover" />
+            <span className="absolute left-1.5 top-1.5">{badge}</span>
+            <span className="absolute right-1.5 top-1.5">{kindChip}</span>
           </div>
         )}
-        <div className="flex items-start gap-2 p-2.5">
+        <div className="flex items-center gap-1.5 px-2 py-1.5">
           {!image && <div className="flex-shrink-0">{badge}</div>}
-          <div className="min-w-0 flex-1">
-            <div className="flex items-center gap-1.5">
-              {item.start_time && <span className="flex-shrink-0 text-[11px] font-bold" style={{ color: c.text }}>{item.start_time}{item.end_time ? `–${item.end_time}` : ""}</span>}
-              <span className="text-xs">{meta.emoji}</span>
-              <span className="truncate text-sm font-extrabold text-stone-800">{item.title || "Untitled stop"}</span>
+          <div className="min-w-0 flex-1 leading-tight">
+            <div className="flex items-center gap-1">
+              {item.start_time && <span className="flex-shrink-0 text-[10px] font-bold" style={{ color: c.text }}>{item.start_time}</span>}
+              <span className="truncate text-[13px] font-extrabold text-stone-800">{item.title || "Untitled stop"}</span>
+              {!image && <span className="flex-shrink-0">{kindChip}</span>}
             </div>
             {item.place && (
-              <div className="mt-0.5 flex items-center gap-1 text-[11px] text-stone-500">
-                <MapPin size={11} className="flex-shrink-0" /> <span className="truncate">{item.place}</span>
+              <div className="flex items-center gap-0.5 text-[10px] text-stone-500">
+                <MapPin size={10} className="flex-shrink-0" /> <span className="truncate">{item.place}</span>
                 {noGeo && <span className="flex-shrink-0 text-amber-500">· locating…</span>}
               </div>
             )}
-            {item.notes && <div className="mt-0.5 truncate text-[11px] text-stone-400">{item.notes}</div>}
           </div>
           <div className="flex flex-shrink-0 flex-col">
-            <button onClick={(e) => { e.stopPropagation(); onMove(index, -1); }} disabled={index === 0} className="rounded p-0.5 text-stone-300 transition-colors hover:text-stone-600 disabled:opacity-25" aria-label="Move up"><ChevronUp size={16} /></button>
-            <button onClick={(e) => { e.stopPropagation(); onMove(index, 1); }} disabled={index === total - 1} className="rounded p-0.5 text-stone-300 transition-colors hover:text-stone-600 disabled:opacity-25" aria-label="Move down"><ChevronDown size={16} /></button>
+            <button onClick={(e) => { e.stopPropagation(); onMove(index, -1); }} disabled={index === 0} className="rounded p-0.5 text-stone-300 transition-colors hover:text-stone-600 disabled:opacity-25" aria-label="Move up"><ChevronUp size={15} /></button>
+            <button onClick={(e) => { e.stopPropagation(); onMove(index, 1); }} disabled={index === total - 1} className="rounded p-0.5 text-stone-300 transition-colors hover:text-stone-600 disabled:opacity-25" aria-label="Move down"><ChevronDown size={15} /></button>
           </div>
-          <button onClick={(e) => { e.stopPropagation(); onOpen(item.id); }} className="flex-shrink-0 rounded p-1 text-stone-300 transition-colors hover:text-rose-400" aria-label="Edit stop"><PenLine size={14} /></button>
+          <button onClick={(e) => { e.stopPropagation(); onOpen(item.id); }} className="flex-shrink-0 rounded p-1 text-stone-300 transition-colors hover:text-rose-400" aria-label="Edit stop"><PenLine size={13} /></button>
         </div>
       </div>
       {distanceToNext && (
@@ -1608,6 +1614,7 @@ function ItemEditor({ item, onUpdate, onRemove, onClose }) {
     { kind: "stay", icon: Bed },
     { kind: "activity", icon: Sparkles },
     { kind: "food", icon: Utensils },
+    { kind: "shop", icon: ShoppingBag },
     { kind: "note", icon: NotebookPen },
   ];
   return (
@@ -1699,7 +1706,7 @@ function ItineraryView({ plans }) {
     refresh();
   };
   // ideas carry pre-geocoded lat/lng (filled offline), so they pin instantly
-  const addIdea = (idea) => addStop({ title: idea.title, place: idea.location || idea.title, notes: idea.summary, lat: idea.lat, lng: idea.lng, idea_id: idea.id });
+  const addIdea = (idea) => addStop({ title: idea.title, place: idea.location || idea.title, notes: idea.summary, lat: idea.lat, lng: idea.lng, kind: idea.kind, idea_id: idea.id });
   const addFreeStop = async () => { const t = newStop.trim(); if (!t) return; setNewStop(""); await addStop({ title: t, place: t }); };
   const update = (id, patch) => {
     const clearGeo = "place" in patch ? { lat: null, lng: null, _geo: undefined } : {};
@@ -1794,10 +1801,26 @@ function ItineraryView({ plans }) {
                     <ChevronDown size={13} className={trayOpen ? "" : "-rotate-90"} /> Add from your {city.name} ideas ({availIdeas.length})
                   </button>
                   {trayOpen && (
-                    <div className="mt-2 flex flex-wrap gap-1.5">
-                      {availIdeas.map((p) => (
-                        <button key={p.id} onClick={() => addIdea(p)} className="flex items-center gap-1 rounded-lg border border-stone-200 bg-white px-2 py-1 text-[11px] font-bold text-stone-600 transition-all hover:scale-105 hover:border-rose-200"><Plus size={11} /> {p.title || "Untitled idea"}</button>
-                      ))}
+                    <div className="mt-2 grid grid-cols-1 gap-1.5 sm:grid-cols-2">
+                      {availIdeas.map((p) => {
+                        const img = ideaImg[p.id];
+                        const km = KIND_META[p.kind] || KIND_META.activity;
+                        const kc = KIND_COLOR[p.kind] || KIND_COLOR.activity;
+                        return (
+                          <button key={p.id} onClick={() => addIdea(p)} className="flex items-center gap-2 rounded-xl border border-stone-200 bg-white p-1.5 text-left transition-all hover:border-rose-200 hover:shadow-sm">
+                            {img ? (
+                              <img src={img} alt="" className="h-10 w-10 flex-shrink-0 rounded-lg object-cover" />
+                            ) : (
+                              <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-lg text-base" style={{ background: kc.soft }}>{km.emoji}</div>
+                            )}
+                            <span className="min-w-0 flex-1">
+                              <span className="block truncate text-[12px] font-extrabold text-stone-700">{p.title || "Untitled idea"}</span>
+                              <span className="text-[10px] font-bold" style={{ color: kc.text }}>{km.emoji} {km.label}</span>
+                            </span>
+                            <Plus size={14} className="flex-shrink-0 text-stone-300" />
+                          </button>
+                        );
+                      })}
                     </div>
                   )}
                 </div>
