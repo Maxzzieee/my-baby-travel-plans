@@ -73,6 +73,34 @@ function extractImages(html, baseUrl, max = 3) {
   }
   return out.slice(0, max);
 }
+const BROWSER_UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36";
+async function kakaoImages(q, n = 4) {
+  const key = process.env.KAKAO_REST_KEY;
+  if (!key || !q || q === "Unknown") return [];
+  try {
+    const r = await fetch("https://dapi.kakao.com/v2/search/image?sort=accuracy&size=" + (n * 2) + "&query=" + encodeURIComponent(q), { headers: { Authorization: "KakaoAK " + key } });
+    if (!r.ok) return [];
+    const d = await r.json();
+    return (d.documents || []).filter((x) => x.image_url && (x.width || 0) >= 300 && (x.height || 0) >= 220).map((x) => x.image_url).slice(0, n);
+  } catch { return []; }
+}
+async function uploadToStorage(imageUrl) {
+  const base = process.env.SUPABASE_URL, key = process.env.SUPABASE_ANON_KEY;
+  if (!base || !key || !imageUrl) return null;
+  try {
+    const r = await fetch(imageUrl, { headers: { "user-agent": BROWSER_UA }, signal: AbortSignal.timeout(8000) });
+    if (!r.ok) return null;
+    const ct = r.headers.get("content-type") || "image/jpeg";
+    if (!ct.startsWith("image/")) return null;
+    const buf = Buffer.from(await r.arrayBuffer());
+    if (buf.length < 2500 || buf.length > 6_000_000) return null;
+    const ext = ct.includes("png") ? "png" : ct.includes("webp") ? "webp" : ct.includes("gif") ? "gif" : "jpg";
+    const path = `scraped/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
+    const up = await fetch(`${base}/storage/v1/object/memes/${path}`, { method: "POST", headers: { apikey: key, Authorization: "Bearer " + key, "content-type": ct }, body: buf });
+    if (!up.ok) return null;
+    return `${base}/storage/v1/object/public/memes/${path}`;
+  } catch { return null; }
+}
 
 const PROMPT =
   "You are helping a couple plan a cozy winter trip to Seoul. From the provided content " +
@@ -108,7 +136,7 @@ app.post("/api/extract", async (req, res) => {
       let pageText = "";
       try {
         const r = await fetch(url, {
-          headers: { "user-agent": "Mozilla/5.0 (compatible; BabyTravelPlans/1.0)" },
+          headers: { "user-agent": BROWSER_UA, accept: "text/html" },
           signal: AbortSignal.timeout(8000),
         });
         rawHtml = await r.text();
@@ -148,10 +176,19 @@ app.post("/api/extract", async (req, res) => {
       data.lat = geo.lat; data.lng = geo.lng;
       if (geo.kind) data.kind = geo.kind;
     }
-    if (rawHtml) {
-      const photos = extractImages(rawHtml, url, 3);
-      if (photos.length) { data.photos = photos; data.thumb = photos[0]; }
+    let candidates = rawHtml ? extractImages(rawHtml, url, 4) : [];
+    if (candidates.length < 3) {
+      const kq = (geo && geo.name) || data.venue || data.title;
+      candidates = candidates.concat(await kakaoImages(kq, 4));
     }
+    candidates = candidates.filter((v, i, a) => a.indexOf(v) === i);
+    const photos = [];
+    for (const src of candidates) {
+      if (photos.length >= 3) break;
+      const hosted = await uploadToStorage(src);
+      if (hosted) photos.push(hosted);
+    }
+    if (photos.length) { data.photos = photos; data.thumb = photos[0]; }
 
     res.json(data);
   } catch (err) {
