@@ -1553,7 +1553,7 @@ function DayMap({ stops, selectedId, onSelect }) {
 }
 
 // One stop in the day list — number badge matches its map pin.
-function StopCard({ item, index, total, selected, distanceToNext, image, onOpen, onMove, onSelect, onDelete, dragHandle }) {
+function StopCard({ item, index, total, selected, distanceToNext, image, onOpen, onMove, onSelect, onDelete, dragging }) {
   const c = KIND_COLOR[item.kind] || KIND_COLOR.activity;
   const meta = KIND_META[item.kind] || KIND_META.activity;
   const noGeo = item.place && (item.lat == null || item.lng == null);
@@ -1568,7 +1568,7 @@ function StopCard({ item, index, total, selected, distanceToNext, image, onOpen,
     <div>
       <div
         onClick={() => onSelect(item.id)}
-        className="cursor-pointer overflow-hidden rounded-2xl bg-white transition-shadow"
+        className="overflow-hidden rounded-2xl bg-white transition-shadow"
         style={{ border: `1.5px solid ${selected ? c.border : "#EAE7E1"}`, boxShadow: selected ? `0 0 0 2px ${c.border}` : "none" }}
       >
         {image && (
@@ -1595,11 +1595,8 @@ function StopCard({ item, index, total, selected, distanceToNext, image, onOpen,
               </div>
             )}
           </div>
-          {dragHandle && (
-            <button {...dragHandle} onClick={(e) => e.stopPropagation()} className="flex-shrink-0 cursor-grab touch-none rounded-lg p-1 text-stone-300 transition-colors hover:text-stone-500 active:cursor-grabbing" aria-label="Drag to reorder" title="Drag to reorder"><GripVertical size={18} /></button>
-          )}
-          <button onClick={(e) => { e.stopPropagation(); onOpen(item.id); }} className="flex-shrink-0 rounded-lg bg-stone-100 p-1.5 text-stone-500 transition-colors hover:bg-stone-200 hover:text-stone-700" aria-label="Edit stop" title="Edit"><PenLine size={14} /></button>
-          <button onClick={(e) => { e.stopPropagation(); onDelete(item.id); }} className="flex-shrink-0 rounded-lg bg-rose-50 p-1.5 text-rose-400 transition-colors hover:bg-rose-100 hover:text-rose-600" aria-label="Delete stop" title="Delete"><Trash2 size={14} /></button>
+          <button onPointerDown={(e) => e.stopPropagation()} onClick={(e) => { e.stopPropagation(); onOpen(item.id); }} className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-xl bg-stone-100 text-stone-600 transition-colors hover:bg-stone-200 hover:text-stone-800" aria-label="Edit stop" title="Edit"><PenLine size={17} /></button>
+          <button onPointerDown={(e) => e.stopPropagation()} onClick={(e) => { e.stopPropagation(); onDelete(item.id); }} className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-xl bg-rose-50 text-rose-500 transition-colors hover:bg-rose-100 hover:text-rose-700" aria-label="Delete stop" title="Delete"><Trash2 size={17} /></button>
         </div>
       </div>
       {distanceToNext && (
@@ -1617,13 +1614,18 @@ function SortableStop(props) {
   const style = {
     transform: CSS.Transform.toString(transform),
     transition,
-    opacity: isDragging ? 0.55 : 1,
+    opacity: isDragging ? 0.6 : 1,
+    boxShadow: isDragging ? "0 10px 24px rgba(0,0,0,0.18)" : "none",
     zIndex: isDragging ? 50 : "auto",
     position: "relative",
+    touchAction: "manipulation",
   };
+  // The WHOLE card is the drag surface (listeners on the wrapper). A tap that
+  // doesn't move still clicks through to select/edit thanks to the sensors'
+  // activation constraints; the edit/delete buttons stop pointer propagation.
   return (
-    <div ref={setNodeRef} style={style}>
-      <StopCard {...props} dragHandle={{ ...attributes, ...listeners }} />
+    <div ref={setNodeRef} style={style} {...attributes} {...listeners} className="cursor-grab outline-none active:cursor-grabbing">
+      <StopCard {...props} dragging={isDragging} />
     </div>
   );
 }
@@ -1747,8 +1749,8 @@ function ItineraryView({ plans }) {
 
   // --- drag-to-reorder (touch-friendly), with the map route updating live ---
   const sensors = useSensors(
-    useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
-    useSensor(TouchSensor, { activationConstraint: { delay: 160, tolerance: 6 } })
+    useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
+    useSensor(TouchSensor, { activationConstraint: { delay: 200, tolerance: 8 } })
   );
   const [dragPreview, setDragPreview] = useState(null); // [ids] during a drag
   const dragStart = useRef([]);
@@ -1760,12 +1762,16 @@ function ItineraryView({ plans }) {
     const from = base.indexOf(active.id), to = base.indexOf(over.id);
     setDragPreview(from < 0 || to < 0 || from === to ? base : arrayMove(base, from, to));
   };
-  const onDragEnd = () => {
-    const order = dragPreview || dragStart.current;
+  const onDragEnd = ({ active, over }) => {
+    setDragPreview(null);
+    if (!over || active.id === over.id) return;
+    const ids = dayIds();
+    const from = ids.indexOf(active.id), to = ids.indexOf(over.id);
+    if (from < 0 || to < 0) return;
+    const order = arrayMove(ids, from, to);
     const pos = new Map(order.map((id, i) => [id, i]));
     setItems((xs) => xs.map((x) => (pos.has(x.id) ? { ...x, position: pos.get(x.id) } : x)));
     reorderItinerary(order);
-    setDragPreview(null);
   };
   // what the map draws — follows the live drag preview so the route moves as you drag
   const mapStops = (() => {
@@ -1824,7 +1830,7 @@ function ItineraryView({ plans }) {
             ) : (
               <DndContext sensors={sensors} collisionDetection={closestCenter} onDragStart={onDragStart} onDragOver={onDragOver} onDragEnd={onDragEnd}>
                 <SortableContext items={numbered.map((n) => n.id)} strategy={verticalListSortingStrategy}>
-                  <div className="space-y-1.5">
+                  <div className="space-y-2">
                     {numbered.map((it, i) => (
                       <SortableStop
                         key={it.id}
