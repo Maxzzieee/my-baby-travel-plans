@@ -8,6 +8,15 @@
 export const config = { maxDuration: 15 };
 
 export default async function handler(req, res) {
+  // env presence check (booleans only, no values) for debugging deploys
+  if (req.query && req.query.diag) {
+    return res.status(200).json({
+      KAKAO_REST_KEY: !!process.env.KAKAO_REST_KEY,
+      SUPABASE_URL: !!process.env.SUPABASE_URL,
+      SUPABASE_ANON_KEY: !!process.env.SUPABASE_ANON_KEY,
+      ANTHROPIC_API_KEY: !!process.env.ANTHROPIC_API_KEY,
+    });
+  }
   const q = ((req.query && req.query.q) || "").toString().trim();
   if (!q) return res.status(400).json({ error: "missing q" });
   const key = process.env.KAKAO_REST_KEY;
