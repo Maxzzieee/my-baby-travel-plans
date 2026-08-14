@@ -43,10 +43,11 @@ async function kakaoGeocode(q) {
   const key = process.env.KAKAO_REST_KEY;
   if (!key || !q || q === "Unknown") return null;
   try {
-    const r = await fetch("https://dapi.kakao.com/v2/local/search/keyword.json?size=1&query=" + encodeURIComponent(q), { headers: { Authorization: "KakaoAK " + key } });
+    const r = await fetch("https://dapi.kakao.com/v2/local/search/keyword.json?size=10&query=" + encodeURIComponent(q), { headers: { Authorization: "KakaoAK " + key } });
     if (!r.ok) return null;
     const d = await r.json();
-    const doc = d.documents && d.documents[0];
+    const docs = d.documents || [];
+    const doc = docs.find((x) => (x.road_address_name || x.address_name || "").startsWith("서울")) || docs[0];
     if (!doc) return null;
     return { name: doc.place_name || "", address: doc.road_address_name || doc.address_name || "", lat: +doc.y, lng: +doc.x, kind: KCAT[doc.category_group_code] || null };
   } catch { return null; }
