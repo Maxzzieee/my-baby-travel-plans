@@ -389,6 +389,12 @@ function SavedIdea({ plan, accent, onDelete, onAddComment, onEdit, onAddToItiner
         <div className="min-w-0">
           <EditText value={plan.title || ""} onSave={(v) => onEdit(plan.id, { title: v })} placeholder="Untitled" className="text-sm font-extrabold text-stone-800" />
           <div className="text-xs text-stone-600"><EditText value={plan.summary || ""} onSave={(v) => onEdit(plan.id, { summary: v })} multiline placeholder="add a summary…" className="text-xs" /></div>
+          {/* editable address/place → powers the itinerary map. Editing it clears
+              the cached coords so the map re-geocodes from the new address. */}
+          <div className="mt-1 flex items-center gap-1 text-[11px] text-stone-500">
+            <MapPin size={11} className="flex-shrink-0" />
+            <EditText value={plan.location || ""} onSave={(v) => onEdit(plan.id, { location: v, lat: null, lng: null })} placeholder="add address / place…" className="text-[11px]" />
+          </div>
         </div>
         <button onClick={() => onDelete(plan.id)} className="flex-shrink-0 text-stone-300 transition-colors hover:text-rose-400" aria-label="Delete idea"><Trash2 size={14} /></button>
       </div>
@@ -1515,13 +1521,19 @@ function MapReady() {
 // The day's live map: numbered pins in order + a dashed line connecting them.
 function DayMap({ stops, selectedId, onSelect }) {
   const pts = stops.filter((s) => s.lat != null && s.lng != null);
+  const line = pts.map((p) => [p.lat, p.lng]);
   const center = pts.length ? [pts[0].lat, pts[0].lng] : [SEOUL_CENTER.lat, SEOUL_CENTER.lng];
   return (
     <div className="rt-map h-full w-full border border-stone-200">
       <MapContainer center={center} zoom={12} scrollWheelZoom className="h-full w-full">
         <TileLayer attribution="&copy; OpenStreetMap contributors" url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
         {pts.length > 1 && (
-          <Polyline positions={pts.map((p) => [p.lat, p.lng])} pathOptions={{ color: "#E0837A", weight: 3.5, opacity: 0.85, dashArray: "2 9", lineCap: "round" }} />
+          <>
+            {/* white halo underneath so the route reads on top of a busy map */}
+            <Polyline positions={line} pathOptions={{ color: "#ffffff", weight: 9, opacity: 0.95, lineCap: "round", lineJoin: "round" }} />
+            {/* bold coral route on top */}
+            <Polyline positions={line} pathOptions={{ color: "#F43F5E", weight: 5, opacity: 1, lineCap: "round", lineJoin: "round", dashArray: "1 12" }} />
+          </>
         )}
         {pts.map((s) => (
           <Marker key={s.id} position={[s.lat, s.lng]} icon={pinIcon(s.n, KIND_PIN[s.kind] || KIND_PIN.activity, s.id === selectedId)} eventHandlers={{ click: () => onSelect(s.id) }} />
@@ -1534,37 +1546,51 @@ function DayMap({ stops, selectedId, onSelect }) {
 }
 
 // One stop in the day list — number badge matches its map pin.
-function StopCard({ item, index, total, selected, distanceToNext, onOpen, onMove, onSelect }) {
+function StopCard({ item, index, total, selected, distanceToNext, image, onOpen, onMove, onSelect }) {
   const c = KIND_COLOR[item.kind] || KIND_COLOR.activity;
   const meta = KIND_META[item.kind] || KIND_META.activity;
   const noGeo = item.place && (item.lat == null || item.lng == null);
+  const pinColor = KIND_PIN[item.kind] || KIND_PIN.activity;
+  const badge = (
+    <span className="flex h-6 w-6 items-center justify-center rounded-full text-[11px] font-black text-white ring-2 ring-white" style={{ background: pinColor }}>{index + 1}</span>
+  );
   return (
     <div>
       <div
         onClick={() => onSelect(item.id)}
-        className="flex cursor-pointer items-start gap-2 rounded-2xl bg-white p-2.5 transition-shadow"
+        className="cursor-pointer overflow-hidden rounded-2xl bg-white transition-shadow"
         style={{ border: `1.5px solid ${selected ? c.border : "#EAE7E1"}`, boxShadow: selected ? `0 0 0 2px ${c.border}` : "none" }}
       >
-        <div className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full text-xs font-black text-white" style={{ background: KIND_PIN[item.kind] || KIND_PIN.activity }}>{index + 1}</div>
-        <div className="min-w-0 flex-1">
-          <div className="flex items-center gap-1.5">
-            {item.start_time && <span className="flex-shrink-0 text-[11px] font-bold" style={{ color: c.text }}>{item.start_time}{item.end_time ? `–${item.end_time}` : ""}</span>}
-            <span className="text-xs">{meta.emoji}</span>
-            <span className="truncate text-sm font-extrabold text-stone-800">{item.title || "Untitled stop"}</span>
+        {image && (
+          // photo of the place (from the linked idea) — a picture is far easier to
+          // recognise than a cryptic title. Number badge overlays it to match the pin.
+          <div className="relative">
+            <img src={image} alt="" className="h-24 w-full object-cover" />
+            <span className="absolute left-2 top-2">{badge}</span>
           </div>
-          {item.place && (
-            <div className="mt-0.5 flex items-center gap-1 text-[11px] text-stone-500">
-              <MapPin size={11} className="flex-shrink-0" /> <span className="truncate">{item.place}</span>
-              {noGeo && <span className="flex-shrink-0 text-amber-500">· locating…</span>}
+        )}
+        <div className="flex items-start gap-2 p-2.5">
+          {!image && <div className="flex-shrink-0">{badge}</div>}
+          <div className="min-w-0 flex-1">
+            <div className="flex items-center gap-1.5">
+              {item.start_time && <span className="flex-shrink-0 text-[11px] font-bold" style={{ color: c.text }}>{item.start_time}{item.end_time ? `–${item.end_time}` : ""}</span>}
+              <span className="text-xs">{meta.emoji}</span>
+              <span className="truncate text-sm font-extrabold text-stone-800">{item.title || "Untitled stop"}</span>
             </div>
-          )}
-          {item.notes && <div className="mt-0.5 truncate text-[11px] text-stone-400">{item.notes}</div>}
+            {item.place && (
+              <div className="mt-0.5 flex items-center gap-1 text-[11px] text-stone-500">
+                <MapPin size={11} className="flex-shrink-0" /> <span className="truncate">{item.place}</span>
+                {noGeo && <span className="flex-shrink-0 text-amber-500">· locating…</span>}
+              </div>
+            )}
+            {item.notes && <div className="mt-0.5 truncate text-[11px] text-stone-400">{item.notes}</div>}
+          </div>
+          <div className="flex flex-shrink-0 flex-col">
+            <button onClick={(e) => { e.stopPropagation(); onMove(index, -1); }} disabled={index === 0} className="rounded p-0.5 text-stone-300 transition-colors hover:text-stone-600 disabled:opacity-25" aria-label="Move up"><ChevronUp size={16} /></button>
+            <button onClick={(e) => { e.stopPropagation(); onMove(index, 1); }} disabled={index === total - 1} className="rounded p-0.5 text-stone-300 transition-colors hover:text-stone-600 disabled:opacity-25" aria-label="Move down"><ChevronDown size={16} /></button>
+          </div>
+          <button onClick={(e) => { e.stopPropagation(); onOpen(item.id); }} className="flex-shrink-0 rounded p-1 text-stone-300 transition-colors hover:text-rose-400" aria-label="Edit stop"><PenLine size={14} /></button>
         </div>
-        <div className="flex flex-shrink-0 flex-col">
-          <button onClick={(e) => { e.stopPropagation(); onMove(index, -1); }} disabled={index === 0} className="rounded p-0.5 text-stone-300 transition-colors hover:text-stone-600 disabled:opacity-25" aria-label="Move up"><ChevronUp size={16} /></button>
-          <button onClick={(e) => { e.stopPropagation(); onMove(index, 1); }} disabled={index === total - 1} className="rounded p-0.5 text-stone-300 transition-colors hover:text-stone-600 disabled:opacity-25" aria-label="Move down"><ChevronDown size={16} /></button>
-        </div>
-        <button onClick={(e) => { e.stopPropagation(); onOpen(item.id); }} className="flex-shrink-0 rounded p-1 text-stone-300 transition-colors hover:text-rose-400" aria-label="Edit stop"><PenLine size={14} /></button>
       </div>
       {distanceToNext && (
         <div className="ml-3.5 flex items-center gap-1 py-1 text-[10px] font-semibold text-stone-400">
@@ -1661,6 +1687,9 @@ function ItineraryView({ plans }) {
   const numbered = dayItems.map((it, i) => ({ ...it, n: i + 1 }));
   const addedIdeaIds = new Set(items.filter((i) => i.idea_id).map((i) => i.idea_id));
   const availIdeas = ideas.filter((p) => !addedIdeaIds.has(p.id));
+  // idea_id -> its photo, so a stop can show the place's picture instead of a cryptic title
+  const ideaImg = {};
+  for (const i of ideas) { const s = i.thumb || (Array.isArray(i.photos) && i.photos[0]) || null; if (s) ideaImg[i.id] = s; }
   const editingItem = editing ? items.find((x) => x.id === editing) || null : null;
   const coordOf = (it) => (it && it.lat != null ? { lat: it.lat, lng: it.lng } : null);
 
@@ -1736,7 +1765,7 @@ function ItineraryView({ plans }) {
             {numbered.length === 0 ? (
               <p className="rounded-2xl border border-dashed border-stone-300 bg-white/60 p-6 text-center text-sm text-stone-400">No stops yet for {dayLabel(day)}. Add one below 👇</p>
             ) : (
-              <div className="space-y-0">
+              <div className="space-y-1.5">
                 {numbered.map((it, i) => (
                   <StopCard
                     key={it.id}
@@ -1744,6 +1773,7 @@ function ItineraryView({ plans }) {
                     index={i}
                     total={numbered.length}
                     selected={selected === it.id}
+                    image={it.idea_id ? ideaImg[it.idea_id] : null}
                     distanceToNext={i < numbered.length - 1 ? legLabel(coordOf(it), coordOf(numbered[i + 1])) : null}
                     onOpen={setEditing}
                     onMove={move}
