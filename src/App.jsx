@@ -1549,7 +1549,7 @@ function DayMap({ stops, selectedId, onSelect }) {
 }
 
 // One stop in the day list — number badge matches its map pin.
-function StopCard({ item, index, total, selected, distanceToNext, image, onOpen, onMove, onSelect }) {
+function StopCard({ item, index, total, selected, distanceToNext, image, onOpen, onMove, onSelect, onDelete }) {
   const c = KIND_COLOR[item.kind] || KIND_COLOR.activity;
   const meta = KIND_META[item.kind] || KIND_META.activity;
   const noGeo = item.place && (item.lat == null || item.lng == null);
@@ -1591,11 +1591,12 @@ function StopCard({ item, index, total, selected, distanceToNext, image, onOpen,
               </div>
             )}
           </div>
-          <div className="flex flex-shrink-0 flex-col">
-            <button onClick={(e) => { e.stopPropagation(); onMove(index, -1); }} disabled={index === 0} className="rounded p-0.5 text-stone-300 transition-colors hover:text-stone-600 disabled:opacity-25" aria-label="Move up"><ChevronUp size={15} /></button>
-            <button onClick={(e) => { e.stopPropagation(); onMove(index, 1); }} disabled={index === total - 1} className="rounded p-0.5 text-stone-300 transition-colors hover:text-stone-600 disabled:opacity-25" aria-label="Move down"><ChevronDown size={15} /></button>
+          <div className="flex flex-shrink-0 flex-col text-stone-400">
+            <button onClick={(e) => { e.stopPropagation(); onMove(index, -1); }} disabled={index === 0} className="rounded p-0.5 transition-colors hover:text-stone-700 disabled:opacity-20" aria-label="Move up"><ChevronUp size={16} /></button>
+            <button onClick={(e) => { e.stopPropagation(); onMove(index, 1); }} disabled={index === total - 1} className="rounded p-0.5 transition-colors hover:text-stone-700 disabled:opacity-20" aria-label="Move down"><ChevronDown size={16} /></button>
           </div>
-          <button onClick={(e) => { e.stopPropagation(); onOpen(item.id); }} className="flex-shrink-0 rounded p-1 text-stone-300 transition-colors hover:text-rose-400" aria-label="Edit stop"><PenLine size={13} /></button>
+          <button onClick={(e) => { e.stopPropagation(); onOpen(item.id); }} className="flex-shrink-0 rounded-lg bg-stone-100 p-1.5 text-stone-500 transition-colors hover:bg-stone-200 hover:text-stone-700" aria-label="Edit stop" title="Edit"><PenLine size={14} /></button>
+          <button onClick={(e) => { e.stopPropagation(); onDelete(item.id); }} className="flex-shrink-0 rounded-lg bg-rose-50 p-1.5 text-rose-400 transition-colors hover:bg-rose-100 hover:text-rose-600" aria-label="Delete stop" title="Delete"><Trash2 size={14} /></button>
         </div>
       </div>
       {distanceToNext && (
@@ -1785,6 +1786,7 @@ function ItineraryView({ plans }) {
                     onOpen={setEditing}
                     onMove={move}
                     onSelect={setSelected}
+                    onDelete={remove}
                   />
                 ))}
               </div>
