@@ -16,17 +16,12 @@ let chain = Promise.resolve();
 const cache = new Map(); // query -> {lat,lng} | null
 
 function raw(query) {
-  const q = `${query}, Seoul, South Korea`;
-  const url =
-    "https://nominatim.openstreetmap.org/search?format=json&limit=1&addressdetails=0" +
-    `&viewbox=${SEOUL_VIEWBOX}&bounded=1&accept-language=en` +
-    `&email=info@zhenghe.com.sg&q=${encodeURIComponent(q)}`;
-  return fetch(url, { headers: { Accept: "application/json" } })
-    .then((r) => (r.ok ? r.json() : []))
-    .then((arr) => {
-      const hit = Array.isArray(arr) && arr[0];
-      if (!hit) return null;
-      const lat = parseFloat(hit.lat), lng = parseFloat(hit.lon);
+  // Server endpoint does Kakao Local (best in Korea) with an OSM fallback.
+  return fetch("/api/geocode?q=" + encodeURIComponent(query))
+    .then((r) => (r.ok ? r.json() : null))
+    .then((d) => {
+      if (!d || d.lat == null || d.lng == null) return null;
+      const lat = +d.lat, lng = +d.lng;
       return Number.isFinite(lat) && Number.isFinite(lng) ? { lat, lng } : null;
     })
     .catch(() => null);
@@ -41,8 +36,8 @@ export function geocodePlace(query) {
     if (cache.has(key)) return cache.get(key);
     const res = await raw(query);
     cache.set(key, res);
-    // pause so we stay under Nominatim's ~1 req/sec policy
-    await new Promise((r) => setTimeout(r, 1100));
+    // small gap between lookups (Kakao is generous; keep it polite)
+    await new Promise((r) => setTimeout(r, 300));
     return res;
   });
   // keep the chain alive even if one lookup throws
