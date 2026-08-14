@@ -1666,10 +1666,11 @@ function ItineraryView({ plans }) {
 
   const addStop = async (fields) => {
     const nextPos = dayItems.length ? Math.max(...dayItems.map((x) => x.position ?? 0)) + 1 : 0;
-    await addItineraryItem({ dest, day, position: nextPos, kind: fields.kind || "activity", start_time: "", end_time: "", title: fields.title || "", place: fields.place || "", notes: fields.notes || "", idea_id: fields.idea_id || null });
+    await addItineraryItem({ dest, day, position: nextPos, kind: fields.kind || "activity", start_time: "", end_time: "", title: fields.title || "", place: fields.place || "", notes: fields.notes || "", lat: fields.lat ?? null, lng: fields.lng ?? null, idea_id: fields.idea_id || null });
     refresh();
   };
-  const addIdea = (idea) => addStop({ title: idea.title, place: idea.location || idea.title, notes: idea.summary, idea_id: idea.id });
+  // ideas carry pre-geocoded lat/lng (filled offline), so they pin instantly
+  const addIdea = (idea) => addStop({ title: idea.title, place: idea.location || idea.title, notes: idea.summary, lat: idea.lat, lng: idea.lng, idea_id: idea.id });
   const addFreeStop = async () => { const t = newStop.trim(); if (!t) return; setNewStop(""); await addStop({ title: t, place: t }); };
   const update = (id, patch) => {
     const clearGeo = "place" in patch ? { lat: null, lng: null, _geo: undefined } : {};
@@ -1960,6 +1961,7 @@ export default function App() {
   const addToItinerary = (destId, day, idea) => addItineraryItem({
     dest: destId, day, kind: "activity", start_time: "",
     title: idea.title || "", place: idea.location || idea.title || "", notes: idea.summary || "",
+    lat: idea.lat ?? null, lng: idea.lng ?? null,
     idea_id: idea.id, position: 0,
   });
 
