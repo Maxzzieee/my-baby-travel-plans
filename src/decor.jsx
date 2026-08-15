@@ -74,18 +74,22 @@ export function SiteDecor() {
       <PixelSprite rows={DECOR_SPRITES.IVY} className="decor decor-ivy decor-ivy-l" />
       <PixelSprite rows={DECOR_SPRITES.IVY} className="decor decor-ivy decor-ivy-r" />
       <PixelSprite rows={DECOR_SPRITES.BLOSSOM} className="decor decor-blossom decor-blossom-bl" />
+      <PixelSprite rows={DECOR_SPRITES.BLOSSOM} className="decor decor-blossom decor-blossom-br" />
       <PixelSprite rows={DECOR_SPRITES.BLOSSOM} className="decor decor-blossom decor-blossom-tr" />
+      <PixelSprite rows={DECOR_SPRITES.BLOSSOM} className="decor decor-blossom decor-blossom-tl" />
+      <PixelSprite rows={DECOR_SPRITES.BLOSSOM} className="decor decor-blossom decor-blossom-bl2" />
       <PixelSprite rows={DECOR_SPRITES.BUTTERFLY} className="decor decor-butterfly decor-butterfly-1" />
     </div>
   );
 }
 
-// A butterfly that flits across the whole screen (above content), wings
-// fluttering, like one loose in a vivarium. Loops on a long wandering path.
-export function FlyingButterfly() {
+// Butterflies that flit across the whole screen (above content) on wandering
+// paths with beating wings, like they're loose in a vivarium. `rainbow` cycles
+// the hue for a rainbow morpho.
+export function FlyingButterfly({ variant = 1, rainbow = false }) {
   return (
-    <div className="flyer" aria-hidden="true">
-      <PixelSprite rows={DECOR_SPRITES.BUTTERFLY} className="flyer-wings" />
+    <div className={`flyer flyer-p${variant}`} aria-hidden="true">
+      <PixelSprite rows={DECOR_SPRITES.BUTTERFLY} className={"flyer-wings" + (rainbow ? " flyer-rainbow" : "")} />
     </div>
   );
 }

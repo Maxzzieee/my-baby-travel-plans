@@ -2139,7 +2139,9 @@ export default function App() {
     <div className="relative isolate min-h-screen w-full font-sans text-stone-800" style={{ backgroundColor: dark ? "#0b0b12" : "#FFFDF9", backgroundImage: dark ? "radial-gradient(circle at 50% -5%, #1c1830 0, transparent 40%), radial-gradient(circle at 15% 12%, #141024 0, transparent 45%), radial-gradient(circle at 85% 88%, #0d1622 0, transparent 48%)" : "radial-gradient(circle at 15% 10%, #FFF5F0 0, transparent 45%), radial-gradient(circle at 85% 90%, #EEF6F1 0, transparent 48%)" }}>
       <Sky dark={dark} />
       <SiteDecor />
-      <FlyingButterfly />
+      <FlyingButterfly variant={1} />
+      <FlyingButterfly variant={2} rainbow />
+      <FlyingButterfly variant={3} />
       {blooms.map((b) => (
         <Bloom key={b.id} x={b.x} y={b.y} onDone={() => setBlooms((p) => p.filter((z) => z.id !== b.id))} />
       ))}
