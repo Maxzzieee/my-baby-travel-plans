@@ -1910,6 +1910,22 @@ function ItineraryView({ plans }) {
   );
 }
 
+// Tasteful decorative botanicals framing the page edges (behind content, never
+// blocking taps). Drop transparent PNGs at public/decor/{ivy,blossom,butterfly}.png.
+function SiteDecor() {
+  const hide = (e) => { e.currentTarget.style.display = "none"; };
+  return (
+    <div className="site-decor" aria-hidden="true">
+      <img src="/decor/ivy.png" onError={hide} alt="" className="decor decor-ivy decor-ivy-l" />
+      <img src="/decor/ivy.png" onError={hide} alt="" className="decor decor-ivy decor-ivy-r" />
+      <img src="/decor/blossom.png" onError={hide} alt="" className="decor decor-blossom decor-blossom-bl" />
+      <img src="/decor/blossom.png" onError={hide} alt="" className="decor decor-blossom decor-blossom-tr" />
+      <img src="/decor/butterfly.png" onError={hide} alt="" className="decor decor-butterfly decor-butterfly-1" />
+      <img src="/decor/butterfly.png" onError={hide} alt="" className="decor decor-butterfly decor-butterfly-2" />
+    </div>
+  );
+}
+
 export default function App() {
   const [votes, setVotes] = useState(() => {
     try {
@@ -2120,6 +2136,7 @@ export default function App() {
     )}
     <div className="relative isolate min-h-screen w-full font-sans text-stone-800" style={{ backgroundColor: dark ? "#0b0b12" : "#FFFDF9", backgroundImage: dark ? "radial-gradient(circle at 50% -5%, #1c1830 0, transparent 40%), radial-gradient(circle at 15% 12%, #141024 0, transparent 45%), radial-gradient(circle at 85% 88%, #0d1622 0, transparent 48%)" : "radial-gradient(circle at 15% 10%, #FFF5F0 0, transparent 45%), radial-gradient(circle at 85% 90%, #EEF6F1 0, transparent 48%)" }}>
       <Sky dark={dark} />
+      <SiteDecor />
       <div className="pointer-events-none fixed inset-0 opacity-[0.18]" style={{ backgroundImage: "radial-gradient(#EEE8DE 1px, transparent 1px)", backgroundSize: "26px 26px" }} />
 
       <div className="relative mx-auto max-w-6xl px-4 py-10 sm:px-6 lg:py-14">

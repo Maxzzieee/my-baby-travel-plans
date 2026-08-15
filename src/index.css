@@ -203,6 +203,44 @@ html.dark .cpet-log { color: #8a857e !important; }
 }
 
 /* ============================================================================
+   SITE DECOR — botanicals framing the page edges. Behind content (z:-1, the
+   root is `isolate`), pointer-events off. Drop files in public/decor/.
+============================================================================ */
+.site-decor { position: fixed; inset: 0; z-index: -1; pointer-events: none; overflow: hidden; }
+.decor { position: absolute; user-select: none; -webkit-user-drag: none; }
+
+/* ivy draping from the top corners */
+.decor-ivy { top: -8px; width: clamp(84px, 12vw, 168px); opacity: 0.9; }
+.decor-ivy-l { left: -12px; }
+.decor-ivy-r { right: -12px; transform: scaleX(-1); }
+
+/* blossoms tucked into corners */
+.decor-blossom { width: clamp(72px, 10vw, 132px); opacity: 0.85; }
+.decor-blossom-bl { bottom: -10px; left: -10px; transform: rotate(6deg); }
+.decor-blossom-tr { top: 64px; right: 6px; width: clamp(52px, 7vw, 92px); opacity: 0.7; transform: rotate(-10deg); }
+
+/* butterflies gently drifting in the side margins */
+.decor-butterfly { width: clamp(46px, 6vw, 82px); opacity: 0.92; animation: decor-float 9s ease-in-out infinite; }
+.decor-butterfly-1 { top: 20%; right: 2.5%; }
+.decor-butterfly-2 { top: 66%; left: 2%; width: clamp(36px, 4.5vw, 62px); opacity: 0.8; animation-delay: 3.5s; animation-duration: 11s; }
+@keyframes decor-float {
+  0%, 100% { transform: translateY(0) rotate(-3deg); }
+  50% { transform: translateY(-16px) rotate(4deg); }
+}
+
+/* on dark mode, black-background PNGs (butterfly/ivy) blend into the night;
+   on light mode transparent PNGs work as-is. Keep it gentle. */
+html.dark .decor-butterfly, html.dark .decor-ivy { opacity: 1; }
+
+@media (max-width: 640px) {
+  .decor-ivy { width: 72px; }
+  .decor-blossom { width: 68px; }
+  .decor-blossom-tr, .decor-butterfly-2 { display: none; }
+  .decor-butterfly-1 { width: 44px; opacity: 0.8; }
+}
+@media (prefers-reduced-motion: reduce) { .decor-butterfly { animation: none; } }
+
+/* ============================================================================
    TRIP PLANNER MAP (Leaflet) — numbered pins + rounded container + dark tiles
 ============================================================================ */
 .rt-map { border-radius: 20px; overflow: hidden; z-index: 0; }

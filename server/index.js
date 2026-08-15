@@ -86,18 +86,19 @@ async function kakaoImages(q, n = 4) {
   } catch { return []; }
 }
 async function uploadToStorage(imageUrl) {
-  const base = process.env.SUPABASE_URL, key = process.env.SUPABASE_ANON_KEY;
+  const base = (process.env.SUPABASE_URL || "").trim();
+  const key = (process.env.SUPABASE_ANON_KEY || "").trim();
   if (!base || !key || !imageUrl) return null;
   try {
     const r = await fetch(imageUrl, { headers: { "user-agent": BROWSER_UA }, signal: AbortSignal.timeout(8000) });
     if (!r.ok) return null;
-    const ct = r.headers.get("content-type") || "image/jpeg";
+    const ct = (r.headers.get("content-type") || "image/jpeg").split(";")[0].trim();
     if (!ct.startsWith("image/")) return null;
-    const buf = Buffer.from(await r.arrayBuffer());
-    if (buf.length < 2500 || buf.length > 6_000_000) return null;
+    const bytes = new Uint8Array(await r.arrayBuffer());
+    if (bytes.length < 2500 || bytes.length > 6_000_000) return null;
     const ext = ct.includes("png") ? "png" : ct.includes("webp") ? "webp" : ct.includes("gif") ? "gif" : "jpg";
     const path = `scraped/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
-    const up = await fetch(`${base}/storage/v1/object/memes/${path}`, { method: "POST", headers: { apikey: key, Authorization: "Bearer " + key, "content-type": ct }, body: buf });
+    const up = await fetch(`${base}/storage/v1/object/memes/${path}`, { method: "POST", headers: { apikey: key, Authorization: "Bearer " + key, "content-type": ct }, body: bytes });
     if (!up.ok) return null;
     return `${base}/storage/v1/object/public/memes/${path}`;
   } catch { return null; }
