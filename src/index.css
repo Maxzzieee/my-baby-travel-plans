@@ -209,36 +209,58 @@ html.dark .cpet-log { color: #8a857e !important; }
 .site-decor { position: fixed; inset: 0; z-index: -1; pointer-events: none; overflow: hidden; }
 .decor { position: absolute; user-select: none; -webkit-user-drag: none; }
 
-/* ivy draping from the top corners */
-.decor-ivy { top: -8px; width: clamp(84px, 12vw, 168px); opacity: 0.9; }
-.decor-ivy-l { left: -12px; }
-.decor-ivy-r { right: -12px; transform: scaleX(-1); }
+/* ivy vine draping from the top corners */
+.decor-ivy { top: -6px; width: clamp(46px, 6vw, 78px); opacity: 0.92; }
+.decor-ivy-l { left: 2px; }
+.decor-ivy-r { right: 2px; transform: scaleX(-1); }
 
 /* blossoms tucked into corners */
-.decor-blossom { width: clamp(72px, 10vw, 132px); opacity: 0.85; }
-.decor-blossom-bl { bottom: -10px; left: -10px; transform: rotate(6deg); }
-.decor-blossom-tr { top: 64px; right: 6px; width: clamp(52px, 7vw, 92px); opacity: 0.7; transform: rotate(-10deg); }
+.decor-blossom { width: clamp(38px, 5vw, 60px); opacity: 0.9; }
+.decor-blossom-bl { bottom: 6px; left: 6px; transform: rotate(6deg); }
+.decor-blossom-tr { top: 70px; right: 8px; width: clamp(28px, 3.6vw, 46px); opacity: 0.8; transform: rotate(-10deg); }
 
 /* butterflies gently drifting in the side margins */
-.decor-butterfly { width: clamp(46px, 6vw, 82px); opacity: 0.92; animation: decor-float 9s ease-in-out infinite; }
-.decor-butterfly-1 { top: 20%; right: 2.5%; }
-.decor-butterfly-2 { top: 66%; left: 2%; width: clamp(36px, 4.5vw, 62px); opacity: 0.8; animation-delay: 3.5s; animation-duration: 11s; }
+.decor-butterfly { width: clamp(38px, 5vw, 64px); opacity: 0.95; animation: decor-float 9s ease-in-out infinite; }
+.decor-butterfly-1 { top: 19%; right: 2.5%; }
+.decor-butterfly-2 { top: 66%; left: 2%; width: clamp(28px, 3.6vw, 48px); opacity: 0.85; animation-delay: 3.5s; animation-duration: 11s; }
 @keyframes decor-float {
-  0%, 100% { transform: translateY(0) rotate(-3deg); }
-  50% { transform: translateY(-16px) rotate(4deg); }
+  0%, 100% { transform: translateY(0) rotate(-4deg); }
+  50% { transform: translateY(-16px) rotate(5deg); }
 }
-
-/* on dark mode, black-background PNGs (butterfly/ivy) blend into the night;
-   on light mode transparent PNGs work as-is. Keep it gentle. */
-html.dark .decor-butterfly, html.dark .decor-ivy { opacity: 1; }
 
 @media (max-width: 640px) {
-  .decor-ivy { width: 72px; }
-  .decor-blossom { width: 68px; }
   .decor-blossom-tr, .decor-butterfly-2 { display: none; }
-  .decor-butterfly-1 { width: 44px; opacity: 0.8; }
+  .decor-butterfly-1 { opacity: 0.85; }
 }
 @media (prefers-reduced-motion: reduce) { .decor-butterfly { animation: none; } }
+
+/* hidden easter egg: rapid-click → butterflies/leaves/blossoms bloom from the spot */
+.bloom { position: fixed; z-index: 60; pointer-events: none; }
+.bloom-part {
+  position: absolute; left: 0; top: 0; opacity: 0; will-change: transform, opacity;
+  animation: bloom-fly 1.6s cubic-bezier(0.2, 0.7, 0.3, 1) forwards;
+}
+@keyframes bloom-fly {
+  0% { opacity: 0; transform: translate(-50%, -50%) scale(0.2) rotate(0deg); }
+  18% { opacity: 1; }
+  100% { opacity: 0; transform: translate(calc(-50% + var(--dx)), calc(-50% + var(--dy))) scale(var(--scale)) rotate(var(--rot)); }
+}
+
+/* vivarium butterfly — flits across the whole screen (above content) */
+.flyer { position: fixed; left: 0; top: 0; z-index: 42; pointer-events: none; width: clamp(34px, 4.6vw, 56px); animation: flit 34s ease-in-out infinite; }
+.flyer-wings { display: block; width: 100%; transform-origin: center; animation: flutter 0.26s ease-in-out infinite alternate; }
+@keyframes flutter { from { transform: scaleX(1) rotate(-4deg); } to { transform: scaleX(0.6) rotate(4deg); } }
+@keyframes flit {
+  0%   { transform: translate(-10vw, 72vh); }
+  12%  { transform: translate(14vw, 44vh); }
+  26%  { transform: translate(30vw, 66vh); }
+  40%  { transform: translate(48vw, 32vh); }
+  55%  { transform: translate(64vw, 58vh); }
+  70%  { transform: translate(80vw, 30vh); }
+  84%  { transform: translate(96vw, 52vh); }
+  100% { transform: translate(114vw, 40vh); }
+}
+@media (prefers-reduced-motion: reduce) { .flyer { display: none; } }
 
 /* ============================================================================
    TRIP PLANNER MAP (Leaflet) — numbered pins + rounded container + dark tiles

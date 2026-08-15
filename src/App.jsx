@@ -50,6 +50,7 @@ import {
 } from "lucide-react";
 import { hasSupabase, loadState, LOAD_FAILED, saveState, subscribe, loadGallery, postImage, deleteImage, subscribeGallery, loadCopy, saveCopy, subscribeCopy, loadMessages, postMessage, subscribeMessages, loadMessageCounts, subscribeAllMessages, uploadImage, loadItinerary, addItineraryItem, updateItineraryItem, deleteItineraryItem, reorderItinerary, subscribeItinerary, joinRoom } from "./lib/supabase";
 import { geocodePlace, legLabel, SEOUL_CENTER } from "./lib/geo";
+import { SiteDecor, FlyingButterfly, Bloom } from "./decor.jsx";
 import "leaflet/dist/leaflet.css";
 import L from "leaflet";
 import { MapContainer, TileLayer, Marker, Polyline, useMap } from "react-leaflet";
@@ -1910,22 +1911,6 @@ function ItineraryView({ plans }) {
   );
 }
 
-// Tasteful decorative botanicals framing the page edges (behind content, never
-// blocking taps). Drop transparent PNGs at public/decor/{ivy,blossom,butterfly}.png.
-function SiteDecor() {
-  const hide = (e) => { e.currentTarget.style.display = "none"; };
-  return (
-    <div className="site-decor" aria-hidden="true">
-      <img src="/decor/ivy.png" onError={hide} alt="" className="decor decor-ivy decor-ivy-l" />
-      <img src="/decor/ivy.png" onError={hide} alt="" className="decor decor-ivy decor-ivy-r" />
-      <img src="/decor/blossom.png" onError={hide} alt="" className="decor decor-blossom decor-blossom-bl" />
-      <img src="/decor/blossom.png" onError={hide} alt="" className="decor decor-blossom decor-blossom-tr" />
-      <img src="/decor/butterfly.png" onError={hide} alt="" className="decor decor-butterfly decor-butterfly-1" />
-      <img src="/decor/butterfly.png" onError={hide} alt="" className="decor decor-butterfly decor-butterfly-2" />
-    </div>
-  );
-}
-
 export default function App() {
   const [votes, setVotes] = useState(() => {
     try {
@@ -1961,6 +1946,23 @@ export default function App() {
   const [muted, setMuted] = useState(sound.muted);
   const [dark, setDark] = useState(() => { try { const s = localStorage.getItem("site.theme"); if (s) return s === "dark"; return !!(window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches); } catch (e) { return false; } });
   useEffect(() => { try { document.documentElement.classList.toggle("dark", dark); localStorage.setItem("site.theme", dark ? "dark" : "light"); } catch (e) {} }, [dark]);
+  // hidden easter egg — rapid-click anywhere and botanicals bloom from the spot
+  const [blooms, setBlooms] = useState([]);
+  const comboRef = useRef({ n: 0, t: 0 });
+  useEffect(() => {
+    const onClick = (e) => {
+      const now = Date.now(), c = comboRef.current;
+      c.n = now - c.t < 650 ? c.n + 1 : 1;
+      c.t = now;
+      if (c.n >= 8) {
+        c.n = 0;
+        setBlooms((b) => [...b.slice(-3), { id: now + ":" + Math.random(), x: e.clientX, y: e.clientY }]);
+        try { sound.yay(); } catch (e2) {}
+      }
+    };
+    window.addEventListener("click", onClick);
+    return () => window.removeEventListener("click", onClick);
+  }, []);
   const hydrated = useRef(false);
   const lastSynced = useRef(null);
 
@@ -2137,6 +2139,10 @@ export default function App() {
     <div className="relative isolate min-h-screen w-full font-sans text-stone-800" style={{ backgroundColor: dark ? "#0b0b12" : "#FFFDF9", backgroundImage: dark ? "radial-gradient(circle at 50% -5%, #1c1830 0, transparent 40%), radial-gradient(circle at 15% 12%, #141024 0, transparent 45%), radial-gradient(circle at 85% 88%, #0d1622 0, transparent 48%)" : "radial-gradient(circle at 15% 10%, #FFF5F0 0, transparent 45%), radial-gradient(circle at 85% 90%, #EEF6F1 0, transparent 48%)" }}>
       <Sky dark={dark} />
       <SiteDecor />
+      <FlyingButterfly />
+      {blooms.map((b) => (
+        <Bloom key={b.id} x={b.x} y={b.y} onDone={() => setBlooms((p) => p.filter((z) => z.id !== b.id))} />
+      ))}
       <div className="pointer-events-none fixed inset-0 opacity-[0.18]" style={{ backgroundImage: "radial-gradient(#EEE8DE 1px, transparent 1px)", backgroundSize: "26px 26px" }} />
 
       <div className="relative mx-auto max-w-6xl px-4 py-10 sm:px-6 lg:py-14">
