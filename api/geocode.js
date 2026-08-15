@@ -27,19 +27,18 @@ export default async function handler(req, res) {
       const kd = await kr.json();
       const docs = (kd.documents || []).filter((x) => x.image_url && (x.width || 0) >= 300).slice(0, 3);
       for (const doc of docs) {
-        const t = { imgHost: (() => { try { return new URL(doc.image_url).host; } catch { return "?"; } })(), thumbHost: (() => { try { return new URL(doc.thumbnail_url).host; } catch { return "?"; } })() };
-        for (const [label, u] of [["img", doc.image_url], ["thumb", doc.thumbnail_url]]) {
-          try {
-            const ir = await fetch(u, { headers: { "user-agent": UA }, signal: AbortSignal.timeout(7000) });
-            t[label] = ir.status + " " + (ir.headers.get("content-type") || "");
-            if (label === "thumb" && ir.ok) {
-              const buf = Buffer.from(await ir.arrayBuffer());
-              const path = `scraped/diag-${Date.now()}-${Math.random().toString(36).slice(2)}.jpg`;
-              const up = await fetch(`${base}/storage/v1/object/memes/${path}`, { method: "POST", headers: { apikey: sk, Authorization: "Bearer " + sk, "content-type": "image/jpeg" }, body: buf });
-              t.upload = up.status + (up.ok ? "" : " " + (await up.text()).slice(0, 60));
-            }
-          } catch (e) { t[label] = "ERR " + String(e).slice(0, 45); }
-        }
+        const t = { imgHost: (() => { try { return new URL(doc.image_url).host; } catch { return "?"; } })() };
+        try {
+          const ir = await fetch(doc.image_url, { headers: { "user-agent": UA }, signal: AbortSignal.timeout(7000) });
+          t.fetch = ir.status;
+          if (ir.ok) {
+            const bytes = new Uint8Array(await ir.arrayBuffer());
+            t.bytes = bytes.length;
+            const path = `scraped/diag-${Date.now()}-${Math.random().toString(36).slice(2)}.jpg`;
+            const up = await fetch(`${base}/storage/v1/object/memes/${path}`, { method: "POST", headers: { apikey: sk, Authorization: "Bearer " + sk, "content-type": "image/jpeg" }, body: bytes });
+            t.upload = up.status + (up.ok ? " OK" : " " + (await up.text()).slice(0, 60));
+          }
+        } catch (e) { t.err = String(e).slice(0, 55); }
         out.tries.push(t);
       }
     } catch (e) { out.error = String(e).slice(0, 90); }
