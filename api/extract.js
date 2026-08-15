@@ -22,7 +22,7 @@ const SCHEMA = {
     summary: { type: "string", description: "1-2 sentence friendly summary of what this place/activity is about." },
     activities: { type: "array", items: { type: "string" }, description: "2-4 concrete things the couple could do here, each a short phrase." },
     location: { type: "string", description: "City / country / area this relates to, or 'Unknown' if unclear." },
-    venue: { type: "string", description: "The SPECIFIC place/venue name to look up on a map (restaurant, cafe, attraction, shop) — in Korean if the page gives it, else romanized/English. 'Unknown' if it is not a specific place." },
+    venue: { type: "string", description: "The exact OFFICIAL place name as it appears on a map or signboard — as SHORT as possible, NO descriptive words (e.g. 'T1 베이스캠프' NOT 'T1 Shop for Esports Fans'; 'Puradak' NOT 'Crispy Korean Fried Chicken'). Strongly prefer the Korean name. 'Unknown' only if there is no specific place." },
   },
   required: ["title", "summary", "activities", "location", "venue"],
   additionalProperties: false,
@@ -31,8 +31,8 @@ const SCHEMA = {
 const PROMPT =
   "You are helping a couple plan a cozy winter trip to Seoul. From the provided content " +
   "(a web page, social post, or screenshot), extract a single travel-plan idea. Be warm and " +
-  "concise. Focus on what the place is and what they could actually do there. For `venue`, give " +
-  "the exact business/place name so it can be found on a map (prefer the Korean name if present).";
+  "concise. Focus on what the place is and what they could actually do there. `venue` must be the " +
+  "real, short, map-searchable place name (Korean strongly preferred) — never a description.";
 
 const KCAT = { FD6: "food", CE7: "food", MT1: "shop", CS2: "shop", AT4: "activity", CT1: "activity", AD5: "stay" };
 

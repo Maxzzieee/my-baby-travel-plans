@@ -33,7 +33,7 @@ const SCHEMA = {
       description: "2-4 concrete things the couple could do here, each a short phrase.",
     },
     location: { type: "string", description: "City / country / area this relates to, or 'Unknown' if unclear." },
-    venue: { type: "string", description: "The SPECIFIC place/venue name to look up on a map (Korean if given, else romanized). 'Unknown' if not a specific place." },
+    venue: { type: "string", description: "The exact OFFICIAL place name as on a map/signboard — as SHORT as possible, NO descriptive words (e.g. 'T1 베이스캠프' NOT 'T1 Shop for Esports Fans'). Strongly prefer Korean. 'Unknown' only if no specific place." },
   },
   required: ["title", "summary", "activities", "location", "venue"],
   additionalProperties: false,
@@ -107,8 +107,8 @@ async function uploadToStorage(imageUrl) {
 const PROMPT =
   "You are helping a couple plan a cozy winter trip to Seoul. From the provided content " +
   "(a web page, social post, or screenshot), extract a single travel-plan idea. Be warm and " +
-  "concise. Focus on what the place is and what they could actually do there. For `venue`, give " +
-  "the exact business/place name so it can be found on a map (prefer the Korean name if present).";
+  "concise. Focus on what the place is and what they could actually do there. `venue` must be the " +
+  "real, short, map-searchable place name (Korean strongly preferred) — never a description.";
 
 function stripHtml(html) {
   return html
