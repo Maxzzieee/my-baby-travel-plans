@@ -1647,6 +1647,13 @@ function StopCard({ item, index, total, selected, distanceToNext, next, image, o
                 {dirBusy ? <Loader2 size={10} className="animate-spin" /> : <Train size={10} />} {dir ? "hide" : "how to get there"}
               </button>
             )}
+            {/* Real, live routing — no API key, opens the maps app's own transit engine */}
+            {next && item.lat != null && item.lng != null && next.lat != null && next.lng != null && (
+              <a href={`https://www.google.com/maps/dir/?api=1&origin=${item.lat},${item.lng}&destination=${next.lat},${next.lng}&travelmode=transit`} target="_blank" rel="noreferrer" className="flex items-center gap-1 rounded-full border border-stone-200 bg-white px-2 py-0.5 font-bold text-stone-500 transition-colors hover:border-emerald-300 hover:text-emerald-600" title="Live transit directions in Google Maps">🗺️ Maps ↗</a>
+            )}
+            {next && next.lat != null && next.lng != null && (
+              <a href={`https://map.kakao.com/link/to/${encodeURIComponent(((hasHangul(next.place) ? next.place.split("·")[0] : next.title) || "목적지").trim())},${next.lat},${next.lng}`} target="_blank" rel="noreferrer" className="flex items-center gap-1 rounded-full border border-stone-200 bg-white px-2 py-0.5 font-bold text-stone-500 transition-colors hover:border-amber-300 hover:text-amber-600" title="Open destination in KakaoMap (best on the ground)">KakaoMap ↗</a>
+            )}
           </div>
           {dir && !dir.error && (
             <div className="mt-1.5 max-w-md rounded-xl border border-sky-100 bg-sky-50/60 p-2.5">
