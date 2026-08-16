@@ -223,6 +223,10 @@ const DESTINATIONS = [
 ];
 
 const DEST_BY_ID = Object.fromEntries(DESTINATIONS.map((d) => [d.id, d]));
+// Trip is booked (Seoul). The other 5 cities are archived decide-phase ideas —
+// hidden by default, revisitable via the "Archived trips" toggle, never deleted.
+const ACTIVE_DEST = "seoul";
+const ARCHIVED_DESTS = DESTINATIONS.filter((d) => d.id !== ACTIVE_DEST);
 
 // Trip runs Nov 27 – Dec 4, 2026 (8 days)
 const TRIP_START = new Date(2026, 10, 27);
@@ -2100,7 +2104,8 @@ export default function App() {
   });
 
   const [openId, setOpenId] = useState(null);
-  const [view, setView] = useState("plan"); // plan | photos | compare
+  const [view, setView] = useState("plan"); // plan(ideas) | itinerary | essentials | photos
+  const [showArchive, setShowArchive] = useState(false); // reveal archived decide-phase cities
   const [synced, setSynced] = useState(false);
   const [lightbox, setLightbox] = useState(null); // { images, index } | null
   const openLightbox = useCallback((images, index = 0) => setLightbox({ images: images.filter(Boolean), index }), []);
@@ -2361,8 +2366,6 @@ export default function App() {
         <GlaggleGame high={copy.glaggleHigh} onHigh={(h) => updateCopy("glaggleHigh", h)} />
         <SeedRush high={copy.seedRushHigh} onHigh={(h) => updateCopy("seedRushHigh", h)} sound={sound} />
 
-        <SpinWheel />
-
         {/* Live reactions dock — floats on both screens */}
         <div className="mx-auto mt-3 flex max-w-md items-center justify-center gap-1 rounded-2xl border border-stone-200 bg-white/70 px-3 py-1.5 backdrop-blur">
           <span className="mr-1 text-[10px] font-bold uppercase tracking-wide text-stone-400">send love →</span>
@@ -2374,11 +2377,10 @@ export default function App() {
         {/* Tabs — show one section at a time */}
         <div className="mx-auto mt-8 flex max-w-2xl items-center justify-start gap-1 overflow-x-auto rounded-2xl border border-stone-200 bg-white/70 p-1.5 backdrop-blur sm:justify-center">
           {[
-            { id: "plan", label: "Decide", icon: MapPin },
+            { id: "plan", label: "Ideas", icon: MapPin },
             { id: "itinerary", label: "Itinerary", icon: CalendarDays },
             { id: "essentials", label: "Prep", icon: Wallet },
             { id: "photos", label: "Photos", icon: ImageIcon },
-            { id: "compare", label: "Compare", icon: Star },
           ].map((t) => {
             const active = view === t.id;
             return (
@@ -2391,24 +2393,8 @@ export default function App() {
         </div>
 
         {view === "plan" && (<>
-        {/* Recommendation banner */}
-        <div className="mx-auto mt-8 max-w-3xl rounded-3xl border border-amber-100 bg-white/80 p-5 backdrop-blur">
-          <div className="flex items-start gap-3">
-            <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-2xl bg-amber-100 text-amber-500"><Trophy size={20} strokeWidth={2.6} /></div>
-            <div>
-              <p className="text-sm font-black text-stone-700">Top recommendation</p>
-              <p className="mt-1 text-sm leading-relaxed text-stone-500">
-                <Editable value={copy.recommendation} onSave={(v) => updateCopy("recommendation", v)} rows={5} center={false} />
-              </p>
-            </div>
-          </div>
-        </div>
-
-        {/* Live tally bar */}
+        {/* Status bar (voting retired — the trip is booked) */}
         <div className="mx-auto mt-8 flex max-w-4xl flex-wrap items-center justify-center gap-3">
-          <div className="flex items-center gap-2 rounded-2xl border border-stone-200 bg-white/70 px-4 py-2.5 backdrop-blur">
-            <Heart size={16} strokeWidth={2.6} className="text-rose-300" fill="#FFDFD3" /><span className="text-sm font-bold text-stone-500">{totals.sum} hearts</span>
-          </div>
           <div className="flex items-center gap-2 rounded-2xl border border-stone-200 bg-white/70 px-4 py-2.5 backdrop-blur" title={synced ? "Both phones sync live" : "Saving on this device only"}>
             {synced ? <Cloud size={16} strokeWidth={2.6} style={{ color: ACCENTS.mint.text }} /> : <CloudOff size={16} strokeWidth={2.6} className="text-stone-400" />}
             <span className="text-sm font-bold text-stone-500">{synced ? "Synced live" : "Local only"}</span>
@@ -2439,52 +2425,73 @@ export default function App() {
               </div>
             );
           })()}
-          <div className="flex items-center gap-2 rounded-2xl border border-stone-200 bg-white/70 px-4 py-2.5 backdrop-blur">
-            <Trophy size={16} strokeWidth={2.6} style={{ color: leader ? leader.accent.text : "#B8AE9E" }} /><span className="text-sm font-bold text-stone-500">{leader ? <>Leader {leader.name}</> : "Tap a heart to vote"}</span>
-          </div>
-          {totals.sum > 0 && (
-            <button onClick={resetVotes} className="flex items-center gap-1.5 rounded-2xl border border-stone-200 bg-white/70 px-4 py-2.5 text-sm font-bold text-stone-400 backdrop-blur transition-colors hover:text-stone-600"><RotateCcw size={14} strokeWidth={2.6} /> Reset</button>
-          )}
         </div>
 
+        {/* Seoul idea board — the one active trip */}
         <main className="mt-10 grid grid-cols-1 gap-6 lg:grid-cols-2">
-          {DESTINATIONS.map((dest) => (
+          {DESTINATIONS.filter((d) => d.id === ACTIVE_DEST).map((dest) => (
             <div key={dest.id} className={openId === dest.id ? "lg:col-span-2" : ""}>
               <PassportCard dest={dest} votes={votes[dest.id]} onVote={handleVote} isOpen={openId === dest.id} onToggle={handleToggle} plans={plans[dest.id]} onAddPlan={addPlan} onDeletePlan={deletePlan} onAddComment={addComment} overrides={copy.dest?.[dest.id]} onEditField={(key, val) => updateDestField(dest.id, key, val)} unread={unreadFor(dest.id)} onEditPlan={editPlan} onAddToItinerary={addToItinerary} />
             </div>
           ))}
         </main>
+
+        {/* Archived decide-phase cities — hidden, never deleted, revisitable */}
+        <div className="mx-auto mt-12 max-w-4xl">
+          <button onClick={() => setShowArchive((s) => !s)} className="mx-auto flex items-center gap-2 rounded-2xl border border-stone-200 bg-white/60 px-4 py-2.5 text-sm font-bold text-stone-500 backdrop-blur transition-colors hover:border-rose-200 hover:text-stone-700">
+            <ChevronDown size={15} className={showArchive ? "" : "-rotate-90"} /> 🗄️ Archived trip ideas ({ARCHIVED_DESTS.length}) — {ARCHIVED_DESTS.map((d) => d.name).join(", ")}
+          </button>
+          {showArchive && (<>
+            <p className="mx-auto mt-3 max-w-xl text-center text-xs leading-relaxed text-stone-400">The maybe-someday cities from before Seoul got booked. Kept here — ideas, votes and all — in case you revisit one on another trip.</p>
+            <div className="mt-5 flex justify-center"><SpinWheel /></div>
+            <div className="mx-auto mt-6 max-w-3xl rounded-3xl border border-amber-100 bg-white/80 p-5 backdrop-blur">
+              <div className="flex items-start gap-3">
+                <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-2xl bg-amber-100 text-amber-500"><Trophy size={20} strokeWidth={2.6} /></div>
+                <div>
+                  <p className="text-sm font-black text-stone-700">Top recommendation (from deciding)</p>
+                  <p className="mt-1 text-sm leading-relaxed text-stone-500">
+                    <Editable value={copy.recommendation} onSave={(v) => updateCopy("recommendation", v)} rows={5} center={false} />
+                  </p>
+                </div>
+              </div>
+            </div>
+            <main className="mt-6 grid grid-cols-1 gap-6 lg:grid-cols-2">
+              {ARCHIVED_DESTS.map((dest) => (
+                <div key={dest.id} className={openId === dest.id ? "lg:col-span-2" : ""}>
+                  <PassportCard dest={dest} votes={votes[dest.id]} onVote={handleVote} isOpen={openId === dest.id} onToggle={handleToggle} plans={plans[dest.id]} onAddPlan={addPlan} onDeletePlan={deletePlan} onAddComment={addComment} overrides={copy.dest?.[dest.id]} onEditField={(key, val) => updateDestField(dest.id, key, val)} unread={unreadFor(dest.id)} onEditPlan={editPlan} onAddToItinerary={addToItinerary} />
+                </div>
+              ))}
+            </main>
+            <section className="mt-8">
+              <h2 className="flex items-center justify-center gap-2 text-center text-xl font-black text-stone-700"><Star size={18} strokeWidth={2.8} className="text-amber-300" fill="#FFE9B0" /> Quick Comparison Snapshot</h2>
+              <div className="mt-5 overflow-x-auto rounded-3xl border-2 border-stone-100 bg-white/85 shadow-sm backdrop-blur">
+                <table className="w-full min-w-[760px] text-left text-sm">
+                  <thead>
+                    <tr className="text-[11px] uppercase tracking-wide text-stone-400">
+                      <th className="px-5 py-4 font-extrabold">Destination</th><th className="px-4 py-4 font-extrabold">Flight</th><th className="px-4 py-4 font-extrabold">Weather</th><th className="px-4 py-4 font-extrabold">Sunset</th><th className="px-4 py-4 font-extrabold">Ideas</th><th className="px-4 py-4 font-extrabold">Me</th><th className="px-4 py-4 font-extrabold">Ants</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {DESTINATIONS.map((d) => (
+                      <tr key={d.id} className="border-t border-stone-100 transition-colors hover:bg-stone-50/60">
+                        <td className="px-5 py-4"><span className="flex items-center gap-2 font-extrabold text-stone-700"><span className="text-lg">{d.emoji}</span> {d.name}</span><span className="text-xs text-stone-400">{d.region}</span></td>
+                        <td className="px-4 py-4"><Pill accent={BUDGET_TONE[d.flight.budget].chip} soft={false}>{d.flight.price}</Pill></td>
+                        <td className="px-4 py-4 font-semibold text-stone-600">{d.weather.range}</td>
+                        <td className="px-4 py-4 font-semibold text-stone-600">{d.sunset}</td>
+                        <td className="px-4 py-4 font-semibold text-stone-600">{plans[d.id].length}</td>
+                        <td className="px-4 py-4"><span className="inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-extrabold" style={{ backgroundColor: d.accent.soft, color: d.accent.text }}><Heart size={11} strokeWidth={3} fill={d.accent.hex} /> {votes[d.id].max}</span></td>
+                        <td className="px-4 py-4"><span className="inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-extrabold" style={{ backgroundColor: d.accent.soft, color: d.accent.text }}><Heart size={11} strokeWidth={3} fill={d.accent.hex} /> {votes[d.id].partner}</span></td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </section>
+          </>)}
+        </div>
         </>)}
 
         {view === "photos" && <MemeWall />}
-
-        {view === "compare" && (
-        <section className="mt-8">
-          <h2 className="flex items-center justify-center gap-2 text-center text-xl font-black text-stone-700"><Star size={18} strokeWidth={2.8} className="text-amber-300" fill="#FFE9B0" /> Quick Comparison Snapshot</h2>
-          <div className="mt-5 overflow-x-auto rounded-3xl border-2 border-stone-100 bg-white/85 shadow-sm backdrop-blur">
-            <table className="w-full min-w-[760px] text-left text-sm">
-              <thead>
-                <tr className="text-[11px] uppercase tracking-wide text-stone-400">
-                  <th className="px-5 py-4 font-extrabold">Destination</th><th className="px-4 py-4 font-extrabold">Flight</th><th className="px-4 py-4 font-extrabold">Weather</th><th className="px-4 py-4 font-extrabold">Sunset</th><th className="px-4 py-4 font-extrabold">Ideas</th><th className="px-4 py-4 font-extrabold">Me</th><th className="px-4 py-4 font-extrabold">Ants</th>
-                </tr>
-              </thead>
-              <tbody>
-                {DESTINATIONS.map((d) => (
-                  <tr key={d.id} className="border-t border-stone-100 transition-colors hover:bg-stone-50/60">
-                    <td className="px-5 py-4"><span className="flex items-center gap-2 font-extrabold text-stone-700"><span className="text-lg">{d.emoji}</span> {d.name}</span><span className="text-xs text-stone-400">{d.region}</span></td>
-                    <td className="px-4 py-4"><Pill accent={BUDGET_TONE[d.flight.budget].chip} soft={false}>{d.flight.price}</Pill></td>
-                    <td className="px-4 py-4 font-semibold text-stone-600">{d.weather.range}</td>
-                    <td className="px-4 py-4 font-semibold text-stone-600">{d.sunset}</td>
-                    <td className="px-4 py-4 font-semibold text-stone-600">{plans[d.id].length}</td>
-                    <td className="px-4 py-4"><span className="inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-extrabold" style={{ backgroundColor: d.accent.soft, color: d.accent.text }}><Heart size={11} strokeWidth={3} fill={d.accent.hex} /> {votes[d.id].max}</span></td>
-                    <td className="px-4 py-4"><span className="inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-extrabold" style={{ backgroundColor: d.accent.soft, color: d.accent.text }}><Heart size={11} strokeWidth={3} fill={d.accent.hex} /> {votes[d.id].partner}</span></td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </section>
-        )}
 
         {view === "itinerary" && <ItineraryView plans={plans} onAddIdea={(idea) => addPlan("seoul", idea)} />}
 
