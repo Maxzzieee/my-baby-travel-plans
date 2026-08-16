@@ -1576,11 +1576,26 @@ function DayMap({ stops, selectedId, onSelect }) {
 }
 
 // One stop in the day list — number badge matches its map pin.
-function StopCard({ item, index, total, selected, distanceToNext, image, onOpen, onMove, onSelect, onDelete, dragging }) {
+const DIR_ICON = { walk: "🚶", subway: "🚇", bus: "🚌", taxi: "🚕", transfer: "🔄" };
+function StopCard({ item, index, total, selected, distanceToNext, next, image, onOpen, onMove, onSelect, onDelete, dragging }) {
   const c = KIND_COLOR[item.kind] || KIND_COLOR.activity;
   const meta = KIND_META[item.kind] || KIND_META.activity;
   const noGeo = item.place && (item.lat == null || item.lng == null);
   const pinColor = KIND_PIN[item.kind] || KIND_PIN.activity;
+  // On-demand Seoul transit directions to the next stop (AI-generated).
+  const [dir, setDir] = useState(null);   // { summary, totalMinutes, steps } | { error }
+  const [dirBusy, setDirBusy] = useState(false);
+  const getDirections = async () => {
+    if (dirBusy) return;
+    if (dir) { setDir(null); return; } // toggle closed
+    setDirBusy(true);
+    try {
+      const res = await fetch("/api/directions", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ from: { title: item.title, place: item.place, lat: item.lat, lng: item.lng }, to: { title: next?.title, place: next?.place, lat: next?.lat, lng: next?.lng } }) });
+      const d = await res.json().catch(() => ({}));
+      if (!res.ok || d.error) throw new Error(d.error || `couldn't get directions (${res.status})`);
+      setDir(d);
+    } catch (e) { setDir({ error: e?.message || "Couldn't get directions." }); } finally { setDirBusy(false); }
+  };
   const badge = (
     <span className="flex h-6 w-6 items-center justify-center rounded-full text-[11px] font-black text-white ring-2 ring-white" style={{ background: pinColor }}>{index + 1}</span>
   );
@@ -1624,8 +1639,30 @@ function StopCard({ item, index, total, selected, distanceToNext, image, onOpen,
         </div>
       </div>
       {distanceToNext && (
-        <div className="ml-3.5 flex items-center gap-1 py-1 text-[10px] font-semibold text-stone-400">
-          <Navigation size={10} /> {distanceToNext}
+        <div className="ml-3.5 py-1">
+          <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[10px] font-semibold text-stone-400">
+            <span className="flex items-center gap-1"><Navigation size={10} /> {distanceToNext}</span>
+            {next && (item.lat != null || item.place) && (next.lat != null || next.place) && (
+              <button onClick={getDirections} className="flex items-center gap-1 rounded-full border border-stone-200 bg-white px-2 py-0.5 font-bold text-stone-500 transition-colors hover:border-sky-300 hover:text-sky-600">
+                {dirBusy ? <Loader2 size={10} className="animate-spin" /> : <Train size={10} />} {dir ? "hide" : "how to get there"}
+              </button>
+            )}
+          </div>
+          {dir && !dir.error && (
+            <div className="mt-1.5 max-w-md rounded-xl border border-sky-100 bg-sky-50/60 p-2.5">
+              <p className="text-[11px] font-black text-sky-700">🚇 {dir.summary}{dir.totalMinutes ? ` · ~${dir.totalMinutes} min` : ""}</p>
+              <ol className="mt-1.5 space-y-1">
+                {(dir.steps || []).map((s, i) => (
+                  <li key={i} className="flex items-start gap-1.5 text-[11px] leading-snug text-stone-600">
+                    <span className="flex-shrink-0">{DIR_ICON[s.mode] || "•"}</span>
+                    <span className="min-w-0"><span className="font-semibold">{s.text}</span>{s.minutes ? <span className="text-stone-400"> · {s.minutes} min</span> : null}</span>
+                  </li>
+                ))}
+              </ol>
+              <p className="mt-1.5 text-[9px] text-stone-400">AI estimate — double-check live times in Naver Map / KakaoMap.</p>
+            </div>
+          )}
+          {dir && dir.error && <p className="mt-1 text-[10px] font-bold text-rose-400">⚠️ {dir.error}</p>}
         </div>
       )}
     </div>
@@ -1982,6 +2019,7 @@ function ItineraryView({ plans, onAddIdea }) {
                         selected={selected === it.id}
                         image={it.idea_id ? ideaImg[it.idea_id] : null}
                         distanceToNext={i < numbered.length - 1 ? legLabel(coordOf(it), coordOf(numbered[i + 1])) : null}
+                        next={i < numbered.length - 1 ? numbered[i + 1] : null}
                         onOpen={setEditing}
                         onMove={move}
                         onSelect={setSelected}

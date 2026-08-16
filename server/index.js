@@ -1,7 +1,7 @@
 import express from "express";
 import cors from "cors";
 import Anthropic from "@anthropic-ai/sdk";
-import { runExtract, runSuggest, runGeocode, getClient, MODEL } from "../api/_lib/core.js";
+import { runExtract, runSuggest, runGeocode, runDirections, getClient, MODEL } from "../api/_lib/core.js";
 
 /**
  * Local dev backend for "My Baby Travel Plans". Mirrors the Vercel functions in
@@ -31,6 +31,15 @@ app.get("/api/suggest", async (req, res) => {
 app.get("/api/geocode", async (req, res) => {
   const { status, json } = await runGeocode((req.query && req.query.q) || "");
   res.status(status).json(json);
+});
+app.post("/api/directions", async (req, res) => {
+  try {
+    const { status, json } = await runDirections(req.body || {});
+    res.status(status).json(json);
+  } catch (err) {
+    console.error("directions error:", err?.message || err);
+    res.status(500).json({ error: err?.message || "Directions failed." });
+  }
 });
 
 // --- dev-only: AI fate narrator for the chicken sim (mirrors api/fate.js) ---

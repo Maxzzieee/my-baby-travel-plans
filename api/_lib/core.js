@@ -259,3 +259,51 @@ export async function runGeocode(q) {
     return { status: 200, json: { lat: null, lng: null, error: String(e) } };
   }
 }
+
+// Seoul transit directions between two stops (subway/bus/walk). AI-generated
+// (no free Korean transit API without a separate key), so it's a realistic
+// guide, not gospel — the client tells users to confirm in a maps app.
+const DIRECTIONS_SCHEMA = {
+  type: "object",
+  properties: {
+    summary: { type: "string", description: "One-line overview, e.g. 'Subway Line 3, ~18 min'." },
+    totalMinutes: { type: "integer", description: "Realistic door-to-door minutes." },
+    steps: {
+      type: "array",
+      description: "2-6 ordered steps from origin to destination.",
+      items: {
+        type: "object",
+        properties: {
+          mode: { type: "string", enum: ["walk", "subway", "bus", "taxi", "transfer"], description: "Mode for this step." },
+          text: { type: "string", description: "Concise instruction: name the subway line (number + colour) or bus number, board/alight stations, transfers, and where to walk." },
+          minutes: { type: "integer", description: "Minutes for this step." },
+        },
+        required: ["mode", "text", "minutes"], additionalProperties: false,
+      },
+    },
+  },
+  required: ["summary", "totalMinutes", "steps"], additionalProperties: false,
+};
+export async function runDirections({ from, to }) {
+  const client = getClient();
+  if (!client) return { status: 500, json: { error: "AI not configured (ANTHROPIC_API_KEY missing)." } };
+  const label = (p) => p && (p.title || p.place);
+  if (!label(from) || !label(to)) return { status: 400, json: { error: "Need a 'from' and a 'to'." } };
+  const loc = (p) => `${p.title || ""}${p.place ? ` — ${p.place}` : ""}${p.lat != null && p.lng != null ? ` [${(+p.lat).toFixed(4)},${(+p.lng).toFixed(4)}]` : ""}`;
+  try {
+    const response = await client.messages.create({
+      model: MODEL, max_tokens: 700,
+      output_config: { format: { type: "json_schema", schema: DIRECTIONS_SCHEMA }, effort: "low" },
+      messages: [{ role: "user", content:
+        "You are a Seoul local giving quick public-transport directions for a couple travelling on foot + subway/bus. " +
+        "Prefer the subway (name the line number, its colour, and the get-off station) plus short walks; use a bus only when clearly better; taxi only for short awkward hops with no transit. " +
+        "Be realistic and concise. The coordinates disambiguate each place.\n\n" +
+        `FROM: ${loc(from)}\nTO: ${loc(to)}` }],
+    });
+    if (response.stop_reason === "refusal") return { status: 422, json: { error: "Couldn't produce directions for this pair." } };
+    const textBlock = response.content.find((b) => b.type === "text");
+    return { status: 200, json: JSON.parse(textBlock?.text || "{}") };
+  } catch (e) {
+    return { status: 500, json: { error: e?.message || "Directions failed." } };
+  }
+}
