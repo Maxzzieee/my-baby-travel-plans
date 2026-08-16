@@ -60,6 +60,21 @@ export async function saveState(votes, plans) {
   }
 }
 
+// Votes only — a partial UPDATE so it never rewrites the `plans` blob (ideas now
+// live in their own table; the blob is kept only as a frozen backup).
+export async function saveVotes(votes) {
+  if (!supabase) return;
+  try {
+    const { error } = await supabase
+      .from("trip_state")
+      .update({ votes, last_client: clientId, updated_at: new Date().toISOString() })
+      .eq("id", ROW_ID);
+    if (error) console.warn("[supabase] saveVotes:", error.message);
+  } catch (e) {
+    console.warn("[supabase] saveVotes failed:", e?.message || e);
+  }
+}
+
 // Subscribe to remote changes made by the *other* device. Returns an unsubscribe fn.
 export function subscribe(onRemote) {
   if (!supabase) return () => {};
@@ -324,29 +339,35 @@ export async function reorderItinerary(orderedIds) {
 // ---------------------------------------------------------------------------
 export const TRIP_ID = "seoul-2026";
 
+// The full idea object lives in `data` (jsonb) so no field is ever lost; a few
+// columns (dest/lat/lng/kind) are denormalised alongside for querying.
+const ideaCols = (idea, dest) => ({
+  trip_id: TRIP_ID, dest: idea.dest || dest || "seoul", data: idea,
+  lat: idea.lat ?? null, lng: idea.lng ?? null, kind: idea.kind || null, last_client: clientId,
+});
 export async function loadIdeas(tripId = TRIP_ID) {
   if (!supabase) return null;
   try {
     const { data, error } = await supabase
       .from("ideas")
-      .select("*")
+      .select("id,dest,data,created_at")
       .eq("trip_id", tripId)
       .order("created_at", { ascending: true });
     if (error) { console.warn("[supabase] loadIdeas:", error.message); return null; }
-    return data || [];
+    return (data || []).map((r) => ({ ...(r.data || {}), id: r.id, dest: r.dest }));
   } catch (e) { console.warn("[supabase] loadIdeas failed:", e?.message || e); return null; }
 }
-export async function addIdeaRow(row) {
+export async function addIdeaRow(idea, dest) {
   if (!supabase) return;
   try {
-    const { error } = await supabase.from("ideas").insert({ trip_id: TRIP_ID, dest: "seoul", ...row, last_client: clientId });
+    const { error } = await supabase.from("ideas").insert({ id: idea.id, ...ideaCols(idea, dest) });
     if (error) console.warn("[supabase] addIdeaRow:", error.message);
   } catch (e) { console.warn("[supabase] addIdeaRow failed:", e?.message || e); }
 }
-export async function updateIdeaRow(id, patch) {
+export async function updateIdeaRow(id, idea, dest) {
   if (!supabase) return;
   try {
-    const { error } = await supabase.from("ideas").update({ ...patch, last_client: clientId }).eq("id", id);
+    const { error } = await supabase.from("ideas").update(ideaCols(idea, dest)).eq("id", id);
     if (error) console.warn("[supabase] updateIdeaRow:", error.message);
   } catch (e) { console.warn("[supabase] updateIdeaRow failed:", e?.message || e); }
 }

@@ -48,7 +48,7 @@ import {
   VolumeX,
   Plane as PlaneIcon,
 } from "lucide-react";
-import { hasSupabase, loadState, LOAD_FAILED, saveState, subscribe, loadGallery, postImage, deleteImage, subscribeGallery, loadCopy, saveCopy, subscribeCopy, loadMessages, postMessage, subscribeMessages, loadMessageCounts, subscribeAllMessages, uploadImage, loadItinerary, addItineraryItem, updateItineraryItem, deleteItineraryItem, reorderItinerary, subscribeItinerary, joinRoom } from "./lib/supabase";
+import { hasSupabase, loadState, LOAD_FAILED, saveVotes, subscribe, loadGallery, postImage, deleteImage, subscribeGallery, loadCopy, saveCopy, subscribeCopy, loadMessages, postMessage, subscribeMessages, loadMessageCounts, subscribeAllMessages, uploadImage, loadItinerary, addItineraryItem, updateItineraryItem, deleteItineraryItem, reorderItinerary, subscribeItinerary, joinRoom, loadIdeas, addIdeaRow, updateIdeaRow, deleteIdeaRow, subscribeIdeas } from "./lib/supabase";
 import { geocodePlace, legLabel, SEOUL_CENTER } from "./lib/geo";
 import { SiteDecor, FlyingButterfly, Bloom } from "./decor.jsx";
 import { buildAutoPlan } from "./autoplan";
@@ -944,7 +944,14 @@ function PassportCard({ dest, votes, onVote, isOpen, onToggle, plans, onAddPlan,
 const emptyVotes = () => DESTINATIONS.reduce((acc, d) => ({ ...acc, [d.id]: { max: 0, partner: 0 } }), {});
 const emptyPlans = () => DESTINATIONS.reduce((acc, d) => ({ ...acc, [d.id]: [] }), {});
 const mergeVotes = (raw) => { const base = emptyVotes(); if (raw) for (const id of Object.keys(base)) if (raw[id]) base[id] = { max: raw[id].max || 0, partner: raw[id].partner || 0 }; return base; };
-const mergePlans = (raw) => { const base = emptyPlans(); if (raw) for (const id of Object.keys(base)) if (Array.isArray(raw[id])) base[id] = raw[id]; return base; };
+// ideas rows (flat) -> the {dest:[...]} board shape, newest-first per dest.
+const ts = (x) => { const t = new Date(x?.createdAt ?? 0).getTime(); return Number.isNaN(t) ? 0 : t; };
+const groupIdeasByDest = (ideas) => {
+  const base = emptyPlans();
+  for (const idea of ideas || []) (base[idea.dest] ||= []).push(idea);
+  for (const id of Object.keys(base)) base[id].sort((a, b) => ts(b) - ts(a));
+  return base;
+};
 const WHO_LABEL = { max: "Me", partner: "Ants" };
 
 // Trip countdown + shared anniversary counter
@@ -2198,64 +2205,86 @@ export default function App() {
     return () => clearTimeout(t);
   }, [copy]);
 
-  // Load the shared board, push local seed if empty, and subscribe to partner's live changes.
+  // Load votes (trip_state) + ideas (their own table), and subscribe to both.
+  // Ideas are row-per-record now, so partner edits merge granularly instead of
+  // clobbering the whole board — a re-read on any ideas change is enough.
   useEffect(() => {
-    let unsub = () => {};
+    let unsubVotes = () => {}, unsubIdeas = () => {};
+    const refreshIdeas = async () => { const rows = await loadIdeas(); if (rows) setPlans(groupIdeasByDest(rows)); };
     (async () => {
       const remote = await loadState();
       if (remote === LOAD_FAILED) {
-        // Load failed after retries. DO NOT seed local→server (that would wipe
-        // the shared board with this device's possibly-stale copy). Keep local
-        // in memory, suppress the mount auto-push, and rely on realtime + the
-        // next successful load to reconcile.
-        lastSynced.current = JSON.stringify({ v: votes, p: plans });
-      } else if (remote && (remote.votes || remote.plans)) {
-        const v = mergeVotes(remote.votes); const p = mergePlans(remote.plans);
-        lastSynced.current = JSON.stringify({ v, p });
-        setVotes(v); setPlans(p);
+        // Load failed after retries — keep local votes, suppress the mount push.
+        lastSynced.current = JSON.stringify(votes);
+      } else if (remote && remote.votes) {
+        const v = mergeVotes(remote.votes);
+        lastSynced.current = JSON.stringify(v);
+        setVotes(v);
       } else if (hasSupabase) {
-        // Query succeeded and the row is genuinely empty → safe to seed.
-        lastSynced.current = JSON.stringify({ v: votes, p: plans });
-        saveState(votes, plans);
+        lastSynced.current = JSON.stringify(votes);
+        saveVotes(votes);
       }
+      await refreshIdeas();
       hydrated.current = true;
       setSynced(hasSupabase);
-      unsub = subscribe((r) => {
-        const v = mergeVotes(r.votes); const p = mergePlans(r.plans);
-        lastSynced.current = JSON.stringify({ v, p });
-        setVotes(v); setPlans(p);
+      unsubVotes = subscribe((r) => {
+        const v = mergeVotes(r.votes);
+        lastSynced.current = JSON.stringify(v);
+        setVotes(v);
       });
+      unsubIdeas = subscribeIdeas(refreshIdeas);
     })();
-    return () => unsub();
+    return () => { unsubVotes(); unsubIdeas(); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Persist to localStorage always; push to Supabase (debounced) when it's a local change.
+  // Cache plans to localStorage (offline); ideas persist to Supabase per-edit
+  // via the mutators below, so nothing here writes the whole board.
   useEffect(() => {
-    try { localStorage.setItem(VOTES_KEY, JSON.stringify(votes)); localStorage.setItem(PLANS_KEY, JSON.stringify(plans)); } catch (e) {}
+    try { localStorage.setItem(PLANS_KEY, JSON.stringify(plans)); } catch (e) {}
+  }, [plans]);
+
+  // Votes still live in the trip_state row — sync them (debounced, partial update).
+  useEffect(() => {
+    try { localStorage.setItem(VOTES_KEY, JSON.stringify(votes)); } catch (e) {}
     if (!hasSupabase || !hydrated.current) return;
-    const cur = JSON.stringify({ v: votes, p: plans });
+    const cur = JSON.stringify(votes);
     if (cur === lastSynced.current) return;
-    const t = setTimeout(() => { lastSynced.current = cur; saveState(votes, plans); }, 400);
+    const t = setTimeout(() => { lastSynced.current = cur; saveVotes(votes); }, 400);
     return () => clearTimeout(t);
-  }, [votes, plans]);
+  }, [votes]);
 
   const handleVote = (id, who) => { setVotes((v) => ({ ...v, [id]: { ...v[id], [who]: v[id][who] + 1 } })); sound.pop(); };
   const handleToggle = (id) => setOpenId((cur) => (cur === id ? null : id));
   const resetVotes = () => setVotes(emptyVotes());
-  const addPlan = (destId, plan) => setPlans((p) => ({ ...p, [destId]: [plan, ...p[destId]] }));
-  const deletePlan = (destId, planId) => setPlans((p) => ({ ...p, [destId]: p[destId].filter((x) => x.id !== planId) }));
-  const addComment = (destId, planId, comment) => setPlans((p) => ({
-    ...p,
-    [destId]: p[destId].map((x) => (x.id === planId ? { ...x, comments: [...(x.comments || []), comment] } : x)),
-  }));
+  // Every mutator updates local state optimistically AND writes the single idea
+  // row (insert/update/delete). No whole-board write, so concurrent edits from
+  // both devices merge instead of clobbering. Our own realtime echo is ignored
+  // (last_client === clientId), so the optimistic update stands.
+  const addPlan = (destId, plan) => {
+    setPlans((p) => ({ ...p, [destId]: [plan, ...(p[destId] || [])] }));
+    addIdeaRow(plan, destId);
+  };
+  const deletePlan = (destId, planId) => {
+    setPlans((p) => ({ ...p, [destId]: (p[destId] || []).filter((x) => x.id !== planId) }));
+    deleteIdeaRow(planId);
+  };
+  const addComment = (destId, planId, comment) => setPlans((p) => {
+    let updated = null;
+    const next = (p[destId] || []).map((x) => (x.id === planId ? (updated = { ...x, comments: [...(x.comments || []), comment] }) : x));
+    if (updated) updateIdeaRow(planId, updated, destId);
+    return { ...p, [destId]: next };
+  });
   // patch may be an object OR a function (x) => partial. The function form reads
   // the LATEST plan, so async work (e.g. a slow photo upload) can't overwrite the
-  // array with a stale render-time snapshot and silently drop photos.
-  const editPlan = (destId, planId, patch) => setPlans((p) => ({
-    ...p,
-    [destId]: p[destId].map((x) => (x.id === planId ? { ...x, ...(typeof patch === "function" ? patch(x) : patch) } : x)),
-  }));
+  // idea with a stale render-time snapshot and silently drop photos. The DB write
+  // uses that same freshly-merged idea, so the row and the UI never diverge.
+  const editPlan = (destId, planId, patch) => setPlans((p) => {
+    let updated = null;
+    const next = (p[destId] || []).map((x) => (x.id === planId ? (updated = { ...x, ...(typeof patch === "function" ? patch(x) : patch) }) : x));
+    if (updated) updateIdeaRow(planId, updated, destId);
+    return { ...p, [destId]: next };
+  });
   const addToItinerary = (destId, day, idea) => addItineraryItem({
     dest: destId, day, kind: "activity", start_time: "",
     title: idea.title || "", place: idea.location || idea.title || "", notes: idea.summary || "",

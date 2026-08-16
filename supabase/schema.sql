@@ -123,21 +123,14 @@ create table if not exists public.ideas (
   id text primary key,
   trip_id text not null default 'seoul-2026',
   dest text not null default 'seoul',
-  title text,
-  summary text,
-  activities jsonb default '[]'::jsonb,
-  comments jsonb default '[]'::jsonb,
-  location text,
+  data jsonb,                 -- the full idea object (lossless); columns below are denormalised
   lat float8,
   lng float8,
   kind text,
-  thumb text,
-  photos jsonb default '[]'::jsonb,
-  source_url text,
-  created_by text,
   last_client text,
   created_at timestamptz default now()
 );
+alter table public.ideas add column if not exists data jsonb; -- for tables created before this column existed
 create index if not exists ideas_trip_dest_idx on public.ideas (trip_id, dest);
 alter table public.ideas enable row level security;
 drop policy if exists "ideas anon all" on public.ideas;
