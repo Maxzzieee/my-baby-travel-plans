@@ -1946,22 +1946,37 @@ export default function App() {
   const [muted, setMuted] = useState(sound.muted);
   const [dark, setDark] = useState(() => { try { const s = localStorage.getItem("site.theme"); if (s) return s === "dark"; return !!(window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches); } catch (e) { return false; } });
   useEffect(() => { try { document.documentElement.classList.toggle("dark", dark); localStorage.setItem("site.theme", dark ? "dark" : "light"); } catch (e) {} }, [dark]);
-  // hidden easter egg — rapid-click anywhere and botanicals bloom from the spot
+  // hidden easter egg — press & hold anywhere for 4s and botanicals bloom from the spot
   const [blooms, setBlooms] = useState([]);
-  const comboRef = useRef({ n: 0, t: 0 });
   useEffect(() => {
-    const onClick = (e) => {
-      const now = Date.now(), c = comboRef.current;
-      c.n = now - c.t < 650 ? c.n + 1 : 1;
-      c.t = now;
-      if (c.n >= 8) {
-        c.n = 0;
-        setBlooms((b) => [...b.slice(-3), { id: now + ":" + Math.random(), x: e.clientX, y: e.clientY }]);
+    let timer = null, sx = 0, sy = 0, cx = 0, cy = 0;
+    const cancel = () => { if (timer) { clearTimeout(timer); timer = null; } };
+    const onDown = (e) => {
+      sx = cx = e.clientX; sy = cy = e.clientY;
+      cancel();
+      timer = setTimeout(() => {
+        timer = null;
+        setBlooms((b) => [...b.slice(-3), { id: Date.now() + ":" + Math.random(), x: cx, y: cy }]);
         try { sound.yay(); } catch (e2) {}
-      }
+      }, 4000);
     };
-    window.addEventListener("click", onClick);
-    return () => window.removeEventListener("click", onClick);
+    const onMove = (e) => {
+      cx = e.clientX; cy = e.clientY;
+      if (Math.abs(cx - sx) > 12 || Math.abs(cy - sy) > 12) cancel(); // moved = scroll/drag, not a hold
+    };
+    window.addEventListener("pointerdown", onDown);
+    window.addEventListener("pointermove", onMove);
+    window.addEventListener("pointerup", cancel);
+    window.addEventListener("pointercancel", cancel);
+    window.addEventListener("scroll", cancel, true);
+    return () => {
+      cancel();
+      window.removeEventListener("pointerdown", onDown);
+      window.removeEventListener("pointermove", onMove);
+      window.removeEventListener("pointerup", cancel);
+      window.removeEventListener("pointercancel", cancel);
+      window.removeEventListener("scroll", cancel, true);
+    };
   }, []);
   const hydrated = useRef(false);
   const lastSynced = useRef(null);
