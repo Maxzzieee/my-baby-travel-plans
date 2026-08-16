@@ -52,6 +52,7 @@ import {
 import { hasSupabase, loadState, LOAD_FAILED, saveVotes, subscribe, loadGallery, postImage, deleteImage, subscribeGallery, loadCopy, saveCopy, subscribeCopy, loadMessages, postMessage, subscribeMessages, loadMessageCounts, subscribeAllMessages, uploadImage, loadItinerary, addItineraryItem, updateItineraryItem, deleteItineraryItem, reorderItinerary, subscribeItinerary, joinRoom, loadIdeas, addIdeaRow, updateIdeaRow, deleteIdeaRow, subscribeIdeas } from "./lib/supabase";
 import { geocodePlace, legLabel, SEOUL_CENTER } from "./lib/geo";
 import { romanize, enCategory, enDistrict, enPlaceLine, readable, hasHangul } from "./lib/ko";
+import ErrorBoundary from "./ErrorBoundary.jsx";
 import { SiteDecor, FlyingButterfly, Bloom } from "./decor.jsx";
 import { buildAutoPlan } from "./autoplan";
 import "leaflet/dist/leaflet.css";
@@ -2392,6 +2393,7 @@ export default function App() {
           })}
         </div>
 
+        <ErrorBoundary key={view}>
         {view === "plan" && (<>
         {/* Status bar (voting retired — the trip is booked) */}
         <div className="mx-auto mt-8 flex max-w-4xl flex-wrap items-center justify-center gap-3">
@@ -2496,6 +2498,7 @@ export default function App() {
         {view === "itinerary" && <ItineraryView plans={plans} onAddIdea={(idea) => addPlan("seoul", idea)} />}
 
         {view === "essentials" && <EssentialsView copy={copy} updateCopy={updateCopy} />}
+        </ErrorBoundary>
 
         <footer className="mt-12 text-center text-xs text-stone-400">
           <p className="font-semibold">Made with ❄️ 🍱 🦦 🧸 ✨ for a very specific kind of cozy winter trip.</p>
