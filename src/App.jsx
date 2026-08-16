@@ -51,6 +51,7 @@ import {
 import { hasSupabase, loadState, LOAD_FAILED, saveState, subscribe, loadGallery, postImage, deleteImage, subscribeGallery, loadCopy, saveCopy, subscribeCopy, loadMessages, postMessage, subscribeMessages, loadMessageCounts, subscribeAllMessages, uploadImage, loadItinerary, addItineraryItem, updateItineraryItem, deleteItineraryItem, reorderItinerary, subscribeItinerary, joinRoom } from "./lib/supabase";
 import { geocodePlace, legLabel, SEOUL_CENTER } from "./lib/geo";
 import { SiteDecor, FlyingButterfly, Bloom } from "./decor.jsx";
+import { buildAutoPlan } from "./autoplan";
 import "leaflet/dist/leaflet.css";
 import L from "leaflet";
 import { MapContainer, TileLayer, Marker, Polyline, useMap } from "react-leaflet";
@@ -1698,6 +1699,8 @@ function ItineraryView({ plans }) {
   const [tab, setTab] = useState("list"); // narrow screens: list | map
   const [trayOpen, setTrayOpen] = useState(false);
   const [newStop, setNewStop] = useState("");
+  const [planPreview, setPlanPreview] = useState(null); // proposed [day][stops] | null
+  const [planDensity, setPlanDensity] = useState("balanced");
   const geocoding = useRef(new Set());
   const isWide = useWide();
 
@@ -1739,6 +1742,29 @@ function ItineraryView({ plans }) {
   // ideas carry pre-geocoded lat/lng (filled offline), so they pin instantly
   const addIdea = (idea) => addStop({ title: idea.title, place: idea.location || idea.title, notes: idea.summary, lat: idea.lat, lng: idea.lng, kind: idea.kind, idea_id: idea.id });
   const addFreeStop = async () => { const t = newStop.trim(); if (!t) return; setNewStop(""); await addStop({ title: t, place: t }); };
+
+  // ✨ Auto-plan — cluster geocoded ideas into balanced days (preview, then apply)
+  const generatePlan = (density = planDensity) => {
+    const avail = ideas.filter((p) => p.lat != null && p.lng != null && !addedIdeaIds.has(p.id));
+    setPlanDensity(density);
+    setPlanPreview(buildAutoPlan(avail, density, TRIP_DAYS));
+  };
+  const applyPlan = async () => {
+    if (!planPreview) return;
+    const emptyDays = Array.from({ length: TRIP_DAYS }, (_, d) => d).filter((d) => !items.some((it) => it.day === d));
+    let di = 0;
+    for (const dayStops of planPreview) {
+      if (di >= emptyDays.length) break;
+      const dd = emptyDays[di++];
+      let pos = 0;
+      for (const s of dayStops) {
+        await addItineraryItem({ dest, day: dd, position: pos++, kind: s.kind || "activity", start_time: s._time || "", end_time: "", title: s.title || "", place: s.location || s.title || "", notes: s.summary || "", lat: s.lat, lng: s.lng, idea_id: s.id });
+      }
+    }
+    setPlanPreview(null);
+    await refresh();
+    try { burstConfetti(); sound.yay(); } catch (e) {}
+  };
   const update = (id, patch) => {
     const clearGeo = "place" in patch ? { lat: null, lng: null, _geo: undefined } : {};
     setItems((xs) => xs.map((x) => (x.id === id ? { ...x, ...patch, ...clearGeo } : x)));
@@ -1801,6 +1827,7 @@ function ItineraryView({ plans }) {
       <div className="text-center">
         <h2 className="text-xl font-black text-stone-700">{city.emoji} Our {city.name} Trip</h2>
         <p className="mt-1 text-sm text-stone-400">Nov 27 – Dec 4 · build each day so it flows — add a stop and watch it pin on the map 📍</p>
+        <button onClick={() => generatePlan()} className="mt-3 inline-flex items-center gap-1.5 rounded-full px-4 py-2 text-sm font-extrabold text-white shadow-sm transition-transform hover:scale-105 active:scale-95" style={{ background: "linear-gradient(135deg,#f472b6,#a78bfa)" }}>✨ Auto-plan my trip</button>
       </div>
 
       {/* day selector */}
@@ -1907,6 +1934,52 @@ function ItineraryView({ plans }) {
       </div>
 
       <ItemEditor item={editingItem} onUpdate={update} onRemove={remove} onClose={() => setEditing(null)} />
+
+      {planPreview && (
+        <div className="fixed inset-0 z-[60] flex items-end justify-center bg-stone-900/40 p-3 backdrop-blur-sm sm:items-center" onClick={() => setPlanPreview(null)}>
+          <div className="flex max-h-[86vh] w-full max-w-lg flex-col rounded-3xl bg-white shadow-xl" onClick={(e) => e.stopPropagation()}>
+            <div className="p-5 pb-3">
+              <h3 className="text-lg font-black text-stone-800">✨ Recommended plan</h3>
+              <p className="mt-0.5 text-xs text-stone-400">Geo-clustered &amp; category-balanced from your pinned ideas. Fills your empty days — drag or edit anything after.</p>
+              <div className="mt-3 flex gap-1.5">
+                {["relaxed", "balanced", "packed", "extreme"].map((d) => {
+                  const active = planDensity === d;
+                  const label = { relaxed: "🍃 Relaxed", balanced: "⚖️ Balanced", packed: "🔥 Packed", extreme: "💥 Extreme" }[d];
+                  return (
+                    <button key={d} onClick={() => generatePlan(d)} className="flex-1 rounded-xl px-1 py-1.5 text-[11px] font-extrabold transition-all" style={{ backgroundColor: active ? accent.hex : "var(--surface)", color: active ? accent.text : "#A8A29E", border: `1.5px solid ${active ? accent.border : "#E7E1D8"}` }}>{label}</button>
+                  );
+                })}
+              </div>
+            </div>
+            <div className="min-h-0 flex-1 overflow-y-auto px-5">
+              {planPreview.length === 0 ? (
+                <p className="py-8 text-center text-sm text-stone-400">No pinned ideas to plan yet — add some ideas with locations first.</p>
+              ) : (
+                <div className="space-y-2">
+                  {planPreview.map((day, i) => (
+                    <div key={i} className="rounded-xl border border-stone-200 p-2.5">
+                      <div className="text-xs font-extrabold text-stone-600">Day {i + 1} · {dayLabel(i)} <span className="font-bold text-stone-300">· {day.length} stop{day.length > 1 ? "s" : ""}</span></div>
+                      <div className="mt-1 space-y-0.5">
+                        {day.map((s, j) => (
+                          <div key={j} className="flex items-center gap-1.5 text-[12px] text-stone-600">
+                            {s._time && <span className="flex-shrink-0 font-bold text-stone-400">{s._time}</span>}
+                            <span>{(KIND_META[s.kind] || KIND_META.activity).emoji}</span>
+                            <span className="truncate">{s.title || "Untitled"}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+            <div className="flex justify-end gap-2 p-5 pt-3">
+              <button onClick={() => setPlanPreview(null)} className="rounded-xl border-2 border-stone-200 px-3.5 py-2 text-sm font-extrabold text-stone-400 transition-colors hover:text-stone-600">Cancel</button>
+              <button onClick={applyPlan} disabled={!planPreview.length} className="rounded-xl px-4 py-2 text-sm font-extrabold text-white transition-transform hover:scale-105 active:scale-95 disabled:opacity-50" style={{ background: "linear-gradient(135deg,#f472b6,#a78bfa)" }}>Apply to empty days</button>
+            </div>
+          </div>
+        </div>
+      )}
     </section>
   );
 }
