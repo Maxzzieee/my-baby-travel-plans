@@ -1,205 +1,40 @@
 import express from "express";
 import cors from "cors";
 import Anthropic from "@anthropic-ai/sdk";
+import { runExtract, runSuggest, runGeocode, getClient, MODEL } from "../api/_lib/core.js";
 
 /**
- * Plan-extraction backend for "My Baby Travel Plans".
- *
- * POST /api/extract
- *   body: { url } | { image: <base64-no-prefix>, mediaType }
- *   returns: { title, summary, activities: string[], location }
- *
- * Uses the Claude API (claude-opus-4-8) with vision for screenshots and
- * server-side page fetching for links, constrained to a JSON schema so the
- * frontend always receives a clean, structured plan object.
+ * Local dev backend for "My Baby Travel Plans". Mirrors the Vercel functions in
+ * api/*.js — and now SHARES their logic via api/_lib/core.js, so /api/extract,
+ * /api/suggest and /api/geocode can never drift from production again. Only the
+ * dev-only bits (fate, flights) live here directly.
  */
-
 const app = express();
 app.use(cors());
 app.use(express.json({ limit: "12mb" })); // screenshots arrive base64-encoded
 
-// Resolves credentials from ANTHROPIC_API_KEY (or an `ant auth login` profile).
-const client = new Anthropic();
-const MODEL = "claude-opus-4-8";
-
-const SCHEMA = {
-  type: "object",
-  properties: {
-    title: { type: "string", description: "Short, cute title for this travel plan idea (max ~8 words)." },
-    summary: { type: "string", description: "1-2 sentence friendly summary of what this place/activity is about." },
-    activities: {
-      type: "array",
-      items: { type: "string" },
-      description: "2-4 concrete things the couple could do here, each a short phrase.",
-    },
-    location: { type: "string", description: "City / country / area this relates to, or 'Unknown' if unclear." },
-    venue: { type: "string", description: "The exact OFFICIAL place name as on a map/signboard — as SHORT as possible, NO descriptive words (e.g. 'T1 베이스캠프' NOT 'T1 Shop for Esports Fans'). Strongly prefer Korean. 'Unknown' only if no specific place." },
-  },
-  required: ["title", "summary", "activities", "location", "venue"],
-  additionalProperties: false,
-};
-const KCAT = { FD6: "food", CE7: "food", MT1: "shop", CS2: "shop", AT4: "activity", CT1: "activity", AD5: "stay" };
-async function kakaoGeocode(q) {
-  const key = process.env.KAKAO_REST_KEY;
-  if (!key || !q || q === "Unknown") return null;
-  try {
-    const r = await fetch("https://dapi.kakao.com/v2/local/search/keyword.json?size=10&query=" + encodeURIComponent(q), { headers: { Authorization: "KakaoAK " + key } });
-    if (!r.ok) return null;
-    const d = await r.json();
-    const docs = d.documents || [];
-    const doc = docs.find((x) => (x.road_address_name || x.address_name || "").startsWith("서울")) || docs[0];
-    if (!doc) return null;
-    return { name: doc.place_name || "", address: doc.road_address_name || doc.address_name || "", lat: +doc.y, lng: +doc.x, kind: KCAT[doc.category_group_code] || null };
-  } catch { return null; }
-}
-function extractImages(html, baseUrl, max = 3) {
-  const out = [];
-  const bad = /(sprite|logo|icon|avatar|favicon|pixel|blank|spacer|1x1|placeholder|loading|advert|badge|button|emoji|share|social)/i;
-  const push = (u) => {
-    if (!u || out.length >= max) return;
-    try { u = new URL(u, baseUrl).href; } catch { return; }
-    if (!/^https?:\/\//i.test(u) || /\.svg(\?|$)/i.test(u) || u.startsWith("data:") || bad.test(u)) return;
-    if (!out.includes(u)) out.push(u);
-  };
-  for (const m of html.match(/<meta[^>]+>/gi) || []) {
-    if (/(?:property|name)=["'](?:og:image(?::secure_url)?|twitter:image(?::src)?)["']/i.test(m)) {
-      const c = m.match(/content=["']([^"']+)["']/i);
-      if (c) push(c[1]);
-    }
-  }
-  for (const tag of html.match(/<img[^>]+>/gi) || []) {
-    if (out.length >= max) break;
-    const s = tag.match(/(?:data-src|data-lazy-src|data-original|src)=["']([^"']+)["']/i);
-    if (s) push(s[1]);
-  }
-  return out.slice(0, max);
-}
-const BROWSER_UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36";
-async function kakaoImages(q, n = 4) {
-  const key = process.env.KAKAO_REST_KEY;
-  if (!key || !q || q === "Unknown") return [];
-  try {
-    const r = await fetch("https://dapi.kakao.com/v2/search/image?sort=accuracy&size=" + (n * 2) + "&query=" + encodeURIComponent(q), { headers: { Authorization: "KakaoAK " + key } });
-    if (!r.ok) return [];
-    const d = await r.json();
-    return (d.documents || []).filter((x) => x.image_url && (x.width || 0) >= 300 && (x.height || 0) >= 220).map((x) => x.image_url).slice(0, n);
-  } catch { return []; }
-}
-async function uploadToStorage(imageUrl) {
-  const base = (process.env.SUPABASE_URL || "").trim();
-  const key = (process.env.SUPABASE_ANON_KEY || "").trim();
-  if (!base || !key || !imageUrl) return null;
-  try {
-    const r = await fetch(imageUrl, { headers: { "user-agent": BROWSER_UA }, signal: AbortSignal.timeout(8000) });
-    if (!r.ok) return null;
-    const ct = (r.headers.get("content-type") || "image/jpeg").split(";")[0].trim();
-    if (!ct.startsWith("image/")) return null;
-    const bytes = new Uint8Array(await r.arrayBuffer());
-    if (bytes.length < 2500 || bytes.length > 6_000_000) return null;
-    const ext = ct.includes("png") ? "png" : ct.includes("webp") ? "webp" : ct.includes("gif") ? "gif" : "jpg";
-    const path = `scraped/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
-    const up = await fetch(`${base}/storage/v1/object/memes/${path}`, { method: "POST", headers: { apikey: key, Authorization: "Bearer " + key, "content-type": ct }, body: bytes });
-    if (!up.ok) return null;
-    return `${base}/storage/v1/object/public/memes/${path}`;
-  } catch { return null; }
-}
-
-const PROMPT =
-  "You are helping a couple plan a cozy winter trip to Seoul. From the provided content " +
-  "(a web page, social post, or screenshot), extract a single travel-plan idea. Be warm and " +
-  "concise. Focus on what the place is and what they could actually do there. `venue` must be the " +
-  "real, short, map-searchable place name (Korean strongly preferred) — never a description.";
-
-function stripHtml(html) {
-  return html
-    .replace(/<script[\s\S]*?<\/script>/gi, " ")
-    .replace(/<style[\s\S]*?<\/style>/gi, " ")
-    .replace(/<[^>]+>/g, " ")
-    .replace(/&[a-z]+;/gi, " ")
-    .replace(/\s+/g, " ")
-    .trim();
-}
-
+// Shared endpoints — thin wrappers over the same core the serverless fns use.
 app.post("/api/extract", async (req, res) => {
   try {
-    const { url, image, mediaType } = req.body || {};
-    let userContent;
-    let rawHtml = "";
-
-    if (image) {
-      userContent = [
-        {
-          type: "image",
-          source: { type: "base64", media_type: mediaType || "image/png", data: image },
-        },
-        { type: "text", text: `${PROMPT}\n\nThis is a screenshot. Read it and extract the plan idea.` },
-      ];
-    } else if (url) {
-      let pageText = "";
-      try {
-        const r = await fetch(url, {
-          headers: { "user-agent": BROWSER_UA, accept: "text/html" },
-          signal: AbortSignal.timeout(8000),
-        });
-        rawHtml = await r.text();
-        pageText = stripHtml(rawHtml).slice(0, 6000);
-      } catch (e) {
-        // Some pages block scraping or need JS — fall back to URL-only inference.
-      }
-      userContent = [
-        {
-          type: "text",
-          text: `${PROMPT}\n\nURL: ${url}\n\nPage content (may be partial):\n${
-            pageText || "(could not fetch page text — infer what you can from the URL itself)"
-          }`,
-        },
-      ];
-    } else {
-      return res.status(400).json({ error: "Provide a 'url' or an 'image'." });
-    }
-
-    const response = await client.messages.create({
-      model: MODEL,
-      max_tokens: 1024,
-      output_config: { format: { type: "json_schema", schema: SCHEMA }, effort: "low" },
-      messages: [{ role: "user", content: userContent }],
-    });
-
-    if (response.stop_reason === "refusal") {
-      return res.status(422).json({ error: "The model declined to read this content." });
-    }
-
-    const textBlock = response.content.find((b) => b.type === "text");
-    const data = JSON.parse(textBlock?.text || "{}");
-
-    const geo = await kakaoGeocode(data.venue || data.title);
-    if (geo && Number.isFinite(geo.lat)) {
-      data.location = geo.name ? `${geo.name} · ${geo.address}` : geo.address || data.location;
-      data.lat = geo.lat; data.lng = geo.lng;
-      if (geo.kind) data.kind = geo.kind;
-    }
-    let candidates = rawHtml ? extractImages(rawHtml, url, 4) : [];
-    if (candidates.length < 3) {
-      const kq = (geo && geo.name) || data.venue || data.title;
-      candidates = candidates.concat(await kakaoImages(kq, 4));
-    }
-    candidates = candidates.filter((v, i, a) => a.indexOf(v) === i);
-    const photos = [];
-    for (const src of candidates) {
-      if (photos.length >= 3) break;
-      const hosted = await uploadToStorage(src);
-      if (hosted) photos.push(hosted);
-    }
-    if (photos.length) { data.photos = photos; data.thumb = photos[0]; }
-
-    res.json(data);
+    const { status, json } = await runExtract(req.body || {});
+    res.status(status).json(json);
   } catch (err) {
     console.error("extract error:", err?.message || err);
     res.status(500).json({ error: err?.message || "Extraction failed." });
   }
 });
+app.get("/api/suggest", async (req, res) => {
+  const q = req.query || {};
+  const { status, json } = await runSuggest({ x: q.x || "", y: q.y || "", kind: (q.kind || "activity").toString(), translate: q.en === "1" || q.en === "true" });
+  res.status(status).json(json);
+});
+app.get("/api/geocode", async (req, res) => {
+  const { status, json } = await runGeocode((req.query && req.query.q) || "");
+  res.status(status).json(json);
+});
 
-// AI fate narrator for the chicken sim widget (mirrors api/fate.js on Vercel)
+// --- dev-only: AI fate narrator for the chicken sim (mirrors api/fate.js) ---
+const client = getClient() || new Anthropic();
 const FX_PROPS = {
   vitality: { type: "integer" }, cluck: { type: "integer" }, swagger: { type: "integer" },
   peck: { type: "integer" }, seeds: { type: "integer" },
@@ -210,8 +45,7 @@ const FATE_SCHEMA = {
     title: { type: "string", description: "Punchy event title, max ~6 words." },
     text: { type: "string", description: "1-2 whimsical sentences setting up the dilemma." },
     choices: {
-      type: "array",
-      description: "Exactly 2 or 3 distinct choices.",
+      type: "array", description: "Exactly 2 or 3 distinct choices.",
       items: {
         type: "object",
         properties: {
@@ -220,13 +54,11 @@ const FATE_SCHEMA = {
           trait: { type: "string", enum: ["none", "facetat", "goldtooth", "mohawk"], description: "Permanent trait; usually 'none'." },
           fx: { type: "object", description: "Stat deltas -15..+15, 0 for untouched.", properties: FX_PROPS, required: ["vitality", "cluck", "swagger", "peck", "seeds"], additionalProperties: false },
         },
-        required: ["label", "out", "trait", "fx"],
-        additionalProperties: false,
+        required: ["label", "out", "trait", "fx"], additionalProperties: false,
       },
     },
   },
-  required: ["title", "text", "choices"],
-  additionalProperties: false,
+  required: ["title", "text", "choices"], additionalProperties: false,
 };
 const clampFx = (n) => Math.max(-15, Math.min(15, Math.round(Number(n) || 0)));
 
@@ -234,8 +66,7 @@ app.post("/api/fate", async (req, res) => {
   try {
     const { name = "Piu", gen = 1, age = 0, stage = "adult", career = null, traits = [], stats = {} } = req.body || {};
     const response = await client.messages.create({
-      model: MODEL,
-      max_tokens: 700,
+      model: MODEL, max_tokens: 700,
       output_config: { format: { type: "json_schema", schema: FATE_SCHEMA }, effort: "low" },
       messages: [{
         role: "user",
@@ -262,18 +93,14 @@ app.post("/api/fate", async (req, res) => {
       return out;
     });
     if (choices.length < 2) throw new Error("model returned too few choices");
-    res.json({
-      title: String(ev.title || "A Strange Breeze").slice(0, 60),
-      text: String(ev.text || "Something inexplicable is happening.").slice(0, 240),
-      choices,
-    });
+    res.json({ title: String(ev.title || "A Strange Breeze").slice(0, 60), text: String(ev.text || "Something inexplicable is happening.").slice(0, 240), choices });
   } catch (err) {
     console.error("fate error:", err?.message || err);
     res.status(500).json({ error: err?.message || "Fate failed." });
   }
 });
 
-// Flight prices via Amadeus Self-Service (mirrors api/flights.js on Vercel)
+// --- dev-only: flight prices via Amadeus (mirrors api/flights.js) ---
 const FL_CITY = { sapporo: "CTS", seoul: "ICN", tokyo: "TYO", taipei: "TPE", fukuoka: "FUK", sydney: "SYD" };
 const FL_ORIGIN = "SIN", FL_DEPART = "2026-11-27", FL_RETURN = "2026-12-04";
 const flBase = () => (process.env.AMADEUS_ENV === "production" ? "https://api.amadeus.com" : "https://test.api.amadeus.com");
@@ -316,47 +143,10 @@ app.get("/api/flights", async (req, res) => {
   }
 });
 
-// Geocoding — Kakao Local (best in Korea) with OpenStreetMap fallback. Mirror of api/geocode.js.
-app.get("/api/geocode", async (req, res) => {
-  const q = (req.query.q || "").toString().trim();
-  if (!q) return res.status(400).json({ error: "missing q" });
-  const key = process.env.KAKAO_REST_KEY;
-  try {
-    if (key) {
-      const r = await fetch("https://dapi.kakao.com/v2/local/search/keyword.json?size=1&query=" + encodeURIComponent(q), { headers: { Authorization: "KakaoAK " + key } });
-      if (r.ok) {
-        const d = await r.json();
-        const doc = d.documents && d.documents[0];
-        if (doc) return res.json({ lat: +doc.y, lng: +doc.x, address: doc.road_address_name || doc.address_name || "", name: doc.place_name || "", cat: doc.category_group_code || "", source: "kakao" });
-      }
-    }
-    const nr = await fetch("https://nominatim.openstreetmap.org/search?format=json&limit=1&countrycodes=kr&q=" + encodeURIComponent(q + ", Seoul, South Korea"), { headers: { "User-Agent": "metrip/1.0 (info@zhenghe.com.sg)" } });
-    if (nr.ok) { const arr = await nr.json(); if (arr && arr[0]) return res.json({ lat: +arr[0].lat, lng: +arr[0].lon, source: "osm" }); }
-    res.json({ lat: null, lng: null });
-  } catch (e) { res.json({ lat: null, lng: null, error: String(e) }); }
-});
-
-// Recommend real nearby places by category (Kakao) — mirrors api/suggest.js
-app.get("/api/suggest", async (req, res) => {
-  const key = (process.env.KAKAO_REST_KEY || "").trim();
-  const { x = "", y = "", kind = "activity" } = req.query;
-  const GROUP = { activity: "AT4", food: "FD6", cafe: "CE7", shop: "MT1", culture: "CT1" };
-  const KCAT = { FD6: "food", CE7: "food", MT1: "shop", CS2: "shop", AT4: "activity", CT1: "activity", AD5: "stay" };
-  if (!key || !x || !y) return res.json({ places: [] });
-  try {
-    const r = await fetch(`https://dapi.kakao.com/v2/local/search/category.json?category_group_code=${GROUP[kind] || "AT4"}&x=${encodeURIComponent(x)}&y=${encodeURIComponent(y)}&radius=6000&size=12&sort=distance`, { headers: { Authorization: "KakaoAK " + key } });
-    if (!r.ok) return res.json({ places: [] });
-    const d = await r.json();
-    res.json({ places: (d.documents || []).map((doc) => ({ name: doc.place_name, address: doc.road_address_name || doc.address_name || "", lat: +doc.y, lng: +doc.x, kind: KCAT[doc.category_group_code] || kind, cat: (doc.category_name || "").split(" > ").slice(-1)[0], url: doc.place_url || "" })) });
-  } catch (e) { res.json({ places: [], error: String(e) }); }
-});
-
 app.get("/api/health", (_req, res) => res.json({ ok: true }));
 
 const PORT = process.env.PORT || 8787;
 app.listen(PORT, () => {
   console.log(`🧳 Plan extractor running on http://localhost:${PORT}`);
-  if (!process.env.ANTHROPIC_API_KEY) {
-    console.warn("⚠️  ANTHROPIC_API_KEY is not set — /api/extract will fail until you set it.");
-  }
+  if (!process.env.ANTHROPIC_API_KEY) console.warn("⚠️  ANTHROPIC_API_KEY is not set — /api/extract will fail until you set it.");
 });

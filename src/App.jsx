@@ -47,6 +47,7 @@ import {
   Volume2,
   VolumeX,
   Plane as PlaneIcon,
+  Search,
 } from "lucide-react";
 import { hasSupabase, loadState, LOAD_FAILED, saveVotes, subscribe, loadGallery, postImage, deleteImage, subscribeGallery, loadCopy, saveCopy, subscribeCopy, loadMessages, postMessage, subscribeMessages, loadMessageCounts, subscribeAllMessages, uploadImage, loadItinerary, addItineraryItem, updateItineraryItem, deleteItineraryItem, reorderItinerary, subscribeItinerary, joinRoom, loadIdeas, addIdeaRow, updateIdeaRow, deleteIdeaRow, subscribeIdeas } from "./lib/supabase";
 import { geocodePlace, legLabel, SEOUL_CENTER } from "./lib/geo";
@@ -1612,6 +1613,7 @@ function StopCard({ item, index, total, selected, distanceToNext, image, onOpen,
               </div>
             )}
           </div>
+          <a href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(((hasHangul(item.place) ? item.place.split("·")[0] : (item.title || item.place)) || "").trim())}`} target="_blank" rel="noreferrer" onPointerDown={(e) => e.stopPropagation()} onClick={(e) => e.stopPropagation()} className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-xl bg-sky-50 text-sky-500 transition-colors hover:bg-sky-100 hover:text-sky-700" aria-label="Look up on Google Maps" title="See what this is — opens Google Maps"><Search size={16} /></a>
           <button onPointerDown={(e) => e.stopPropagation()} onClick={(e) => { e.stopPropagation(); onOpen(item.id); }} className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-xl bg-stone-100 text-stone-600 transition-colors hover:bg-stone-200 hover:text-stone-800" aria-label="Edit stop" title="Edit"><PenLine size={17} /></button>
           <button onPointerDown={(e) => e.stopPropagation()} onClick={(e) => { e.stopPropagation(); onDelete(item.id); }} className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-xl bg-rose-50 text-rose-500 transition-colors hover:bg-rose-100 hover:text-rose-700" aria-label="Delete stop" title="Delete"><Trash2 size={17} /></button>
         </div>
@@ -1806,14 +1808,14 @@ function ItineraryView({ plans, onAddIdea }) {
     const c = dayCentroid; if (!c) return;
     setGapBusy(true); setSuggestions(null);
     try {
-      const res = await fetch(`/api/suggest?x=${c.lng}&y=${c.lat}&kind=${kind}`);
+      const res = await fetch(`/api/suggest?x=${c.lng}&y=${c.lat}&kind=${kind}&en=1`);
       const d = await res.json();
       const have = new Set(dayItems.map((i) => String(i.title || "").toLowerCase()));
       setSuggestions((d.places || []).filter((p) => !have.has(String(p.name).toLowerCase())).slice(0, 5));
     } catch (e) { setSuggestions([]); } finally { setGapBusy(false); }
   };
   const addSuggestion = async (pl) => {
-    const idea = { id: `p_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`, title: pl.name, summary: pl.cat || "", activities: [], location: pl.address ? `${pl.name} · ${pl.address}` : pl.name, sourceUrl: pl.url || "", lat: pl.lat, lng: pl.lng, kind: pl.kind, thumb: "", photos: [] };
+    const idea = { id: `p_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`, title: pl.en || pl.name, summary: pl.catEn || pl.cat || "", activities: [], location: pl.address ? `${pl.name} · ${pl.address}` : pl.name, sourceUrl: pl.url || "", lat: pl.lat, lng: pl.lng, kind: pl.kind, thumb: "", photos: [] };
     if (onAddIdea) onAddIdea(idea);
     await addStop({ title: idea.title, place: idea.location, notes: "", lat: idea.lat, lng: idea.lng, kind: idea.kind, idea_id: idea.id });
     setSuggestions((s) => (s || []).filter((x) => x !== pl));
@@ -1960,8 +1962,8 @@ function ItineraryView({ plans, onAddIdea }) {
                       <button key={i} onClick={() => addSuggestion(pl)} className="flex w-full items-center gap-2 rounded-xl border border-stone-200 bg-white p-2 text-left transition-colors hover:border-rose-200">
                         <span className="text-base">{(KIND_META[pl.kind] || KIND_META.activity).emoji}</span>
                         <span className="min-w-0 flex-1">
-                          <span className="block truncate text-[12px] font-extrabold text-stone-700">{romanize(pl.name)}</span>
-                          <span className="block truncate text-[10px] text-stone-400">{[enCategory(pl.cat), enPlaceLine(pl.address)].filter(Boolean).join(" · ")}</span>
+                          <span className="block truncate text-[12px] font-extrabold text-stone-700">{pl.en || romanize(pl.name)}</span>
+                          <span className="block truncate text-[10px] text-stone-400">{[pl.catEn || enCategory(pl.cat), enPlaceLine(pl.address)].filter(Boolean).join(" · ")}</span>
                           <span className="block truncate text-[10px] text-stone-300">{pl.name}{pl.address ? ` · ${pl.address}` : ""}</span>
                         </span>
                         <Plus size={14} className="flex-shrink-0 text-stone-300" />
