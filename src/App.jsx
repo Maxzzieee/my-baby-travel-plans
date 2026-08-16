@@ -50,11 +50,11 @@ import {
   Search,
 } from "lucide-react";
 import { hasSupabase, loadState, LOAD_FAILED, saveVotes, subscribe, loadGallery, postImage, deleteImage, subscribeGallery, loadCopy, saveCopy, subscribeCopy, loadMessages, postMessage, subscribeMessages, loadMessageCounts, subscribeAllMessages, uploadImage, loadItinerary, addItineraryItem, updateItineraryItem, deleteItineraryItem, reorderItinerary, subscribeItinerary, joinRoom, loadIdeas, addIdeaRow, updateIdeaRow, deleteIdeaRow, subscribeIdeas } from "./lib/supabase";
-import { geocodePlace, legLabel, SEOUL_CENTER } from "./lib/geo";
+import { geocodePlace, legLabel, SEOUL_CENTER, haversineKm } from "./lib/geo";
 import { romanize, enCategory, enDistrict, enPlaceLine, readable, hasHangul } from "./lib/ko";
 import ErrorBoundary from "./ErrorBoundary.jsx";
 import { SiteDecor, FlyingButterfly, Bloom } from "./decor.jsx";
-import { buildAutoPlan } from "./autoplan";
+import { buildAutoPlan, BASE_JONGNO } from "./autoplan";
 import "leaflet/dist/leaflet.css";
 import L from "leaflet";
 import { MapContainer, TileLayer, Marker, Polyline, useMap } from "react-leaflet";
@@ -1841,6 +1841,44 @@ function ItineraryView({ plans, onAddIdea }) {
     await reorderItinerary(arr.map((a) => a.id));
   };
 
+  // Reorder this day's stops to minimise walking: nearest-neighbour from base
+  // camp, then a 2-opt polish. Existing times are re-sequenced ascending onto
+  // the new route so the day still reads morning→evening along the short path.
+  const [optMsg, setOptMsg] = useState("");
+  const optimiseDay = async () => {
+    const geo = dayItems.filter((i) => i.lat != null && i.lng != null);
+    if (geo.length < 3) return;
+    const pathLen = (r) => { let d = haversineKm(BASE_JONGNO, r[0]); for (let i = 0; i < r.length - 1; i++) d += haversineKm(r[i], r[i + 1]); return d; };
+    const before = pathLen(geo);
+    // nearest-neighbour
+    const remaining = [...geo]; const route = []; let cur = BASE_JONGNO;
+    while (remaining.length) {
+      let bi = 0, bd = Infinity;
+      remaining.forEach((s, i) => { const d = haversineKm(cur, s); if (d < bd) { bd = d; bi = i; } });
+      route.push(remaining[bi]); cur = remaining[bi]; remaining.splice(bi, 1);
+    }
+    // 2-opt polish (cheap for a day's worth of stops)
+    for (let improved = true; improved; ) {
+      improved = false;
+      for (let i = 0; i < route.length - 1; i++) for (let k = i + 1; k < route.length; k++) {
+        const nr = [...route.slice(0, i), ...route.slice(i, k + 1).reverse(), ...route.slice(k + 1)];
+        if (pathLen(nr) < pathLen(route) - 1e-9) { route.splice(0, route.length, ...nr); improved = true; }
+      }
+    }
+    const after = pathLen(route);
+    const ordered = [...route, ...dayItems.filter((i) => i.lat == null || i.lng == null)];
+    if (ordered.every((o, i) => o.id === dayItems[i].id)) { setOptMsg("Already the shortest route 👌"); setTimeout(() => setOptMsg(""), 3500); return; }
+    const times = dayItems.map((i) => i.start_time).filter(Boolean).sort();
+    const timeById = new Map(ordered.map((o, i) => [o.id, times[i] || ""]));
+    const pos = new Map(ordered.map((o, i) => [o.id, i]));
+    setItems((xs) => xs.map((x) => (pos.has(x.id) ? { ...x, position: pos.get(x.id), start_time: timeById.get(x.id) } : x)));
+    await reorderItinerary(ordered.map((o) => o.id));
+    await Promise.all(ordered.filter((o) => (o.start_time || "") !== timeById.get(o.id)).map((o) => updateItineraryItem(o.id, { start_time: timeById.get(o.id) })));
+    const saved = before > 0 ? Math.round((1 - after / before) * 100) : 0;
+    setOptMsg(saved > 0 ? `Reordered — about ${saved}% less walking ✨` : "Reordered to a tighter route ✨");
+    setTimeout(() => setOptMsg(""), 4000);
+  };
+
   // --- drag-to-reorder (touch-friendly), with the map route updating live ---
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
@@ -1923,6 +1961,15 @@ function ItineraryView({ plans, onAddIdea }) {
             {numbered.length === 0 ? (
               <p className="rounded-2xl border border-dashed border-stone-300 bg-white/60 p-6 text-center text-sm text-stone-400">No stops yet for {dayLabel(day)}. Add one below 👇</p>
             ) : (
+              <>
+              {dayCoords.length >= 3 && (
+                <div className="mb-2 flex flex-wrap items-center justify-end gap-2">
+                  {optMsg && <span className="text-[11px] font-bold text-emerald-600">{optMsg}</span>}
+                  <button onClick={optimiseDay} className="flex items-center gap-1.5 rounded-xl border-2 border-stone-200 bg-white px-3 py-1.5 text-xs font-extrabold text-stone-500 transition-colors hover:border-violet-300 hover:text-violet-600" title="Reorder this day's stops to walk the least">
+                    <Sparkles size={13} strokeWidth={2.8} /> Optimise route
+                  </button>
+                </div>
+              )}
               <DndContext sensors={sensors} collisionDetection={closestCenter} onDragStart={onDragStart} onDragOver={onDragOver} onDragEnd={onDragEnd}>
                 <SortableContext items={numbered.map((n) => n.id)} strategy={verticalListSortingStrategy}>
                   <div className="space-y-2">
@@ -1944,6 +1991,7 @@ function ItineraryView({ plans, onAddIdea }) {
                   </div>
                 </SortableContext>
               </DndContext>
+              </>
             )}
 
             {gapKind && (
