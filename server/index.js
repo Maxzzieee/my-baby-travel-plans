@@ -336,6 +336,21 @@ app.get("/api/geocode", async (req, res) => {
   } catch (e) { res.json({ lat: null, lng: null, error: String(e) }); }
 });
 
+// Recommend real nearby places by category (Kakao) — mirrors api/suggest.js
+app.get("/api/suggest", async (req, res) => {
+  const key = (process.env.KAKAO_REST_KEY || "").trim();
+  const { x = "", y = "", kind = "activity" } = req.query;
+  const GROUP = { activity: "AT4", food: "FD6", cafe: "CE7", shop: "MT1", culture: "CT1" };
+  const KCAT = { FD6: "food", CE7: "food", MT1: "shop", CS2: "shop", AT4: "activity", CT1: "activity", AD5: "stay" };
+  if (!key || !x || !y) return res.json({ places: [] });
+  try {
+    const r = await fetch(`https://dapi.kakao.com/v2/local/search/category.json?category_group_code=${GROUP[kind] || "AT4"}&x=${encodeURIComponent(x)}&y=${encodeURIComponent(y)}&radius=6000&size=12&sort=distance`, { headers: { Authorization: "KakaoAK " + key } });
+    if (!r.ok) return res.json({ places: [] });
+    const d = await r.json();
+    res.json({ places: (d.documents || []).map((doc) => ({ name: doc.place_name, address: doc.road_address_name || doc.address_name || "", lat: +doc.y, lng: +doc.x, kind: KCAT[doc.category_group_code] || kind, cat: (doc.category_name || "").split(" > ").slice(-1)[0], url: doc.place_url || "" })) });
+  } catch (e) { res.json({ places: [], error: String(e) }); }
+});
+
 app.get("/api/health", (_req, res) => res.json({ ok: true }));
 
 const PORT = process.env.PORT || 8787;

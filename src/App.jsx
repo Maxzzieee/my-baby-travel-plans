@@ -1686,7 +1686,7 @@ function ItemEditor({ item, onUpdate, onRemove, onClose }) {
   );
 }
 
-function ItineraryView({ plans }) {
+function ItineraryView({ plans, onAddIdea }) {
   const dest = "seoul"; // trip is confirmed Seoul
   const city = DEST_BY_ID[dest] || DESTINATIONS[0];
   const accent = city.accent;
@@ -1701,6 +1701,9 @@ function ItineraryView({ plans }) {
   const [newStop, setNewStop] = useState("");
   const [planPreview, setPlanPreview] = useState(null); // proposed [day][stops] | null
   const [planDensity, setPlanDensity] = useState("balanced");
+  const [linkUrl, setLinkUrl] = useState("");
+  const [gapBusy, setGapBusy] = useState(false);
+  const [suggestions, setSuggestions] = useState(null); // recommended places | null
   const geocoding = useRef(new Set());
   const isWide = useWide();
 
@@ -1764,6 +1767,46 @@ function ItineraryView({ plans }) {
     setPlanPreview(null);
     await refresh();
     try { burstConfetti(); sound.yay(); } catch (e) {}
+  };
+
+  // --- Phase 2: gap nudge — what this day is missing + where to look ---
+  const dayCoords = dayItems.filter((i) => i.lat != null);
+  const dayCentroid = dayCoords.length ? { lat: dayCoords.reduce((s, i) => s + i.lat, 0) / dayCoords.length, lng: dayCoords.reduce((s, i) => s + i.lng, 0) / dayCoords.length } : null;
+  const dayKinds = new Set(dayItems.map((i) => i.kind));
+  const gapKind = dayItems.length === 0 ? null : (!dayKinds.has("food") ? "food" : (!dayKinds.has("activity") ? "activity" : null));
+  const district = (() => {
+    const ms = dayItems.map((i) => (String(i.place || i.location || "").match(/서울\s*(\S+구)/) || [])[1]).filter(Boolean);
+    if (!ms.length) return null;
+    const c = {}; ms.forEach((m) => (c[m] = (c[m] || 0) + 1));
+    return Object.keys(c).sort((a, b) => c[b] - c[a])[0];
+  })();
+  const addFromLink = async (url) => {
+    const u = (url || "").trim(); if (!u) return;
+    setGapBusy(true);
+    try {
+      const res = await fetch("/api/extract", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ url: u }) });
+      const data = await res.json();
+      const idea = { id: `p_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`, title: data.title || u, summary: data.summary || "", activities: Array.isArray(data.activities) ? data.activities : [], location: data.location || "", sourceUrl: u, lat: data.lat ?? null, lng: data.lng ?? null, kind: data.kind, thumb: data.thumb || "", photos: data.photos || [] };
+      if (onAddIdea) onAddIdea(idea);
+      await addStop({ title: idea.title, place: idea.location || idea.title, notes: idea.summary, lat: idea.lat, lng: idea.lng, kind: idea.kind, idea_id: idea.id });
+      setLinkUrl(""); setSuggestions(null);
+    } catch (e) {} finally { setGapBusy(false); }
+  };
+  const fetchSuggestions = async (kind) => {
+    const c = dayCentroid; if (!c) return;
+    setGapBusy(true); setSuggestions(null);
+    try {
+      const res = await fetch(`/api/suggest?x=${c.lng}&y=${c.lat}&kind=${kind}`);
+      const d = await res.json();
+      const have = new Set(dayItems.map((i) => String(i.title || "").toLowerCase()));
+      setSuggestions((d.places || []).filter((p) => !have.has(String(p.name).toLowerCase())).slice(0, 5));
+    } catch (e) { setSuggestions([]); } finally { setGapBusy(false); }
+  };
+  const addSuggestion = async (pl) => {
+    const idea = { id: `p_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`, title: pl.name, summary: pl.cat || "", activities: [], location: pl.address ? `${pl.name} · ${pl.address}` : pl.name, sourceUrl: pl.url || "", lat: pl.lat, lng: pl.lng, kind: pl.kind, thumb: "", photos: [] };
+    if (onAddIdea) onAddIdea(idea);
+    await addStop({ title: idea.title, place: idea.location, notes: "", lat: idea.lat, lng: idea.lng, kind: idea.kind, idea_id: idea.id });
+    setSuggestions((s) => (s || []).filter((x) => x !== pl));
   };
   const update = (id, patch) => {
     const clearGeo = "place" in patch ? { lat: null, lng: null, _geo: undefined } : {};
@@ -1884,6 +1927,34 @@ function ItineraryView({ plans }) {
                   </div>
                 </SortableContext>
               </DndContext>
+            )}
+
+            {gapKind && (
+              <div className="mt-3 rounded-2xl border-2 border-dashed p-3" style={{ borderColor: accent.border, backgroundColor: accent.soft }}>
+                <p className="text-xs font-bold leading-snug" style={{ color: accent.text }}>
+                  {gapKind === "food" ? "🍜" : "🎨"} This day has no {gapKind === "food" ? "food" : "activity"} yet{district ? ` — you're around ${district}` : ""}. Go find {gapKind === "food" ? "a spot to eat" : "something fun to do"}{district ? ` in ${district}` : " nearby"} and drop a link 👇
+                </p>
+                <div className="mt-2 flex gap-2">
+                  <input value={linkUrl} onChange={(e) => setLinkUrl(e.target.value)} onKeyDown={(e) => e.key === "Enter" && addFromLink(linkUrl)} placeholder="paste a link…" className="flex-1 rounded-xl border-2 border-stone-200 bg-white px-3 py-2 text-sm outline-none focus:border-rose-200" />
+                  <button onClick={() => addFromLink(linkUrl)} disabled={gapBusy || !linkUrl.trim()} className="flex items-center rounded-xl px-3 py-2 text-sm font-extrabold text-white transition-transform hover:scale-105 active:scale-95 disabled:opacity-50" style={{ background: "linear-gradient(135deg,#f472b6,#a78bfa)" }}>{gapBusy ? <Loader2 size={15} className="animate-spin" /> : "Add"}</button>
+                </div>
+                {dayCentroid && (
+                  <button onClick={() => fetchSuggestions(gapKind)} disabled={gapBusy} className="mt-2 text-xs font-bold underline decoration-dashed underline-offset-2 disabled:opacity-50" style={{ color: accent.text }}>🔮 or suggest {gapKind === "food" ? "food" : "an activity"} near here</button>
+                )}
+                {suggestions && (
+                  <div className="mt-2 space-y-1.5">
+                    {suggestions.length === 0 ? (
+                      <p className="text-[11px] text-stone-400">Nothing found nearby — try pasting a link instead.</p>
+                    ) : suggestions.map((pl, i) => (
+                      <button key={i} onClick={() => addSuggestion(pl)} className="flex w-full items-center gap-2 rounded-xl border border-stone-200 bg-white p-2 text-left transition-colors hover:border-rose-200">
+                        <span className="text-base">{(KIND_META[pl.kind] || KIND_META.activity).emoji}</span>
+                        <span className="min-w-0 flex-1"><span className="block truncate text-[12px] font-extrabold text-stone-700">{pl.name}</span><span className="block truncate text-[10px] text-stone-400">{pl.cat}{pl.address ? ` · ${pl.address}` : ""}</span></span>
+                        <Plus size={14} className="flex-shrink-0 text-stone-300" />
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
             )}
 
             <div className="mt-3 space-y-2">
@@ -2376,7 +2447,7 @@ export default function App() {
         </section>
         )}
 
-        {view === "itinerary" && <ItineraryView plans={plans} />}
+        {view === "itinerary" && <ItineraryView plans={plans} onAddIdea={(idea) => addPlan("seoul", idea)} />}
 
         {view === "essentials" && <EssentialsView copy={copy} updateCopy={updateCopy} />}
 
