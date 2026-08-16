@@ -50,6 +50,7 @@ import {
 } from "lucide-react";
 import { hasSupabase, loadState, LOAD_FAILED, saveVotes, subscribe, loadGallery, postImage, deleteImage, subscribeGallery, loadCopy, saveCopy, subscribeCopy, loadMessages, postMessage, subscribeMessages, loadMessageCounts, subscribeAllMessages, uploadImage, loadItinerary, addItineraryItem, updateItineraryItem, deleteItineraryItem, reorderItinerary, subscribeItinerary, joinRoom, loadIdeas, addIdeaRow, updateIdeaRow, deleteIdeaRow, subscribeIdeas } from "./lib/supabase";
 import { geocodePlace, legLabel, SEOUL_CENTER } from "./lib/geo";
+import { romanize, enCategory, enDistrict, enPlaceLine, readable, hasHangul } from "./lib/ko";
 import { SiteDecor, FlyingButterfly, Bloom } from "./decor.jsx";
 import { buildAutoPlan } from "./autoplan";
 import "leaflet/dist/leaflet.css";
@@ -1601,12 +1602,12 @@ function StopCard({ item, index, total, selected, distanceToNext, image, onOpen,
           <div className="min-w-0 flex-1 leading-tight">
             <div className="flex items-center gap-1">
               {item.start_time && <span className="flex-shrink-0 text-[10px] font-bold" style={{ color: c.text }}>{item.start_time}</span>}
-              <span className="truncate text-[13px] font-extrabold text-stone-800">{item.title || "Untitled stop"}</span>
+              <span className="truncate text-[13px] font-extrabold text-stone-800" title={item.title || ""}>{readable(item.title) || "Untitled stop"}</span>
               {!image && <span className="flex-shrink-0">{kindChip}</span>}
             </div>
             {item.place && (
               <div className="flex items-center gap-0.5 text-[10px] text-stone-500">
-                <MapPin size={10} className="flex-shrink-0" /> <span className="truncate">{item.place}</span>
+                <MapPin size={10} className="flex-shrink-0" /> <span className="truncate" title={item.place}>{hasHangul(item.place) ? enPlaceLine(item.place) : item.place}</span>
                 {noGeo && <span className="flex-shrink-0 text-amber-500">· locating…</span>}
               </div>
             )}
@@ -1710,6 +1711,7 @@ function ItineraryView({ plans, onAddIdea }) {
   const [planDensity, setPlanDensity] = useState("balanced");
   const [linkUrl, setLinkUrl] = useState("");
   const [gapBusy, setGapBusy] = useState(false);
+  const [gapErr, setGapErr] = useState(""); // surfaced paste/suggest failure
   const [suggestions, setSuggestions] = useState(null); // recommended places | null
   const geocoding = useRef(new Set());
   const isWide = useWide();
@@ -1789,15 +1791,16 @@ function ItineraryView({ plans, onAddIdea }) {
   })();
   const addFromLink = async (url) => {
     const u = (url || "").trim(); if (!u) return;
-    setGapBusy(true);
+    setGapBusy(true); setGapErr("");
     try {
       const res = await fetch("/api/extract", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ url: u }) });
-      const data = await res.json();
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || data.error) throw new Error(data.error || `couldn't read that link (${res.status})`);
       const idea = { id: `p_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`, title: data.title || u, summary: data.summary || "", activities: Array.isArray(data.activities) ? data.activities : [], location: data.location || "", sourceUrl: u, lat: data.lat ?? null, lng: data.lng ?? null, kind: data.kind, thumb: data.thumb || "", photos: data.photos || [] };
       if (onAddIdea) onAddIdea(idea);
       await addStop({ title: idea.title, place: idea.location || idea.title, notes: idea.summary, lat: idea.lat, lng: idea.lng, kind: idea.kind, idea_id: idea.id });
       setLinkUrl(""); setSuggestions(null);
-    } catch (e) {} finally { setGapBusy(false); }
+    } catch (e) { setGapErr(e?.message || "Couldn't add that link. Try again or add it by hand below."); } finally { setGapBusy(false); }
   };
   const fetchSuggestions = async (kind) => {
     const c = dayCentroid; if (!c) return;
@@ -1939,12 +1942,13 @@ function ItineraryView({ plans, onAddIdea }) {
             {gapKind && (
               <div className="mt-3 rounded-2xl border-2 border-dashed p-3" style={{ borderColor: accent.border, backgroundColor: accent.soft }}>
                 <p className="text-xs font-bold leading-snug" style={{ color: accent.text }}>
-                  {gapKind === "food" ? "🍜" : "🎨"} This day has no {gapKind === "food" ? "food" : "activity"} yet{district ? ` — you're around ${district}` : ""}. Go find {gapKind === "food" ? "a spot to eat" : "something fun to do"}{district ? ` in ${district}` : " nearby"} and drop a link 👇
+                  {gapKind === "food" ? "🍜" : "🎨"} This day has no {gapKind === "food" ? "food" : "activity"} yet{district ? ` — you're around ${enDistrict(district)}` : ""}. Go find {gapKind === "food" ? "a spot to eat" : "something fun to do"}{district ? ` in ${enDistrict(district)}` : " nearby"} and drop a link 👇
                 </p>
                 <div className="mt-2 flex gap-2">
                   <input value={linkUrl} onChange={(e) => setLinkUrl(e.target.value)} onKeyDown={(e) => e.key === "Enter" && addFromLink(linkUrl)} placeholder="paste a link…" className="flex-1 rounded-xl border-2 border-stone-200 bg-white px-3 py-2 text-sm outline-none focus:border-rose-200" />
                   <button onClick={() => addFromLink(linkUrl)} disabled={gapBusy || !linkUrl.trim()} className="flex items-center rounded-xl px-3 py-2 text-sm font-extrabold text-white transition-transform hover:scale-105 active:scale-95 disabled:opacity-50" style={{ background: "linear-gradient(135deg,#f472b6,#a78bfa)" }}>{gapBusy ? <Loader2 size={15} className="animate-spin" /> : "Add"}</button>
                 </div>
+                {gapErr && <p className="mt-2 text-[11px] font-bold text-rose-500">⚠️ {gapErr}</p>}
                 {dayCentroid && (
                   <button onClick={() => fetchSuggestions(gapKind)} disabled={gapBusy} className="mt-2 text-xs font-bold underline decoration-dashed underline-offset-2 disabled:opacity-50" style={{ color: accent.text }}>🔮 or suggest {gapKind === "food" ? "food" : "an activity"} near here</button>
                 )}
@@ -1955,7 +1959,11 @@ function ItineraryView({ plans, onAddIdea }) {
                     ) : suggestions.map((pl, i) => (
                       <button key={i} onClick={() => addSuggestion(pl)} className="flex w-full items-center gap-2 rounded-xl border border-stone-200 bg-white p-2 text-left transition-colors hover:border-rose-200">
                         <span className="text-base">{(KIND_META[pl.kind] || KIND_META.activity).emoji}</span>
-                        <span className="min-w-0 flex-1"><span className="block truncate text-[12px] font-extrabold text-stone-700">{pl.name}</span><span className="block truncate text-[10px] text-stone-400">{pl.cat}{pl.address ? ` · ${pl.address}` : ""}</span></span>
+                        <span className="min-w-0 flex-1">
+                          <span className="block truncate text-[12px] font-extrabold text-stone-700">{romanize(pl.name)}</span>
+                          <span className="block truncate text-[10px] text-stone-400">{[enCategory(pl.cat), enPlaceLine(pl.address)].filter(Boolean).join(" · ")}</span>
+                          <span className="block truncate text-[10px] text-stone-300">{pl.name}{pl.address ? ` · ${pl.address}` : ""}</span>
+                        </span>
                         <Plus size={14} className="flex-shrink-0 text-stone-300" />
                       </button>
                     ))}
