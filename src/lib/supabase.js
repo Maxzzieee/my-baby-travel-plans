@@ -319,6 +319,57 @@ export async function reorderItinerary(orderedIds) {
 }
 
 // ---------------------------------------------------------------------------
+// Ideas — row-per-idea (replaces the trip_state.plans blob so concurrent edits
+// no longer clobber each other). Granular insert/update/delete + realtime.
+// ---------------------------------------------------------------------------
+export const TRIP_ID = "seoul-2026";
+
+export async function loadIdeas(tripId = TRIP_ID) {
+  if (!supabase) return null;
+  try {
+    const { data, error } = await supabase
+      .from("ideas")
+      .select("*")
+      .eq("trip_id", tripId)
+      .order("created_at", { ascending: true });
+    if (error) { console.warn("[supabase] loadIdeas:", error.message); return null; }
+    return data || [];
+  } catch (e) { console.warn("[supabase] loadIdeas failed:", e?.message || e); return null; }
+}
+export async function addIdeaRow(row) {
+  if (!supabase) return;
+  try {
+    const { error } = await supabase.from("ideas").insert({ trip_id: TRIP_ID, dest: "seoul", ...row, last_client: clientId });
+    if (error) console.warn("[supabase] addIdeaRow:", error.message);
+  } catch (e) { console.warn("[supabase] addIdeaRow failed:", e?.message || e); }
+}
+export async function updateIdeaRow(id, patch) {
+  if (!supabase) return;
+  try {
+    const { error } = await supabase.from("ideas").update({ ...patch, last_client: clientId }).eq("id", id);
+    if (error) console.warn("[supabase] updateIdeaRow:", error.message);
+  } catch (e) { console.warn("[supabase] updateIdeaRow failed:", e?.message || e); }
+}
+export async function deleteIdeaRow(id) {
+  if (!supabase) return;
+  try { await supabase.from("ideas").delete().eq("id", id); }
+  catch (e) { console.warn("[supabase] deleteIdeaRow failed:", e?.message || e); }
+}
+export function subscribeIdeas(onChange, tripId = TRIP_ID) {
+  if (!supabase) return () => {};
+  // No trip filter on the channel: DELETE events only carry the primary key, so
+  // a trip_id filter would silently drop deletions. onChange re-reads the table.
+  const channel = supabase
+    .channel("ideas_changes")
+    .on("postgres_changes", { event: "*", schema: "public", table: "ideas" }, (payload) => {
+      if (payload?.new?.last_client === clientId) return; // ignore our own writes
+      onChange();
+    })
+    .subscribe();
+  return () => supabase.removeChannel(channel);
+}
+
+// ---------------------------------------------------------------------------
 // Live room — presence (who's online), typing + floating-reaction broadcasts
 // ---------------------------------------------------------------------------
 export function joinRoom(me, handlers) {

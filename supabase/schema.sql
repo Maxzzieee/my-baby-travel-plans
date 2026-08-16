@@ -95,3 +95,60 @@ drop policy if exists "memes delete" on storage.objects;
 create policy "memes read"   on storage.objects for select using (bucket_id = 'memes');
 create policy "memes insert" on storage.objects for insert with check (bucket_id = 'memes');
 create policy "memes delete" on storage.objects for delete using (bucket_id = 'memes');
+
+-- =============================================================================
+-- Phase 0 — trip-scoped model: `trips` + `ideas` as real rows (row-per-idea).
+-- Moves ideas out of the single trip_state.plans blob so concurrent edits stop
+-- clobbering each other, and makes the app multi-trip. Run this whole block once.
+-- =============================================================================
+create table if not exists public.trips (
+  id text primary key,
+  name text,
+  city text,
+  start_date date,
+  days int default 8,
+  base_lat float8,
+  base_lng float8,
+  phase text default 'booked',        -- 'deciding' | 'booked'
+  created_at timestamptz default now()
+);
+insert into public.trips (id, name, city, start_date, days, base_lat, base_lng, phase)
+values ('seoul-2026', 'Me & Ants · Seoul', 'seoul', '2026-11-27', 8, 37.5714, 126.9918, 'booked')
+on conflict (id) do nothing;
+alter table public.trips enable row level security;
+drop policy if exists "trips anon all" on public.trips;
+create policy "trips anon all" on public.trips for all using (true) with check (true);
+
+create table if not exists public.ideas (
+  id text primary key,
+  trip_id text not null default 'seoul-2026',
+  dest text not null default 'seoul',
+  title text,
+  summary text,
+  activities jsonb default '[]'::jsonb,
+  comments jsonb default '[]'::jsonb,
+  location text,
+  lat float8,
+  lng float8,
+  kind text,
+  thumb text,
+  photos jsonb default '[]'::jsonb,
+  source_url text,
+  created_by text,
+  last_client text,
+  created_at timestamptz default now()
+);
+create index if not exists ideas_trip_dest_idx on public.ideas (trip_id, dest);
+alter table public.ideas enable row level security;
+drop policy if exists "ideas anon all" on public.ideas;
+create policy "ideas anon all" on public.ideas for all using (true) with check (true);
+
+-- trip_id on the existing per-record tables (default the current Seoul trip)
+alter table public.itinerary add column if not exists trip_id text default 'seoul-2026';
+alter table public.gallery   add column if not exists trip_id text default 'seoul-2026';
+alter table public.messages  add column if not exists trip_id text default 'seoul-2026';
+
+do $$ begin
+  begin alter publication supabase_realtime add table public.ideas; exception when others then null; end;
+  begin alter publication supabase_realtime add table public.trips; exception when others then null; end;
+end $$;
