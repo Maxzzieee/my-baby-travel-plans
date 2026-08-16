@@ -307,3 +307,30 @@ export async function runDirections({ from, to }) {
     return { status: 500, json: { error: e?.message || "Directions failed." } };
   }
 }
+
+// Trip concierge — a chat that knows the whole plan and gives warm, specific
+// Seoul advice. Advisory only (it never edits the plan itself); the client
+// applies anything it suggests. `context` is a compact trip summary; `history`
+// is prior [{role, content}] turns.
+export async function runConcierge({ message, context = "", history = [] }) {
+  const client = getClient();
+  if (!client) return { status: 500, json: { error: "AI not configured (ANTHROPIC_API_KEY missing)." } };
+  if (!message || !String(message).trim()) return { status: 400, json: { error: "Say something first." } };
+  const system =
+    "You are the warm, witty travel concierge for a couple's cozy winter trip to Seoul (27 Nov – 4 Dec 2026), base camp in Jongno-gu. " +
+    "Help them plan and adjust: be SPECIFIC and practical — name real Seoul places, group things by area to cut travel, suggest subway lines, respect a cozy-cold couple's vibe (cafés, hanok, markets, warm food). " +
+    "Keep replies short and scannable: a sentence or two, or a tight bullet list. Use the couple's own itinerary below when relevant; if a day is packed or scattered, say so and suggest a fix. You can recommend places to add, but you don't edit the plan yourself — tell them what to add and where.\n\n" +
+    "THEIR CURRENT TRIP:\n" + (context || "(no itinerary yet)");
+  const msgs = [
+    ...(Array.isArray(history) ? history : []).slice(-8).map((m) => ({ role: m.role === "assistant" ? "assistant" : "user", content: String(m.content || "") })),
+    { role: "user", content: String(message) },
+  ];
+  try {
+    const response = await client.messages.create({ model: MODEL, max_tokens: 900, system, messages: msgs });
+    if (response.stop_reason === "refusal") return { status: 422, json: { error: "I'd rather not answer that one." } };
+    const textBlock = response.content.find((b) => b.type === "text");
+    return { status: 200, json: { reply: textBlock?.text || "(no reply)" } };
+  } catch (e) {
+    return { status: 500, json: { error: e?.message || "Concierge failed." } };
+  }
+}

@@ -1,7 +1,7 @@
 import express from "express";
 import cors from "cors";
 import Anthropic from "@anthropic-ai/sdk";
-import { runExtract, runSuggest, runGeocode, runDirections, getClient, MODEL } from "../api/_lib/core.js";
+import { runExtract, runSuggest, runGeocode, runDirections, runConcierge, getClient, MODEL } from "../api/_lib/core.js";
 
 /**
  * Local dev backend for "My Baby Travel Plans". Mirrors the Vercel functions in
@@ -39,6 +39,15 @@ app.post("/api/directions", async (req, res) => {
   } catch (err) {
     console.error("directions error:", err?.message || err);
     res.status(500).json({ error: err?.message || "Directions failed." });
+  }
+});
+app.post("/api/concierge", async (req, res) => {
+  try {
+    const { status, json } = await runConcierge(req.body || {});
+    res.status(status).json(json);
+  } catch (err) {
+    console.error("concierge error:", err?.message || err);
+    res.status(500).json({ error: err?.message || "Concierge failed." });
   }
 });
 

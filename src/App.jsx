@@ -2170,6 +2170,104 @@ function ItineraryView({ plans, onAddIdea }) {
   );
 }
 
+// Tiny markdown: **bold** + bullet lines. Enough for the concierge's replies.
+function MdLite({ text }) {
+  const boldify = (s) => s.split(/(\*\*[^*]+\*\*)/g).map((p, i) => (p.startsWith("**") && p.endsWith("**") ? <strong key={i}>{p.slice(2, -2)}</strong> : <span key={i}>{p}</span>));
+  return (
+    <div className="space-y-1">
+      {String(text || "").split("\n").map((ln, i) => {
+        const t = ln.trim();
+        if (!t) return <div key={i} className="h-1.5" />;
+        if (/^[-*•]\s+/.test(t)) return <div key={i} className="flex gap-1.5"><span className="flex-shrink-0">•</span><span className="min-w-0">{boldify(t.replace(/^[-*•]\s+/, ""))}</span></div>;
+        return <p key={i}>{boldify(t)}</p>;
+      })}
+    </div>
+  );
+}
+
+// Compact trip summary the concierge reasons over (itinerary + unscheduled ideas).
+function buildTripContext(items, plans) {
+  const byDay = {};
+  for (const it of items || []) (byDay[it.day] ??= []).push(it);
+  const lines = Object.keys(byDay).map(Number).sort((a, b) => a - b).map((d) => {
+    const stops = byDay[d].slice().sort((a, b) => (a.position ?? 0) - (b.position ?? 0)).map((s) => `${s.start_time || "—"} ${s.title || "?"}${s.place ? ` @ ${s.place}` : ""}`);
+    return `Day ${d + 1}: ${stops.join(" | ") || "(empty)"}`;
+  });
+  const scheduled = new Set((items || []).map((i) => i.idea_id).filter(Boolean));
+  const ideas = ((plans && plans.seoul) || []).filter((i) => !scheduled.has(i.id)).map((i) => i.title).filter(Boolean).slice(0, 40);
+  return `ITINERARY:\n${lines.join("\n") || "(nothing scheduled yet)"}\n\nUNSCHEDULED IDEAS (${ideas.length}): ${ideas.join(", ") || "(none)"}`;
+}
+
+const CONCIERGE_STARTERS = ["Make a day less scattered", "Cozy rainy-day plan near Jongno", "Best area for a romantic dinner?", "What am I missing on this trip?"];
+
+// Floating trip-aware chat. Read-only: it advises, you apply. Loads the live
+// itinerary each time it opens so its advice matches the current plan.
+function ConciergePanel({ plans }) {
+  const [open, setOpen] = useState(false);
+  const [msgs, setMsgs] = useState([]);
+  const [input, setInput] = useState("");
+  const [busy, setBusy] = useState(false);
+  const ctx = useRef("");
+  const scroller = useRef(null);
+  useEffect(() => {
+    if (!open) return;
+    (async () => { const items = (await loadItinerary("seoul")) || []; ctx.current = buildTripContext(items, plans); })();
+  }, [open, plans]);
+  useEffect(() => { const el = scroller.current; if (el) el.scrollTop = el.scrollHeight; }, [msgs, busy]);
+  const ask = async (text) => {
+    const m = (text ?? input).trim(); if (!m || busy) return;
+    setInput("");
+    const history = msgs.map((x) => ({ role: x.role, content: x.content }));
+    setMsgs((xs) => [...xs, { role: "user", content: m }]); setBusy(true);
+    try {
+      const res = await fetch("/api/concierge", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ message: m, context: ctx.current, history }) });
+      const d = await res.json().catch(() => ({}));
+      if (!res.ok || d.error) throw new Error(d.error || `error ${res.status}`);
+      setMsgs((xs) => [...xs, { role: "assistant", content: d.reply || "(no reply)" }]);
+    } catch (e) { setMsgs((xs) => [...xs, { role: "assistant", content: `⚠️ ${e?.message || "Something went wrong — try again."}` }]); }
+    finally { setBusy(false); }
+  };
+  return (
+    <>
+      <button onClick={() => setOpen((o) => !o)} className="fixed bottom-5 right-5 z-[60] flex h-14 w-14 items-center justify-center rounded-full text-white shadow-lg transition-transform hover:scale-105 active:scale-95" style={{ background: "linear-gradient(135deg,#f472b6,#a78bfa)" }} aria-label="Trip concierge" title="Ask your trip concierge">
+        {open ? <X size={24} strokeWidth={2.8} /> : <MessageCircle size={24} strokeWidth={2.6} />}
+      </button>
+      {open && (
+        <div className="fixed bottom-24 right-5 z-[60] flex max-h-[70vh] w-[min(92vw,380px)] flex-col overflow-hidden rounded-3xl border border-stone-200 bg-white shadow-2xl">
+          <div className="flex items-center gap-2 border-b border-stone-100 px-4 py-3">
+            <Sparkles size={16} className="text-violet-500" strokeWidth={2.8} />
+            <div><p className="text-sm font-black text-stone-700">Trip concierge</p><p className="text-[10px] text-stone-400">Knows your Seoul plan · ask anything</p></div>
+          </div>
+          <div ref={scroller} className="flex-1 space-y-3 overflow-y-auto px-4 py-3">
+            {msgs.length === 0 && (
+              <div className="space-y-2">
+                <p className="text-xs leading-relaxed text-stone-400">Hi! I know your whole itinerary. Ask me to tighten a day, find a spot, or spot what's missing. 💛</p>
+                <div className="flex flex-wrap gap-1.5">
+                  {CONCIERGE_STARTERS.map((s) => (
+                    <button key={s} onClick={() => ask(s)} className="rounded-full border border-stone-200 bg-stone-50 px-2.5 py-1 text-left text-[11px] font-bold text-stone-500 transition-colors hover:border-violet-300 hover:text-violet-600">{s}</button>
+                  ))}
+                </div>
+              </div>
+            )}
+            {msgs.map((m, i) => (
+              <div key={i} className={m.role === "user" ? "flex justify-end" : "flex justify-start"}>
+                <div className={`max-w-[85%] rounded-2xl px-3 py-2 text-[12px] leading-relaxed ${m.role === "user" ? "bg-violet-500 text-white" : "bg-stone-100 text-stone-700"}`}>
+                  {m.role === "user" ? m.content : <MdLite text={m.content} />}
+                </div>
+              </div>
+            ))}
+            {busy && <div className="flex justify-start"><div className="rounded-2xl bg-stone-100 px-3 py-2 text-stone-400"><Loader2 size={14} className="animate-spin" /></div></div>}
+          </div>
+          <div className="flex items-center gap-2 border-t border-stone-100 p-2.5">
+            <input value={input} onChange={(e) => setInput(e.target.value)} onKeyDown={(e) => e.key === "Enter" && ask()} placeholder="Ask about your trip…" className="min-w-0 flex-1 rounded-xl border-2 border-stone-200 bg-white px-3 py-2 text-sm outline-none focus:border-violet-300" />
+            <button onClick={() => ask()} disabled={busy || !input.trim()} className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-xl text-white disabled:opacity-40" style={{ background: "linear-gradient(135deg,#f472b6,#a78bfa)" }} aria-label="Send"><Send size={16} /></button>
+          </div>
+        </div>
+      )}
+    </>
+  );
+}
+
 export default function App() {
   const [votes, setVotes] = useState(() => {
     try {
@@ -2592,6 +2690,8 @@ export default function App() {
 
         {view === "essentials" && <EssentialsView copy={copy} updateCopy={updateCopy} />}
         </ErrorBoundary>
+
+        <ConciergePanel plans={plans} />
 
         <footer className="mt-12 text-center text-xs text-stone-400">
           <p className="font-semibold">Made with ❄️ 🍱 🦦 🧸 ✨ for a very specific kind of cozy winter trip.</p>
