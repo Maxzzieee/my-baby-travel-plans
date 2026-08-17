@@ -417,3 +417,19 @@ html.aero button[style*="gradient"] {
 /* Pixel decor pops harder in Aero */
 html.aero .pixel-sprite,
 html.aero [class*="Pixel"] { image-rendering: pixelated; }
+
+/* --- Aero critters: drifting clouds, a swimming fish, a leaping dolphin --- */
+.aero-critters { position: fixed; inset: 0; z-index: -1; overflow: hidden; pointer-events: none; }
+.aero-critters svg { image-rendering: pixelated; display: block; }
+.aero-cloud { position: absolute; left: 0; animation: aero-drift-x linear infinite; }
+.aero-cloud svg { height: auto; filter: drop-shadow(0 3px 4px rgba(120,180,210,0.28)); }
+.aero-fish { position: absolute; left: 0; animation: aero-drift-x linear infinite; }
+.aero-fish svg { width: 46px; height: auto; }
+.aero-dolphin { position: absolute; animation: aero-leap 6.5s ease-in-out infinite; }
+.aero-dolphin svg { width: 88px; height: auto; filter: drop-shadow(0 4px 6px rgba(40,90,120,0.3)); }
+@keyframes aero-drift-x { from { transform: translateX(-160px); } to { transform: translateX(112vw); } }
+@keyframes aero-leap {
+  0%, 100% { transform: translateY(30px) rotate(-12deg); }
+  50%      { transform: translateY(-36px) rotate(12deg); }
+}
+@media (prefers-reduced-motion: reduce) { .aero-cloud, .aero-fish, .aero-dolphin { animation: none; } }

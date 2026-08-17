@@ -2370,6 +2370,58 @@ function AeroScene() {
   );
 }
 
+// Drifting clouds, a swimming fish, and a leaping dolphin — Aero critters.
+function AeroCritters() {
+  const Cloud = (
+    <svg viewBox="0 0 40 20" shapeRendering="crispEdges" xmlns="http://www.w3.org/2000/svg">
+      <rect x="4" y="12" width="32" height="5" fill="#ffffff" />
+      <rect x="8" y="9" width="24" height="6" fill="#ffffff" />
+      <rect x="12" y="6" width="9" height="6" fill="#ffffff" />
+      <rect x="20" y="4" width="11" height="8" fill="#ffffff" />
+      <rect x="27" y="8" width="8" height="5" fill="#ffffff" />
+      <rect x="6" y="15" width="28" height="2" fill="#dbeffb" />
+    </svg>
+  );
+  return (
+    <div className="aero-critters" aria-hidden="true">
+      <span className="aero-cloud" style={{ top: "6%", animationDuration: "74s" }}><svg width="118" viewBox="0 0 40 20">{Cloud.props.children}</svg></span>
+      <span className="aero-cloud" style={{ top: "17%", animationDuration: "108s", animationDelay: "-40s" }}><svg width="82" viewBox="0 0 40 20">{Cloud.props.children}</svg></span>
+      {/* fish */}
+      <span className="aero-fish" style={{ top: "60%", animationDuration: "48s", animationDelay: "-14s" }}>
+        <svg viewBox="0 0 24 14" shapeRendering="crispEdges" xmlns="http://www.w3.org/2000/svg">
+          <rect x="4" y="4" width="12" height="7" fill="#f6a53a" />
+          <rect x="7" y="2" width="4" height="2" fill="#ef8f2e" />
+          <rect x="1" y="3" width="4" height="3" fill="#ef8f2e" />
+          <rect x="1" y="8" width="4" height="3" fill="#ef8f2e" />
+          <rect x="5" y="8" width="9" height="2" fill="#ffce8a" />
+          <rect x="9" y="4" width="1.5" height="7" fill="#ef8f2e" />
+          <rect x="13" y="5" width="1.6" height="1.6" fill="#2a1c10" />
+        </svg>
+      </span>
+      {/* leaping dolphin */}
+      <span className="aero-dolphin" style={{ left: "70%", top: "40%" }}>
+        <svg viewBox="0 0 30 24" shapeRendering="crispEdges" xmlns="http://www.w3.org/2000/svg">
+          <rect x="18" y="4" width="7" height="4" fill="#5aa0d6" />
+          <rect x="23" y="5" width="3" height="3" fill="#5aa0d6" />
+          <rect x="14" y="6" width="7" height="5" fill="#5aa0d6" />
+          <rect x="10" y="8" width="7" height="5" fill="#5aa0d6" />
+          <rect x="6" y="11" width="7" height="5" fill="#5aa0d6" />
+          <rect x="3" y="14" width="6" height="4" fill="#5aa0d6" />
+          <rect x="13" y="4" width="4" height="3" fill="#4a90c2" />
+          <rect x="0" y="15" width="4" height="3" fill="#4a90c2" />
+          <rect x="1" y="17" width="5" height="2" fill="#4a90c2" />
+          <rect x="11" y="12" width="3" height="4" fill="#4a90c2" />
+          <rect x="18" y="7" width="7" height="1.5" fill="#d6eefb" />
+          <rect x="14" y="9" width="6" height="2" fill="#d6eefb" />
+          <rect x="10" y="11" width="6" height="2" fill="#d6eefb" />
+          <rect x="6" y="14" width="5" height="2" fill="#d6eefb" />
+          <rect x="20" y="5" width="1.6" height="1.6" fill="#12354f" />
+        </svg>
+      </span>
+    </div>
+  );
+}
+
 export default function App() {
   const [votes, setVotes] = useState(() => {
     try {
@@ -2637,7 +2689,7 @@ export default function App() {
       </div>
     )}
     <div className="relative isolate min-h-screen w-full font-sans text-stone-800" style={{ backgroundColor: dark ? "#0b0b12" : "#FFFDF9", backgroundImage: dark ? "radial-gradient(circle at 50% -5%, #1c1830 0, transparent 40%), radial-gradient(circle at 15% 12%, #141024 0, transparent 45%), radial-gradient(circle at 85% 88%, #0d1622 0, transparent 48%)" : "radial-gradient(circle at 15% 10%, #FFF5F0 0, transparent 45%), radial-gradient(circle at 85% 90%, #EEF6F1 0, transparent 48%)" }}>
-      {aero && <><AeroBubbles /><AeroScene /></>}
+      {aero && <><AeroBubbles /><AeroScene /><AeroCritters /></>}
       {!aero && <Sky dark={dark} />}
       <SiteDecor />
       <FlyingButterfly variant={1} />
