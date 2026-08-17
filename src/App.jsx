@@ -2202,11 +2202,12 @@ const CONCIERGE_STARTERS = ["Make a day less scattered", "Cozy rainy-day plan ne
 
 // Floating trip-aware chat. Read-only: it advises, you apply. Loads the live
 // itinerary each time it opens so its advice matches the current plan.
-function ConciergePanel({ plans }) {
+function ConciergePanel({ plans, onAddIdea }) {
   const [open, setOpen] = useState(false);
   const [msgs, setMsgs] = useState([]);
   const [input, setInput] = useState("");
   const [busy, setBusy] = useState(false);
+  const [added, setAdded] = useState({}); // place name -> "adding" | "added"
   const ctx = useRef("");
   const scroller = useRef(null);
   useEffect(() => {
@@ -2223,9 +2224,27 @@ function ConciergePanel({ plans }) {
       const res = await fetch("/api/concierge", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ message: m, context: ctx.current, history }) });
       const d = await res.json().catch(() => ({}));
       if (!res.ok || d.error) throw new Error(d.error || `error ${res.status}`);
-      setMsgs((xs) => [...xs, { role: "assistant", content: d.reply || "(no reply)" }]);
+      setMsgs((xs) => [...xs, { role: "assistant", content: d.reply || "(no reply)", places: Array.isArray(d.places) ? d.places : [] }]);
     } catch (e) { setMsgs((xs) => [...xs, { role: "assistant", content: `⚠️ ${e?.message || "Something went wrong — try again."}` }]); }
     finally { setBusy(false); }
+  };
+  // "Add to ideas" — scrape a photo + address for the recommended name, then add.
+  const addPlace = async (pl) => {
+    if (!pl?.name || added[pl.name]) return;
+    setAdded((a) => ({ ...a, [pl.name]: "adding" }));
+    try {
+      const res = await fetch(`/api/place?q=${encodeURIComponent(pl.name)}`);
+      const d = await res.json().catch(() => ({}));
+      const b = d.idea || {};
+      onAddIdea && onAddIdea({
+        id: `p_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
+        title: b.title || pl.name, summary: pl.why || "", activities: [],
+        location: b.location || pl.area || "", sourceUrl: "",
+        lat: b.lat ?? null, lng: b.lng ?? null, kind: b.kind || "activity",
+        thumb: b.thumb || "", photos: b.photos || [], createdAt: Date.now(),
+      });
+      setAdded((a) => ({ ...a, [pl.name]: "added" }));
+    } catch { setAdded((a) => { const n = { ...a }; delete n[pl.name]; return n; }); }
   };
   return (
     <>
@@ -2250,11 +2269,30 @@ function ConciergePanel({ plans }) {
               </div>
             )}
             {msgs.map((m, i) => (
-              <div key={i} className={m.role === "user" ? "flex justify-end" : "flex justify-start"}>
-                <div className={`max-w-[85%] rounded-2xl px-3 py-2 text-[12px] leading-relaxed ${m.role === "user" ? "bg-violet-500 text-white" : "bg-stone-100 text-stone-700"}`}>
-                  {m.role === "user" ? m.content : <MdLite text={m.content} />}
+              m.role === "user" ? (
+                <div key={i} className="flex justify-end">
+                  <div className="max-w-[85%] rounded-2xl bg-violet-500 px-3 py-2 text-[12px] leading-relaxed text-white">{m.content}</div>
                 </div>
-              </div>
+              ) : (
+                <div key={i} className="space-y-2">
+                  <div className="max-w-[92%] rounded-2xl bg-stone-100 px-3 py-2 text-[12px] leading-relaxed text-stone-700"><MdLite text={m.content} /></div>
+                  {m.places && m.places.length > 0 && (
+                    <div className="space-y-1.5">
+                      {m.places.map((pl, j) => (
+                        <div key={j} className="flex items-center gap-2 rounded-xl border border-stone-200 bg-white p-2">
+                          <div className="min-w-0 flex-1">
+                            <p className="truncate text-[12px] font-extrabold text-stone-700">{pl.name}</p>
+                            <p className="truncate text-[10px] text-stone-400">{[pl.area, pl.why].filter(Boolean).join(" · ")}</p>
+                          </div>
+                          <button onClick={() => addPlace(pl)} disabled={!!added[pl.name]} className="flex flex-shrink-0 items-center gap-1 rounded-lg px-2.5 py-1 text-[11px] font-extrabold text-white disabled:opacity-70" style={{ background: added[pl.name] === "added" ? "#34C759" : "linear-gradient(135deg,#f472b6,#a78bfa)" }}>
+                            {added[pl.name] === "adding" ? <Loader2 size={11} className="animate-spin" /> : added[pl.name] === "added" ? "✓ Added" : <><Plus size={11} strokeWidth={3} /> Add</>}
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )
             ))}
             {busy && <div className="flex justify-start"><div className="rounded-2xl bg-stone-100 px-3 py-2 text-stone-400"><Loader2 size={14} className="animate-spin" /></div></div>}
           </div>
@@ -2691,7 +2729,7 @@ export default function App() {
         {view === "essentials" && <EssentialsView copy={copy} updateCopy={updateCopy} />}
         </ErrorBoundary>
 
-        <ConciergePanel plans={plans} />
+        <ConciergePanel plans={plans} onAddIdea={(idea) => addPlan("seoul", idea)} />
 
         <footer className="mt-12 text-center text-xs text-stone-400">
           <p className="font-semibold">Made with ❄️ 🍱 🦦 🧸 ✨ for a very specific kind of cozy winter trip.</p>

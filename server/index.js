@@ -1,7 +1,7 @@
 import express from "express";
 import cors from "cors";
 import Anthropic from "@anthropic-ai/sdk";
-import { runExtract, runSuggest, runGeocode, runDirections, runConcierge, getClient, MODEL } from "../api/_lib/core.js";
+import { runExtract, runSuggest, runGeocode, runDirections, runConcierge, runPlace, getClient, MODEL } from "../api/_lib/core.js";
 
 /**
  * Local dev backend for "My Baby Travel Plans". Mirrors the Vercel functions in
@@ -30,6 +30,10 @@ app.get("/api/suggest", async (req, res) => {
 });
 app.get("/api/geocode", async (req, res) => {
   const { status, json } = await runGeocode((req.query && req.query.q) || "");
+  res.status(status).json(json);
+});
+app.get("/api/place", async (req, res) => {
+  const { status, json } = await runPlace((req.query && req.query.q) || "");
   res.status(status).json(json);
 });
 app.post("/api/directions", async (req, res) => {
