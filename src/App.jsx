@@ -1585,6 +1585,7 @@ function StopCard({ item, index, total, selected, distanceToNext, next, image, o
   // On-demand Seoul transit directions to the next stop (AI-generated).
   const [dir, setDir] = useState(null);   // { summary, totalMinutes, steps } | { error }
   const [dirBusy, setDirBusy] = useState(false);
+  const [legOpen, setLegOpen] = useState(false); // collapse all the transit links behind one toggle
   const getDirections = async () => {
     if (dirBusy) return;
     if (dir) { setDir(null); return; } // toggle closed
@@ -1633,43 +1634,51 @@ function StopCard({ item, index, total, selected, distanceToNext, next, image, o
               </div>
             )}
           </div>
-          <a href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(((hasHangul(item.place) ? item.place.split("·")[0] : (item.title || item.place)) || "").trim())}`} target="_blank" rel="noreferrer" onPointerDown={(e) => e.stopPropagation()} onClick={(e) => e.stopPropagation()} className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-xl bg-sky-50 text-sky-500 transition-colors hover:bg-sky-100 hover:text-sky-700" aria-label="Look up on Google Maps" title="See what this is — opens Google Maps"><Search size={16} /></a>
-          <button onPointerDown={(e) => e.stopPropagation()} onClick={(e) => { e.stopPropagation(); onOpen(item.id); }} className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-xl bg-stone-100 text-stone-600 transition-colors hover:bg-stone-200 hover:text-stone-800" aria-label="Edit stop" title="Edit"><PenLine size={17} /></button>
+          <a href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(((hasHangul(item.place) ? item.place.split("·")[0] : (item.title || item.place)) || "").trim())}`} target="_blank" rel="noreferrer" onPointerDown={(e) => e.stopPropagation()} onClick={(e) => e.stopPropagation()} className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl bg-sky-50 text-sky-500 transition-colors hover:bg-sky-100 hover:text-sky-700" aria-label="Look up on Google Maps" title="See what this is — opens Google Maps"><Search size={16} /></a>
+          <button onPointerDown={(e) => e.stopPropagation()} onClick={(e) => { e.stopPropagation(); onOpen(item.id); }} className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl bg-stone-100 text-stone-600 transition-colors hover:bg-stone-200 hover:text-stone-800" aria-label="Edit stop" title="Edit"><PenLine size={17} /></button>
           <DeleteButton onConfirm={() => onDelete(item.id)} variant="icon-box" size={17} />
         </div>
       </div>
       {distanceToNext && (
         <div className="ml-3.5 py-1">
-          <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs font-semibold text-stone-500">
+          <div className="flex items-center gap-2 text-xs font-semibold text-stone-500">
             <span className="flex items-center gap-1"><Navigation size={10} /> {distanceToNext}</span>
             {next && (item.lat != null || item.place) && (next.lat != null || next.place) && (
-              <button onClick={getDirections} className="flex items-center gap-1 rounded-full border border-stone-200 bg-white px-2 py-0.5 font-bold text-stone-500 transition-colors hover:border-sky-300 hover:text-sky-600">
-                {dirBusy ? <Loader2 size={10} className="animate-spin" /> : <Train size={10} />} {dir ? "hide" : "how to get there"}
+              <button onClick={() => setLegOpen((o) => !o)} className="flex items-center gap-1 rounded-full border border-stone-200 bg-white px-2.5 py-1 font-bold text-stone-500 transition-colors hover:border-sky-300 hover:text-sky-600">
+                <Train size={11} /> Directions <ChevronDown size={11} className={`transition-transform ${legOpen ? "" : "-rotate-90"}`} />
               </button>
             )}
-            {/* Real, live routing — no API key, opens the maps app's own transit engine */}
-            {next && item.lat != null && item.lng != null && next.lat != null && next.lng != null && (
-              <a href={`https://www.google.com/maps/dir/?api=1&origin=${item.lat},${item.lng}&destination=${next.lat},${next.lng}&travelmode=transit`} target="_blank" rel="noreferrer" className="flex items-center gap-1 rounded-full border border-stone-200 bg-white px-2 py-0.5 font-bold text-stone-500 transition-colors hover:border-emerald-300 hover:text-emerald-600" title="Live transit directions in Google Maps">🗺️ Maps ↗</a>
-            )}
-            {next && next.lat != null && next.lng != null && (
-              <a href={`https://map.kakao.com/link/to/${encodeURIComponent(((hasHangul(next.place) ? next.place.split("·")[0] : next.title) || "목적지").trim())},${next.lat},${next.lng}`} target="_blank" rel="noreferrer" className="flex items-center gap-1 rounded-full border border-stone-200 bg-white px-2 py-0.5 font-bold text-stone-500 transition-colors hover:border-amber-300 hover:text-amber-600" title="Open destination in KakaoMap (best on the ground)">KakaoMap ↗</a>
-            )}
           </div>
-          {dir && !dir.error && (
-            <div className="mt-1.5 max-w-md rounded-xl border border-sky-100 bg-sky-50/60 p-2.5">
-              <p className="text-xs font-black text-sky-700">🚇 {dir.summary}{dir.totalMinutes ? ` · ~${dir.totalMinutes} min` : ""}</p>
-              <ol className="mt-1.5 space-y-1">
-                {(dir.steps || []).map((s, i) => (
-                  <li key={i} className="flex items-start gap-1.5 text-xs leading-snug text-stone-600">
-                    <span className="flex-shrink-0">{DIR_ICON[s.mode] || "•"}</span>
-                    <span className="min-w-0"><span className="font-semibold">{s.text}</span>{s.minutes ? <span className="text-stone-500"> · {s.minutes} min</span> : null}</span>
-                  </li>
-                ))}
-              </ol>
-              <p className="mt-1.5 text-xs text-stone-500">AI estimate — double-check live times in Naver Map / KakaoMap.</p>
+          {legOpen && (
+            <div className="mt-1.5 max-w-md rounded-xl border border-stone-200 bg-white p-2">
+              <div className="flex flex-wrap gap-1.5">
+                {item.lat != null && item.lng != null && next.lat != null && next.lng != null && (
+                  <a href={`https://www.google.com/maps/dir/?api=1&origin=${item.lat},${item.lng}&destination=${next.lat},${next.lng}&travelmode=transit`} target="_blank" rel="noreferrer" className="flex items-center gap-1 rounded-lg border border-stone-200 px-2.5 py-1.5 text-xs font-bold text-stone-600 transition-colors hover:border-emerald-300 hover:text-emerald-600" title="Live transit directions in Google Maps">🗺️ Google Maps ↗</a>
+                )}
+                {next.lat != null && next.lng != null && (
+                  <a href={`https://map.kakao.com/link/to/${encodeURIComponent(((hasHangul(next.place) ? next.place.split("·")[0] : next.title) || "목적지").trim())},${next.lat},${next.lng}`} target="_blank" rel="noreferrer" className="flex items-center gap-1 rounded-lg border border-stone-200 px-2.5 py-1.5 text-xs font-bold text-stone-600 transition-colors hover:border-amber-300 hover:text-amber-600" title="Open destination in KakaoMap (best on the ground)">KakaoMap ↗</a>
+                )}
+                <button onClick={getDirections} className="flex items-center gap-1 rounded-lg border border-stone-200 px-2.5 py-1.5 text-xs font-bold text-stone-600 transition-colors hover:border-sky-300 hover:text-sky-600">
+                  {dirBusy ? <Loader2 size={11} className="animate-spin" /> : <Train size={11} />} {dir && !dir.error ? "Hide steps" : "AI subway steps"}
+                </button>
+              </div>
+              {dir && !dir.error && (
+                <div className="mt-2 rounded-lg bg-sky-50/70 p-2">
+                  <p className="text-xs font-black text-sky-700">🚇 {dir.summary}{dir.totalMinutes ? ` · ~${dir.totalMinutes} min` : ""}</p>
+                  <ol className="mt-1.5 space-y-1">
+                    {(dir.steps || []).map((s, i) => (
+                      <li key={i} className="flex items-start gap-1.5 text-xs leading-snug text-stone-600">
+                        <span className="flex-shrink-0">{DIR_ICON[s.mode] || "•"}</span>
+                        <span className="min-w-0"><span className="font-semibold">{s.text}</span>{s.minutes ? <span className="text-stone-500"> · {s.minutes} min</span> : null}</span>
+                      </li>
+                    ))}
+                  </ol>
+                  <p className="mt-1.5 text-xs text-stone-500">AI estimate — confirm live times in Naver / KakaoMap.</p>
+                </div>
+              )}
+              {dir && dir.error && <p className="mt-1 text-xs font-bold text-rose-400">⚠️ {dir.error}</p>}
             </div>
           )}
-          {dir && dir.error && <p className="mt-1 text-xs font-bold text-rose-400">⚠️ {dir.error}</p>}
         </div>
       )}
     </div>
@@ -2298,7 +2307,7 @@ function ConciergePanel({ plans, onAddIdea }) {
           </div>
           <div className="flex items-center gap-2 border-t border-stone-100 p-2.5">
             <input value={input} onChange={(e) => setInput(e.target.value)} onKeyDown={(e) => e.key === "Enter" && ask()} placeholder="Ask about your trip…" className="min-w-0 flex-1 rounded-xl border-2 border-stone-200 bg-white px-3 py-2 text-sm outline-none focus:border-violet-300" />
-            <button onClick={() => ask()} disabled={busy || !input.trim()} className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-xl text-white disabled:opacity-40" style={{ background: "linear-gradient(135deg,#f472b6,#a78bfa)" }} aria-label="Send"><Send size={16} /></button>
+            <button onClick={() => ask()} disabled={busy || !input.trim()} className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl text-white disabled:opacity-40" style={{ background: "linear-gradient(135deg,#f472b6,#a78bfa)" }} aria-label="Send"><Send size={16} /></button>
           </div>
         </div>
       )}
