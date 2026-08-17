@@ -318,23 +318,52 @@ html.aero {
   scroll-behavior: smooth;
 }
 html.aero body {
-  background-color: #8fd4ff;
-  /* hard-stop bubbles (pixel-crisp) over a banded sky→aqua→lime water gradient */
+  background-color: #4ea9f0;
+  /* iconic Frutiger Aero: sun glow up top, SMOOTH sky → aqua → grass */
   background-image:
-    radial-gradient(circle at 18px 22px, rgba(255,255,255,0.55) 0 3px, transparent 4px),
-    radial-gradient(circle at 78px 96px, rgba(255,255,255,0.45) 0 5px, transparent 6px),
-    radial-gradient(circle at 120px 44px, rgba(255,255,255,0.35) 0 2px, transparent 3px),
-    radial-gradient(circle at 50px 130px, rgba(255,255,255,0.4) 0 4px, transparent 5px),
+    radial-gradient(150% 70% at 50% -14%, rgba(255,255,255,0.92) 0%, rgba(255,255,255,0.0) 46%),
     linear-gradient(180deg,
-      #79c6ff 0%, #79c6ff 18%,
-      #9ce0f2 18%, #9ce0f2 38%,
-      #bff0e6 38%, #bff0e6 58%,
-      #cdf3d2 58%, #cdf3d2 78%,
-      #e6f8c4 78%, #e6f8c4 100%);
-  background-size: 150px 150px, 150px 150px, 150px 150px, 150px 150px, 100% 100%;
+      #4ea9f0 0%,     /* sky blue */
+      #74c3ee 30%,
+      #9adce6 52%,    /* aqua */
+      #b7ead0 68%,
+      #9fdc86 82%,    /* meadow */
+      #74c85a 100%);  /* grass */
   background-attachment: fixed;
-  image-rendering: pixelated;
 }
+/* let the body's aqua sky show through the app's (normally opaque) root shell */
+html.aero .isolate.min-h-screen { background: transparent !important; }
+
+/* --- little pixel house sitting on the grass (Aero only) --- */
+.aero-scene {
+  position: fixed; left: 0; right: 0; bottom: 0; z-index: -1;
+  display: flex; justify-content: center; align-items: flex-end;
+  pointer-events: none;
+}
+.aero-scene svg { width: min(260px, 46vw); height: auto; image-rendering: pixelated; opacity: 0.96; filter: drop-shadow(0 6px 10px rgba(40,90,60,0.25)); }
+
+/* --- floating glossy pixel bubbles (rendered only in Aero) --- */
+.aero-bubbles { position: fixed; inset: 0; z-index: -1; overflow: hidden; pointer-events: none; }
+.aero-bubble {
+  position: absolute; bottom: -160px; border-radius: 50%;
+  background-image:
+    radial-gradient(circle at 34% 28%, rgba(255,255,255,0.95) 0 9%, rgba(255,255,255,0) 24%),   /* specular hotspot */
+    radial-gradient(circle at 62% 70%, rgba(255,255,255,0.5) 0 5%, rgba(255,255,255,0) 16%),      /* secondary glint */
+    radial-gradient(circle at 50% 50%,
+      rgba(255,255,255,0.28) 0 55%,
+      rgba(150,228,244,0.30) 56% 78%,
+      rgba(110,200,230,0.12) 79% 100%);
+  border: 2px solid rgba(255,255,255,0.6);
+  box-shadow: inset 0 0 14px rgba(255,255,255,0.55), 0 0 12px rgba(150,225,255,0.45);
+  animation: aero-rise linear infinite;
+}
+@keyframes aero-rise {
+  0%   { transform: translate(0, 0) scale(0.85); opacity: 0; }
+  12%  { opacity: 0.95; }
+  88%  { opacity: 0.85; }
+  100% { transform: translate(var(--drift, 0px), -122vh) scale(1.08); opacity: 0; }
+}
+@media (prefers-reduced-motion: reduce) { .aero-bubble { animation: none; opacity: 0.5; } }
 
 /* Glossy aqua glass for every card / panel / chip */
 html.aero .bg-white,

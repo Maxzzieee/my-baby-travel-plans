@@ -2306,6 +2306,70 @@ function ConciergePanel({ plans, onAddIdea }) {
   );
 }
 
+// Floating glossy pixel bubbles for the Frutiger Aero skin (rendered only when on).
+function AeroBubbles() {
+  const bubbles = useMemo(() => Array.from({ length: 16 }, () => ({
+    size: 24 + Math.round(Math.random() * 96),
+    left: Math.round(Math.random() * 100),
+    delay: -(Math.random() * 18).toFixed(1),
+    dur: (13 + Math.random() * 13).toFixed(1),
+    drift: Math.round((Math.random() * 2 - 1) * 60),
+  })), []);
+  return (
+    <div className="aero-bubbles" aria-hidden="true">
+      {bubbles.map((b, i) => (
+        <span key={i} className="aero-bubble" style={{ left: `${b.left}%`, width: b.size, height: b.size, animationDuration: `${b.dur}s`, animationDelay: `${b.delay}s`, "--drift": `${b.drift}px` }} />
+      ))}
+    </div>
+  );
+}
+
+// A cozy pixel cottage on a grassy mound — the Frutiger Aero scene anchor.
+function AeroScene() {
+  return (
+    <div className="aero-scene" aria-hidden="true">
+      <svg viewBox="0 0 120 92" shapeRendering="crispEdges" xmlns="http://www.w3.org/2000/svg">
+        {/* grassy mound */}
+        <rect x="0" y="80" width="120" height="12" fill="#7cc85a" />
+        <rect x="8" y="75" width="104" height="7" fill="#8ed36a" />
+        <rect x="26" y="70" width="68" height="7" fill="#8ed36a" />
+        {/* tree */}
+        <rect x="15" y="58" width="6" height="20" fill="#7a4a2c" />
+        <rect x="6" y="44" width="24" height="18" fill="#5fae44" />
+        <rect x="11" y="37" width="14" height="10" fill="#6cbf50" />
+        <rect x="10" y="46" width="7" height="7" fill="#84d766" />
+        {/* roof (stepped pixel triangle) + gloss */}
+        <rect x="56" y="22" width="8" height="4" fill="#e8664d" />
+        <rect x="52" y="26" width="16" height="4" fill="#e8664d" />
+        <rect x="48" y="30" width="24" height="4" fill="#e8664d" />
+        <rect x="42" y="34" width="36" height="4" fill="#e8664d" />
+        <rect x="34" y="38" width="52" height="5" fill="#d8543c" />
+        <rect x="55" y="26" width="4" height="12" fill="#f2836e" />
+        {/* chimney + smoke puffs */}
+        <rect x="66" y="19" width="7" height="13" fill="#c05a42" />
+        <rect x="70" y="11" width="5" height="5" fill="#ffffff" opacity="0.85" />
+        <rect x="74" y="4" width="6" height="6" fill="#ffffff" opacity="0.65" />
+        {/* house body */}
+        <rect x="38" y="43" width="44" height="34" fill="#fdf3e3" />
+        <rect x="38" y="43" width="6" height="34" fill="#f1e3ca" />
+        {/* windows + cross + gloss */}
+        <rect x="46" y="49" width="11" height="11" fill="#8fd4f0" />
+        <rect x="63" y="49" width="11" height="11" fill="#8fd4f0" />
+        <rect x="51" y="49" width="1.5" height="11" fill="#ffffff" />
+        <rect x="46" y="54" width="11" height="1.5" fill="#ffffff" />
+        <rect x="68" y="49" width="1.5" height="11" fill="#ffffff" />
+        <rect x="63" y="54" width="11" height="1.5" fill="#ffffff" />
+        <rect x="47" y="50" width="3" height="3" fill="#d3f0ff" />
+        <rect x="64" y="50" width="3" height="3" fill="#d3f0ff" />
+        {/* door + knob */}
+        <rect x="55" y="63" width="12" height="14" fill="#8a5a3c" />
+        <rect x="55" y="63" width="12" height="3" fill="#9c6a48" />
+        <rect x="64" y="70" width="2" height="2" fill="#f5d06a" />
+      </svg>
+    </div>
+  );
+}
+
 export default function App() {
   const [votes, setVotes] = useState(() => {
     try {
@@ -2573,7 +2637,8 @@ export default function App() {
       </div>
     )}
     <div className="relative isolate min-h-screen w-full font-sans text-stone-800" style={{ backgroundColor: dark ? "#0b0b12" : "#FFFDF9", backgroundImage: dark ? "radial-gradient(circle at 50% -5%, #1c1830 0, transparent 40%), radial-gradient(circle at 15% 12%, #141024 0, transparent 45%), radial-gradient(circle at 85% 88%, #0d1622 0, transparent 48%)" : "radial-gradient(circle at 15% 10%, #FFF5F0 0, transparent 45%), radial-gradient(circle at 85% 90%, #EEF6F1 0, transparent 48%)" }}>
-      <Sky dark={dark} />
+      {aero && <><AeroBubbles /><AeroScene /></>}
+      {!aero && <Sky dark={dark} />}
       <SiteDecor />
       <FlyingButterfly variant={1} />
       <FlyingButterfly variant={2} rainbow />

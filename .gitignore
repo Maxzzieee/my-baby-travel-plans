@@ -26,3 +26,10 @@ pnpm-debug.log*
 .env
 .env.*
 !.env.example
+
+# AI coding-tool config (local dev tooling — impeccable hooks, cursor, codex).
+# Machine-specific (absolute paths), so kept local, not shared in the repo.
+.claude/settings.local.json
+.codex/
+.cursor/
+.agents/
