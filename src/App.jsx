@@ -411,7 +411,7 @@ function SavedIdea({ plan, accent, onDelete, onAddComment, onEdit, onAddToItiner
             <EditText value={plan.location || ""} onSave={(v) => onEdit(plan.id, { location: v, lat: null, lng: null })} placeholder="add address / place…" className="text-xs" />
           </div>
         </div>
-        <button onClick={() => onDelete(plan.id)} className="flex-shrink-0 text-stone-400 transition-colors hover:text-rose-400" aria-label="Delete idea"><Trash2 size={14} /></button>
+        <DeleteButton onConfirm={() => onDelete(plan.id)} variant="icon-soft" size={14} />
       </div>
 
       <div className="mt-2 flex flex-wrap gap-2">
@@ -1635,7 +1635,7 @@ function StopCard({ item, index, total, selected, distanceToNext, next, image, o
           </div>
           <a href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(((hasHangul(item.place) ? item.place.split("·")[0] : (item.title || item.place)) || "").trim())}`} target="_blank" rel="noreferrer" onPointerDown={(e) => e.stopPropagation()} onClick={(e) => e.stopPropagation()} className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-xl bg-sky-50 text-sky-500 transition-colors hover:bg-sky-100 hover:text-sky-700" aria-label="Look up on Google Maps" title="See what this is — opens Google Maps"><Search size={16} /></a>
           <button onPointerDown={(e) => e.stopPropagation()} onClick={(e) => { e.stopPropagation(); onOpen(item.id); }} className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-xl bg-stone-100 text-stone-600 transition-colors hover:bg-stone-200 hover:text-stone-800" aria-label="Edit stop" title="Edit"><PenLine size={17} /></button>
-          <button onPointerDown={(e) => e.stopPropagation()} onClick={(e) => { e.stopPropagation(); onDelete(item.id); }} className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-xl bg-rose-50 text-rose-500 transition-colors hover:bg-rose-100 hover:text-rose-700" aria-label="Delete stop" title="Delete"><Trash2 size={17} /></button>
+          <DeleteButton onConfirm={() => onDelete(item.id)} variant="icon-box" size={17} />
         </div>
       </div>
       {distanceToNext && (
@@ -1737,7 +1737,7 @@ function ItemEditor({ item, onUpdate, onRemove, onClose }) {
         </div>
         <textarea defaultValue={item.notes || ""} onBlur={(e) => e.target.value !== (item.notes || "") && onUpdate(item.id, { notes: e.target.value })} placeholder="notes…" rows={2} className="w-full resize-y rounded-xl border-2 border-stone-200 px-3 py-2 text-xs outline-none focus:border-rose-200" />
         <div className="flex items-center justify-between">
-          <button onClick={() => { onRemove(item.id); onClose(); }} className="flex items-center gap-1.5 rounded-xl px-3 py-2 text-xs font-extrabold text-rose-400 transition-colors hover:bg-rose-50"><Trash2 size={14} /> Delete</button>
+          <DeleteButton onConfirm={() => { onRemove(item.id); onClose(); }} variant="text" size={14} />
           <button onClick={onClose} className="rounded-xl px-4 py-2 text-sm font-extrabold transition-all hover:scale-[1.03] active:scale-95" style={{ backgroundColor: ACCENTS.mint.hex, color: ACCENTS.mint.text, border: `1.5px solid ${ACCENTS.mint.border}` }}>Done</button>
         </div>
       </div>
@@ -2367,6 +2367,37 @@ function AeroScene() {
         <rect x="64" y="70" width="2" height="2" fill="#f5d06a" />
       </svg>
     </div>
+  );
+}
+
+// Tap-twice-to-delete: first tap arms (3s), second tap confirms. No accidental
+// nukes on the shared board, no modal friction. Works with realtime.
+function DeleteButton({ onConfirm, variant = "icon-soft", size = 14 }) {
+  const [armed, setArmed] = useState(false);
+  const t = useRef();
+  useEffect(() => () => clearTimeout(t.current), []);
+  const fire = (e) => {
+    e.stopPropagation();
+    if (armed) { clearTimeout(t.current); setArmed(false); onConfirm(); }
+    else { setArmed(true); t.current = setTimeout(() => setArmed(false), 3000); }
+  };
+  const pd = (e) => e.stopPropagation();
+  if (variant === "text") {
+    return (
+      <button onPointerDown={pd} onClick={fire} className={`flex items-center gap-1.5 rounded-xl px-3 py-2 text-xs font-extrabold transition-colors ${armed ? "bg-rose-500 text-white" : "text-rose-400 hover:bg-rose-50"}`}>
+        <Trash2 size={size} /> {armed ? "Tap again to confirm" : "Delete"}
+      </button>
+    );
+  }
+  const V = {
+    "icon-soft": { base: "flex-shrink-0 text-stone-400 transition-colors hover:text-rose-400", armed: "flex-shrink-0 rounded-full bg-rose-500 p-0.5 text-white animate-pulse" },
+    "icon-box": { base: "flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl bg-rose-50 text-rose-500 transition-colors hover:bg-rose-100 hover:text-rose-700", armed: "flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl bg-rose-500 text-white animate-pulse" },
+  };
+  const s = V[variant] || V["icon-soft"];
+  return (
+    <button onPointerDown={pd} onClick={fire} className={armed ? s.armed : s.base} aria-label={armed ? "Tap again to delete" : "Delete"} title={armed ? "Tap again to delete" : "Delete"}>
+      <Trash2 size={size} />
+    </button>
   );
 }
 
