@@ -2398,24 +2398,29 @@ function AeroCritters() {
           <rect x="13" y="5" width="1.6" height="1.6" fill="#2a1c10" />
         </svg>
       </span>
-      {/* leaping dolphin */}
+      {/* leaping dolphin (side profile; CSS arcs it) */}
       <span className="aero-dolphin" style={{ left: "70%", top: "40%" }}>
-        <svg viewBox="0 0 30 24" shapeRendering="crispEdges" xmlns="http://www.w3.org/2000/svg">
-          <rect x="18" y="4" width="7" height="4" fill="#5aa0d6" />
-          <rect x="23" y="5" width="3" height="3" fill="#5aa0d6" />
-          <rect x="14" y="6" width="7" height="5" fill="#5aa0d6" />
-          <rect x="10" y="8" width="7" height="5" fill="#5aa0d6" />
-          <rect x="6" y="11" width="7" height="5" fill="#5aa0d6" />
-          <rect x="3" y="14" width="6" height="4" fill="#5aa0d6" />
-          <rect x="13" y="4" width="4" height="3" fill="#4a90c2" />
-          <rect x="0" y="15" width="4" height="3" fill="#4a90c2" />
-          <rect x="1" y="17" width="5" height="2" fill="#4a90c2" />
-          <rect x="11" y="12" width="3" height="4" fill="#4a90c2" />
-          <rect x="18" y="7" width="7" height="1.5" fill="#d6eefb" />
-          <rect x="14" y="9" width="6" height="2" fill="#d6eefb" />
-          <rect x="10" y="11" width="6" height="2" fill="#d6eefb" />
-          <rect x="6" y="14" width="5" height="2" fill="#d6eefb" />
-          <rect x="20" y="5" width="1.6" height="1.6" fill="#12354f" />
+        <svg viewBox="0 0 28 14" shapeRendering="crispEdges" xmlns="http://www.w3.org/2000/svg">
+          {/* tail flukes + stock (left) */}
+          <rect x="0" y="3" width="3" height="2" fill="#3f83b8" />
+          <rect x="0" y="9" width="3" height="2" fill="#3f83b8" />
+          <rect x="2" y="5" width="3" height="4" fill="#4a90c2" />
+          {/* body */}
+          <rect x="5" y="4" width="15" height="6" fill="#5aa0d6" />
+          <rect x="7" y="3" width="12" height="1" fill="#5aa0d6" />
+          <rect x="7" y="10" width="12" height="1" fill="#5aa0d6" />
+          {/* melon + snout (right) */}
+          <rect x="20" y="4" width="3" height="5" fill="#5aa0d6" />
+          <rect x="22" y="6" width="4" height="2" fill="#5aa0d6" />
+          {/* dorsal fin (top) */}
+          <rect x="12" y="1" width="4" height="2" fill="#3f83b8" />
+          <rect x="13" y="0" width="2" height="1" fill="#3f83b8" />
+          {/* pectoral fin (bottom) */}
+          <rect x="10" y="10" width="3" height="3" fill="#3f83b8" />
+          {/* belly */}
+          <rect x="7" y="8" width="13" height="2" fill="#dff1fc" />
+          {/* eye */}
+          <rect x="22.5" y="6" width="1.4" height="1.4" fill="#12354f" />
         </svg>
       </span>
     </div>
