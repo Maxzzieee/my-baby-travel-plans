@@ -2506,6 +2506,9 @@ export default function App() {
   // 🫧 Frutiger Aero (pixel) skin — a whole-app vibe swap, mutually exclusive with dark.
   const [aero, setAero] = useState(() => { try { return localStorage.getItem("site.aero") === "1"; } catch (e) { return false; } });
   useEffect(() => { try { document.documentElement.classList.toggle("aero", aero); localStorage.setItem("site.aero", aero ? "1" : "0"); } catch (e) {} }, [aero]);
+  // First-run hints — surfaces the hidden features once; re-openable from the footer.
+  const [showTips, setShowTips] = useState(() => { try { return localStorage.getItem("seen.tips.v1") !== "1"; } catch (e) { return false; } });
+  const dismissTips = () => { setShowTips(false); try { localStorage.setItem("seen.tips.v1", "1"); } catch (e) {} };
   // hidden easter egg — press & hold anywhere for 4s and botanicals bloom from the spot
   const [blooms, setBlooms] = useState([]);
   useEffect(() => {
@@ -2769,6 +2772,24 @@ export default function App() {
           ))}
         </div>
 
+        {/* First-run hints — the hidden goodies, shown once */}
+        {showTips && (
+          <div className="mx-auto mt-8 max-w-2xl rounded-3xl border-2 border-violet-100 bg-white/85 p-5 backdrop-blur">
+            <div className="flex items-start justify-between gap-3">
+              <p className="text-sm font-black text-stone-700">✨ Psst — the hidden goodies</p>
+              <button onClick={dismissTips} className="rounded-lg px-2 py-1 text-xs font-bold text-stone-500 transition-colors hover:text-stone-700">Got it ✕</button>
+            </div>
+            <ul className="mt-2 grid gap-1.5 text-xs leading-relaxed text-stone-600 sm:grid-cols-2">
+              <li>💬 <b>Bottom-right</b> — ask the AI concierge about your trip</li>
+              <li>🐔 <b>Bottom-left</b> — raise our joint chicken</li>
+              <li>🫧 <b>"Aero"</b> button below — Frutiger Aero mode</li>
+              <li>✨ <b>"Optimise route"</b> on any day — least walking</li>
+              <li>🧭 <b>"Directions"</b> on each stop — subway + Maps</li>
+              <li>🦋 <b>Long-press</b> anywhere for a little secret…</li>
+            </ul>
+          </div>
+        )}
+
         {/* Tabs — show one section at a time */}
         <div className="mx-auto mt-8 flex max-w-2xl items-center justify-start gap-1 overflow-x-auto rounded-2xl border border-stone-200 bg-white/70 p-1.5 backdrop-blur sm:justify-center">
           {[
@@ -2903,6 +2924,7 @@ export default function App() {
         <footer className="mt-12 text-center text-xs text-stone-500">
           <p className="font-semibold">Made with ❄️ 🍱 🦦 🧸 ✨ for a very specific kind of cozy winter trip.</p>
           <p className="mt-1">Prices in SGD per pax · planning weather &amp; sunset for late Nov / early Dec · live temps via Open-Meteo · plan scrubbing via Claude.</p>
+          <button onClick={() => { setView("plan"); setShowTips(true); }} className="mt-3 rounded-full border border-stone-200 bg-white/70 px-3 py-1.5 text-xs font-bold text-stone-500 backdrop-blur transition-colors hover:border-violet-300 hover:text-violet-600">✨ Show the hidden goodies</button>
         </footer>
       </div>
     </div>
