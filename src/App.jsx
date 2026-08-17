@@ -58,8 +58,8 @@ import { buildAutoPlan, BASE_JONGNO } from "./autoplan";
 import "leaflet/dist/leaflet.css";
 import L from "leaflet";
 import { MapContainer, TileLayer, Marker, Polyline, useMap } from "react-leaflet";
-import { DndContext, closestCenter, PointerSensor, TouchSensor, useSensor, useSensors } from "@dnd-kit/core";
-import { SortableContext, verticalListSortingStrategy, useSortable, arrayMove } from "@dnd-kit/sortable";
+import { DndContext, closestCenter, PointerSensor, TouchSensor, KeyboardSensor, useSensor, useSensors } from "@dnd-kit/core";
+import { SortableContext, verticalListSortingStrategy, useSortable, arrayMove, sortableKeyboardCoordinates } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { burstConfetti, floatEmoji, sound } from "./fx";
 import SeedRush from "./SeedRush";
@@ -806,9 +806,9 @@ function DestChat({ dest, isOpen }) {
       {typerWho && typerWho !== me && (
         <p className="mt-1 flex items-center gap-1 px-1 text-xs font-semibold italic text-stone-500">
           <span className="inline-flex gap-0.5">
-            <span className="h-1 w-1 animate-bounce rounded-full bg-stone-400" style={{ animationDelay: "0ms" }} />
-            <span className="h-1 w-1 animate-bounce rounded-full bg-stone-400" style={{ animationDelay: "120ms" }} />
-            <span className="h-1 w-1 animate-bounce rounded-full bg-stone-400" style={{ animationDelay: "240ms" }} />
+            <span className="h-1 w-1 typing-dot rounded-full bg-stone-400" style={{ animationDelay: "0ms" }} />
+            <span className="h-1 w-1 typing-dot rounded-full bg-stone-400" style={{ animationDelay: "120ms" }} />
+            <span className="h-1 w-1 typing-dot rounded-full bg-stone-400" style={{ animationDelay: "240ms" }} />
           </span>
           {WHO_NAME[typerWho] || "Someone"} is typing…
         </p>
@@ -1935,7 +1935,8 @@ function ItineraryView({ plans, onAddIdea }) {
   // --- drag-to-reorder (touch-friendly), with the map route updating live ---
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
-    useSensor(TouchSensor, { activationConstraint: { delay: 200, tolerance: 8 } })
+    useSensor(TouchSensor, { activationConstraint: { delay: 200, tolerance: 8 } }),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
   );
   const [dragPreview, setDragPreview] = useState(null); // [ids] during a drag
   const dragStart = useRef([]);

@@ -433,3 +433,15 @@ html.aero [class*="Pixel"] { image-rendering: pixelated; }
   50%      { transform: translateY(-36px) rotate(12deg); }
 }
 @media (prefers-reduced-motion: reduce) { .aero-cloud, .aero-fish, .aero-dolphin { animation: none; } }
+
+/* --- accessibility: visible keyboard focus rings (mouse users unaffected) --- */
+:where(a, button, [role="button"], input, textarea, select, summary):focus-visible {
+  outline: 2.5px solid #a78bfa;
+  outline-offset: 2px;
+  border-radius: 6px;
+}
+html.aero :where(a, button, [role="button"]):focus-visible { outline-color: #2f86c9; }
+
+/* --- gentle typing-indicator bob (replaces dated bounce easing) --- */
+@keyframes typing-bob { 0%, 60%, 100% { transform: translateY(0); } 30% { transform: translateY(-4px); } }
+.typing-dot { animation: typing-bob 1s ease-in-out infinite; }
