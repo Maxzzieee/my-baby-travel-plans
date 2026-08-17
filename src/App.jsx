@@ -270,7 +270,7 @@ function StatRow({ icon: Icon, label, value, accent }) {
         <Icon size={16} strokeWidth={2.4} />
       </div>
       <div className="min-w-0">
-        <p className="text-[11px] font-bold uppercase tracking-wide text-stone-400">{label}</p>
+        <p className="text-xs font-bold uppercase tracking-wide text-stone-500">{label}</p>
         <p className="text-sm font-semibold text-stone-700">{value}</p>
       </div>
     </div>
@@ -301,9 +301,9 @@ function LiveWeather({ coords, accent }) {
   return (
     <div className="flex items-center justify-between rounded-2xl px-4 py-2.5" style={{ backgroundColor: accent.soft, border: `1.5px solid ${accent.border}` }}>
       <div className="flex items-center gap-2">
-        <span className="text-[10px] font-bold uppercase tracking-wide text-stone-400">Live there now</span>
-        {state.status === "loading" && <span className="text-sm font-semibold text-stone-400">fetching…</span>}
-        {state.status === "error" && <span className="text-sm font-semibold text-stone-400">offline — see planning range</span>}
+        <span className="text-xs font-bold uppercase tracking-wide text-stone-500">Live there now</span>
+        {state.status === "loading" && <span className="text-sm font-semibold text-stone-500">fetching…</span>}
+        {state.status === "error" && <span className="text-sm font-semibold text-stone-500">offline — see planning range</span>}
         {state.status === "ok" && <span className="text-sm font-extrabold" style={{ color: accent.text }}>{w.e} {state.data.temp}°C · {w.t}</span>}
       </div>
       <button onClick={load} className="rounded-full p-1.5 transition-transform hover:rotate-90 active:scale-90" style={{ color: accent.text }} aria-label="Refresh live weather">
@@ -406,12 +406,12 @@ function SavedIdea({ plan, accent, onDelete, onAddComment, onEdit, onAddToItiner
           <div className="text-xs text-stone-600"><EditText value={plan.summary || ""} onSave={(v) => onEdit(plan.id, { summary: v })} multiline placeholder="add a summary…" className="text-xs" /></div>
           {/* editable address/place → powers the itinerary map. Editing it clears
               the cached coords so the map re-geocodes from the new address. */}
-          <div className="mt-1 flex items-center gap-1 text-[11px] text-stone-500">
+          <div className="mt-1 flex items-center gap-1 text-xs text-stone-500">
             <MapPin size={11} className="flex-shrink-0" />
-            <EditText value={plan.location || ""} onSave={(v) => onEdit(plan.id, { location: v, lat: null, lng: null })} placeholder="add address / place…" className="text-[11px]" />
+            <EditText value={plan.location || ""} onSave={(v) => onEdit(plan.id, { location: v, lat: null, lng: null })} placeholder="add address / place…" className="text-xs" />
           </div>
         </div>
-        <button onClick={() => onDelete(plan.id)} className="flex-shrink-0 text-stone-300 transition-colors hover:text-rose-400" aria-label="Delete idea"><Trash2 size={14} /></button>
+        <button onClick={() => onDelete(plan.id)} className="flex-shrink-0 text-stone-400 transition-colors hover:text-rose-400" aria-label="Delete idea"><Trash2 size={14} /></button>
       </div>
 
       <div className="mt-2 flex flex-wrap gap-2">
@@ -425,14 +425,14 @@ function SavedIdea({ plan, accent, onDelete, onAddComment, onEdit, onAddToItiner
             <button onClick={() => openLightbox(allPhotos, lbBase + i)} className="block overflow-hidden rounded-xl border border-stone-200" aria-label="View photo">
               <img src={src} alt="" className="h-28 w-28 object-cover transition-transform hover:scale-105 sm:h-32 sm:w-32" />
             </button>
-            <button onClick={() => onEdit(plan.id, (x) => ({ photos: (x.photos || []).filter((s) => s !== src) }))} className="absolute -right-1.5 -top-1.5 rounded-full bg-white p-0.5 text-stone-400 shadow hover:text-rose-500" aria-label="Remove photo"><X size={12} /></button>
+            <button onClick={() => onEdit(plan.id, (x) => ({ photos: (x.photos || []).filter((s) => s !== src) }))} className="absolute -right-1.5 -top-1.5 rounded-full bg-white p-0.5 text-stone-500 shadow hover:text-rose-500" aria-label="Remove photo"><X size={12} /></button>
           </div>
         ))}
         <input ref={photoRef} type="file" accept="image/*" className="hidden" onChange={(e) => addPhoto(e.target.files?.[0])} />
-        <button onClick={() => photoRef.current?.click()} disabled={uploading} className="flex h-28 w-28 flex-col items-center justify-center gap-1 rounded-xl border-2 border-dashed border-stone-300 text-stone-400 transition-colors hover:border-rose-200 hover:text-rose-400 disabled:opacity-50 sm:h-32 sm:w-32">
+        <button onClick={() => photoRef.current?.click()} disabled={uploading} className="flex h-28 w-28 flex-col items-center justify-center gap-1 rounded-xl border-2 border-dashed border-stone-300 text-stone-500 transition-colors hover:border-rose-200 hover:text-rose-400 disabled:opacity-50 sm:h-32 sm:w-32">
           {uploading ? <Loader2 size={18} className="animate-spin" /> : <ImageIcon size={18} strokeWidth={2.2} />}
-          <span className="text-[11px] font-bold">Add photo</span>
-          <span className="text-[9px] font-semibold text-stone-300">or paste ⌘V</span>
+          <span className="text-xs font-bold">Add photo</span>
+          <span className="text-xs font-semibold text-stone-400">or paste ⌘V</span>
         </button>
       </div>
 
@@ -441,18 +441,18 @@ function SavedIdea({ plan, accent, onDelete, onAddComment, onEdit, onAddToItiner
           <li key={i} className="flex items-center gap-1.5 text-xs text-stone-500">
             <span>✨</span>
             <EditText value={a} onSave={(v) => onEdit(plan.id, { activities: acts.map((x, j) => (j === i ? v : x)) })} className="text-xs" />
-            <button onClick={() => onEdit(plan.id, { activities: acts.filter((_, j) => j !== i) })} className="text-stone-300 hover:text-rose-400" aria-label="Remove"><X size={11} /></button>
+            <button onClick={() => onEdit(plan.id, { activities: acts.filter((_, j) => j !== i) })} className="text-stone-400 hover:text-rose-400" aria-label="Remove"><X size={11} /></button>
           </li>
         ))}
         <li>
-          <button onClick={() => onEdit(plan.id, { activities: [...acts, "New idea"] })} className="flex items-center gap-1 text-[11px] font-bold text-stone-400 transition-colors hover:text-rose-400"><Plus size={11} strokeWidth={3} /> add activity</button>
+          <button onClick={() => onEdit(plan.id, { activities: [...acts, "New idea"] })} className="flex items-center gap-1 text-xs font-bold text-stone-500 transition-colors hover:text-rose-400"><Plus size={11} strokeWidth={3} /> add activity</button>
         </li>
       </ul>
 
       <div className="mt-2 flex flex-wrap items-center gap-1.5">
-        <span className="rounded-lg px-2 py-1 text-[11px] font-semibold" style={{ backgroundColor: ACCENTS.mint.soft, color: ACCENTS.mint.text }}>🎯 <EditText value={plan.want || ""} onSave={(v) => onEdit(plan.id, { want: v })} placeholder="what to do…" className="text-[11px]" /></span>
-        <span className="rounded-lg px-2 py-1 text-[11px] text-stone-500" style={{ backgroundColor: accent.soft }}>💬 <EditText value={plan.comment || ""} onSave={(v) => onEdit(plan.id, { comment: v })} placeholder="note…" className="text-[11px]" /></span>
-        {plan.sourceUrl && <a href={plan.sourceUrl} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 rounded-lg bg-stone-100 px-2 py-1 text-[11px] font-semibold text-stone-400 hover:text-rose-400"><ExternalLink size={11} /> source</a>}
+        <span className="rounded-lg px-2 py-1 text-xs font-semibold" style={{ backgroundColor: ACCENTS.mint.soft, color: ACCENTS.mint.text }}>🎯 <EditText value={plan.want || ""} onSave={(v) => onEdit(plan.id, { want: v })} placeholder="what to do…" className="text-xs" /></span>
+        <span className="rounded-lg px-2 py-1 text-xs text-stone-500" style={{ backgroundColor: accent.soft }}>💬 <EditText value={plan.comment || ""} onSave={(v) => onEdit(plan.id, { comment: v })} placeholder="note…" className="text-xs" /></span>
+        {plan.sourceUrl && <a href={plan.sourceUrl} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 rounded-lg bg-stone-100 px-2 py-1 text-xs font-semibold text-stone-500 hover:text-rose-400"><ExternalLink size={11} /> source</a>}
       </div>
 
       {/* septic-fuck rating slider */}
@@ -461,7 +461,7 @@ function SavedIdea({ plan, accent, onDelete, onAddComment, onEdit, onAddToItiner
           <img key={floater.key} src="/septic-fuck.png" alt="" className="septic-float pointer-events-none absolute bottom-2 left-1/2 z-10 object-contain" style={{ width: 22 + floater.v * 22 }} />
         )}
         <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5">
-          <span className="text-[10px] font-bold uppercase tracking-wide text-stone-400">Septic rating</span>
+          <span className="text-xs font-bold uppercase tracking-wide text-stone-500">Septic rating</span>
           <div className="flex items-end gap-1">
             {[1, 2, 3, 4, 5].map((n) => {
               const active = (drag ?? myRating) >= n;
@@ -480,7 +480,7 @@ function SavedIdea({ plan, accent, onDelete, onAddComment, onEdit, onAddToItiner
             className="h-1.5 min-w-[110px] flex-1 cursor-pointer accent-emerald-400"
             aria-label="Rate 1 to 5 septic fucks"
           />
-          <span className="flex items-center gap-1.5 text-[10px] font-bold text-stone-400">
+          <span className="flex items-center gap-1.5 text-xs font-bold text-stone-500">
             {myRating > 0 && <>{WHO_NAME[me]}: {drag ?? myRating}</>}
             {partnerRating > 0 && <span className="flex items-center gap-0.5">{WHO_NAME[partnerKey]}: {partnerRating}<img src="/septic-fuck.png" alt="" className="w-4 object-contain" /></span>}
           </span>
@@ -490,18 +490,18 @@ function SavedIdea({ plan, accent, onDelete, onAddComment, onEdit, onAddToItiner
       {hasSupabase && (
         <div className="mt-2">
           {addedDay != null ? (
-            <span className="inline-flex items-center gap-1 rounded-lg bg-emerald-50 px-2.5 py-1.5 text-[11px] font-extrabold text-emerald-600"><Check size={12} strokeWidth={3} /> Added to Day {addedDay + 1} · {dayLabel(addedDay)}</span>
+            <span className="inline-flex items-center gap-1 rounded-lg bg-emerald-50 px-2.5 py-1.5 text-xs font-extrabold text-emerald-600"><Check size={12} strokeWidth={3} /> Added to Day {addedDay + 1} · {dayLabel(addedDay)}</span>
           ) : !showDays ? (
-            <button onClick={() => setShowDays(true)} className="inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-[11px] font-extrabold transition-colors" style={{ backgroundColor: accent.soft, color: accent.text }}>
+            <button onClick={() => setShowDays(true)} className="inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-extrabold transition-colors" style={{ backgroundColor: accent.soft, color: accent.text }}>
               <CalendarDays size={12} strokeWidth={2.8} /> Add to itinerary
             </button>
           ) : (
             <div className="flex flex-wrap items-center gap-1">
-              <span className="mr-1 text-[10px] font-bold uppercase text-stone-400">Which day?</span>
+              <span className="mr-1 text-xs font-bold uppercase text-stone-500">Which day?</span>
               {Array.from({ length: TRIP_DAYS }).map((_, dd) => (
-                <button key={dd} onClick={() => pickDay(dd)} title={dayLabel(dd)} className="rounded-md px-2 py-1 text-[11px] font-extrabold transition-transform hover:scale-110" style={{ backgroundColor: accent.soft, color: accent.text }}>{dd + 1}</button>
+                <button key={dd} onClick={() => pickDay(dd)} title={dayLabel(dd)} className="rounded-md px-2 py-1 text-xs font-extrabold transition-transform hover:scale-110" style={{ backgroundColor: accent.soft, color: accent.text }}>{dd + 1}</button>
               ))}
-              <button onClick={() => setShowDays(false)} className="ml-1 text-stone-300 hover:text-rose-400" aria-label="Cancel"><X size={12} /></button>
+              <button onClick={() => setShowDays(false)} className="ml-1 text-stone-400 hover:text-rose-400" aria-label="Cancel"><X size={12} /></button>
             </div>
           )}
         </div>
@@ -509,14 +509,14 @@ function SavedIdea({ plan, accent, onDelete, onAddComment, onEdit, onAddToItiner
 
       {/* comment thread */}
       <div className="mt-3 border-t border-stone-100 pt-2.5">
-        <p className="flex items-center gap-1 text-[10px] font-bold uppercase tracking-wide text-stone-400"><MessageCircle size={11} strokeWidth={2.8} /> Comments{comments.length > 0 ? ` (${comments.length})` : ""}</p>
+        <p className="flex items-center gap-1 text-xs font-bold uppercase tracking-wide text-stone-500"><MessageCircle size={11} strokeWidth={2.8} /> Comments{comments.length > 0 ? ` (${comments.length})` : ""}</p>
         {comments.length > 0 && (
           <div className="mt-2 space-y-1.5">
             {comments.map((c) => {
               const ca = c.who === "baby" ? ACCENTS.blush : ACCENTS.winter;
               return (
                 <div key={c.id} className="flex items-start gap-1.5 text-xs">
-                  <span className="mt-0.5 rounded-md px-1.5 py-0.5 text-[10px] font-extrabold" style={{ backgroundColor: ca.soft, color: ca.text }}>{WHO_NAME[c.who] || "?"}</span>
+                  <span className="mt-0.5 rounded-md px-1.5 py-0.5 text-xs font-extrabold" style={{ backgroundColor: ca.soft, color: ca.text }}>{WHO_NAME[c.who] || "?"}</span>
                   <span className="text-stone-600">{c.text}</span>
                 </div>
               );
@@ -630,7 +630,7 @@ function IdeaBoard({ dest, plans, onAdd, onDelete, onAddComment, onEdit, onAddTo
       <p className="flex items-center gap-1.5 text-xs font-extrabold uppercase tracking-wide" style={{ color: accent.text }}>
         <NotebookPen size={14} strokeWidth={2.8} /> Idea Board · {dest.name}
       </p>
-      <p className="mt-1 text-xs text-stone-400">Paste a link or drop a screenshot — AI scrubs it into a clean plan pinned here.</p>
+      <p className="mt-1 text-xs text-stone-500">Paste a link or drop a screenshot — AI scrubs it into a clean plan pinned here.</p>
 
       {/* tabs */}
       <div className="mt-3 flex flex-wrap gap-2">
@@ -657,7 +657,7 @@ function IdeaBoard({ dest, plans, onAdd, onDelete, onAddComment, onEdit, onAddTo
       {mode === "screenshot" && (
         <div className="mt-3 outline-none" tabIndex={0} onPaste={(e) => { const f = imageFromPaste(e); if (f) { e.preventDefault(); readScreenshot(f); } }}>
           <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={(e) => readScreenshot(e.target.files?.[0])} />
-          <button onClick={() => fileRef.current?.click()} disabled={busy} className="flex w-full flex-col items-center justify-center gap-1.5 rounded-xl border-2 border-dashed border-stone-300 bg-stone-50/60 px-4 py-5 text-stone-400 transition-colors hover:border-rose-200 hover:text-rose-400 disabled:opacity-60">
+          <button onClick={() => fileRef.current?.click()} disabled={busy} className="flex w-full flex-col items-center justify-center gap-1.5 rounded-xl border-2 border-dashed border-stone-300 bg-stone-50/60 px-4 py-5 text-stone-500 transition-colors hover:border-rose-200 hover:text-rose-400 disabled:opacity-60">
             {busy ? <Loader2 size={20} className="animate-spin" /> : <ImageIcon size={20} strokeWidth={2.2} />}
             <span className="text-sm font-bold">{busy ? "Scrubbing screenshot…" : "Upload or paste a screenshot"}</span>
           </button>
@@ -674,20 +674,20 @@ function IdeaBoard({ dest, plans, onAdd, onDelete, onAddComment, onEdit, onAddTo
       {/* editable draft */}
       {hasDraft && (
         <div className="mt-4 space-y-3 rounded-xl border-2 border-stone-100 bg-stone-50/50 p-3 outline-none" tabIndex={0} onPaste={(e) => { const f = imageFromPaste(e); if (f) { e.preventDefault(); e.stopPropagation(); addPhoto(f); } }}>
-          <p className="text-[10px] font-semibold text-stone-300">Tip: paste ⌘V to drop an image straight in</p>
+          <p className="text-xs font-semibold text-stone-400">Tip: paste ⌘V to drop an image straight in</p>
           {/* photos */}
           <div className="flex flex-wrap gap-2">
             {draft.thumb && <img src={draft.thumb} alt="" className="h-20 w-20 rounded-lg border border-stone-200 object-cover" />}
             {(draft.photos || []).map((src, i) => (
               <div key={i} className="relative">
                 <img src={src} alt="" className="h-20 w-20 rounded-lg border border-stone-200 object-cover" />
-                <button onClick={() => setDraft({ ...draft, photos: draft.photos.filter((_, j) => j !== i) })} className="absolute -right-1.5 -top-1.5 rounded-full bg-white p-0.5 text-stone-400 shadow hover:text-rose-500"><X size={12} /></button>
+                <button onClick={() => setDraft({ ...draft, photos: draft.photos.filter((_, j) => j !== i) })} className="absolute -right-1.5 -top-1.5 rounded-full bg-white p-0.5 text-stone-500 shadow hover:text-rose-500"><X size={12} /></button>
               </div>
             ))}
             <input ref={photoRef} type="file" accept="image/*" className="hidden" onChange={(e) => addPhoto(e.target.files?.[0])} />
-            <button onClick={() => photoRef.current?.click()} disabled={busy} className="flex h-20 w-20 flex-col items-center justify-center gap-1 rounded-lg border-2 border-dashed border-stone-300 text-stone-400 transition-colors hover:border-rose-200 hover:text-rose-400 disabled:opacity-50">
+            <button onClick={() => photoRef.current?.click()} disabled={busy} className="flex h-20 w-20 flex-col items-center justify-center gap-1 rounded-lg border-2 border-dashed border-stone-300 text-stone-500 transition-colors hover:border-rose-200 hover:text-rose-400 disabled:opacity-50">
               {busy ? <Loader2 size={16} className="animate-spin" /> : <ImageIcon size={16} strokeWidth={2.2} />}
-              <span className="text-[10px] font-bold">Add photo</span>
+              <span className="text-xs font-bold">Add photo</span>
             </button>
           </div>
           <input value={draft.title} onChange={(e) => setDraft({ ...draft, title: e.target.value })} placeholder="Title" className="w-full rounded-lg border-2 border-stone-200 px-3 py-2 text-sm font-bold outline-none focus:border-rose-200" />
@@ -698,7 +698,7 @@ function IdeaBoard({ dest, plans, onAdd, onDelete, onAddComment, onEdit, onAddTo
                 <li key={i} className="flex items-center gap-2 text-sm">
                   <span>✨</span>
                   <input value={a} onChange={(e) => { const n = [...draft.activities]; n[i] = e.target.value; setDraft({ ...draft, activities: n }); }} className="flex-1 rounded-md border border-stone-200 px-2 py-1 text-sm outline-none focus:border-rose-200" />
-                  <button onClick={() => setDraft({ ...draft, activities: draft.activities.filter((_, j) => j !== i) })} className="text-stone-300 hover:text-rose-400"><X size={14} /></button>
+                  <button onClick={() => setDraft({ ...draft, activities: draft.activities.filter((_, j) => j !== i) })} className="text-stone-400 hover:text-rose-400"><X size={14} /></button>
                 </li>
               ))}
             </ul>
@@ -708,7 +708,7 @@ function IdeaBoard({ dest, plans, onAdd, onDelete, onAddComment, onEdit, onAddTo
             <textarea value={draft.want} onChange={(e) => setDraft({ ...draft, want: e.target.value })} rows={2} placeholder="🎯 What you want to do" className="w-full resize-y rounded-lg border-2 border-stone-200 px-3 py-2 text-sm outline-none focus:border-rose-200" />
           </div>
           <div className="flex justify-end gap-2">
-            <button onClick={reset} className="rounded-xl border-2 border-stone-200 px-3.5 py-1.5 text-sm font-extrabold text-stone-400 transition-colors hover:text-stone-600">Cancel</button>
+            <button onClick={reset} className="rounded-xl border-2 border-stone-200 px-3.5 py-1.5 text-sm font-extrabold text-stone-500 transition-colors hover:text-stone-600">Cancel</button>
             <button onClick={save} disabled={!draft.title.trim() && !draft.summary.trim()} className="flex items-center gap-1.5 rounded-xl px-3.5 py-1.5 text-sm font-extrabold transition-all hover:scale-[1.03] active:scale-95 disabled:opacity-50" style={{ backgroundColor: accent.hex, color: accent.text, border: `1.5px solid ${accent.border}` }}>
               <Plus size={15} strokeWidth={3} /> Save to {dest.name}
             </button>
@@ -774,7 +774,7 @@ function DestChat({ dest, isOpen }) {
 
   if (!hasSupabase) {
     return (
-      <div className="rounded-2xl border border-dashed border-stone-300 bg-stone-50/60 p-4 text-center text-xs text-stone-400">
+      <div className="rounded-2xl border border-dashed border-stone-300 bg-stone-50/60 p-4 text-center text-xs text-stone-500">
         💬 Live chat turns on once Supabase sync is connected.
       </div>
     );
@@ -787,14 +787,14 @@ function DestChat({ dest, isOpen }) {
       </p>
 
       <div className="mt-3 max-h-64 space-y-2 overflow-y-auto pr-1">
-        {msgs.length === 0 && <p className="py-4 text-center text-xs text-stone-400">No messages yet — say something 💕</p>}
+        {msgs.length === 0 && <p className="py-4 text-center text-xs text-stone-500">No messages yet — say something 💕</p>}
         {msgs.map((m) => {
           const mine = m.who === me;
           const wa = m.who === "baby" ? ACCENTS.blush : ACCENTS.winter;
           return (
             <div key={m.id} className={`flex ${mine ? "justify-end" : "justify-start"}`}>
               <div className={`max-w-[82%] rounded-2xl px-3 py-1.5 ${m._optimistic ? "opacity-60" : ""}`} style={{ backgroundColor: wa.soft }}>
-                <span className="mr-1.5 text-[10px] font-extrabold" style={{ color: wa.text }}>{WHO_NAME[m.who] || "?"}</span>
+                <span className="mr-1.5 text-xs font-extrabold" style={{ color: wa.text }}>{WHO_NAME[m.who] || "?"}</span>
                 <span className="text-sm text-stone-600">{m.body}</span>
               </div>
             </div>
@@ -804,7 +804,7 @@ function DestChat({ dest, isOpen }) {
       </div>
 
       {typerWho && typerWho !== me && (
-        <p className="mt-1 flex items-center gap-1 px-1 text-[11px] font-semibold italic text-stone-400">
+        <p className="mt-1 flex items-center gap-1 px-1 text-xs font-semibold italic text-stone-500">
           <span className="inline-flex gap-0.5">
             <span className="h-1 w-1 animate-bounce rounded-full bg-stone-400" style={{ animationDelay: "0ms" }} />
             <span className="h-1 w-1 animate-bounce rounded-full bg-stone-400" style={{ animationDelay: "120ms" }} />
@@ -847,16 +847,16 @@ function FlightPrices({ dest }) {
         </button>
         <a href={gf} target="_blank" rel="noreferrer" className="flex items-center gap-1 rounded-xl bg-white px-3 py-1.5 text-xs font-extrabold text-stone-500 transition-colors hover:text-rose-400" style={{ border: "1.5px solid #E7E1D8" }}><ExternalLink size={12} /> Open in Google Flights</a>
       </div>
-      {st.status === "unconfigured" && <p className="mt-2 text-xs text-stone-400">Live prices need an Amadeus key (add it in Vercel). Google Flights works now ↑</p>}
-      {st.status === "error" && <p className="mt-2 text-xs text-stone-400">Couldn't reach the price service — use Google Flights ↑ (live prices work once deployed with a key)</p>}
-      {st.status === "ok" && (!st.offers || st.offers.length === 0) && <p className="mt-2 text-xs text-stone-400">No live offers for these dates{st.note ? ` (${st.note})` : ""} — try Google Flights ↑</p>}
+      {st.status === "unconfigured" && <p className="mt-2 text-xs text-stone-500">Live prices need an Amadeus key (add it in Vercel). Google Flights works now ↑</p>}
+      {st.status === "error" && <p className="mt-2 text-xs text-stone-500">Couldn't reach the price service — use Google Flights ↑ (live prices work once deployed with a key)</p>}
+      {st.status === "ok" && (!st.offers || st.offers.length === 0) && <p className="mt-2 text-xs text-stone-500">No live offers for these dates{st.note ? ` (${st.note})` : ""} — try Google Flights ↑</p>}
       {st.status === "ok" && st.offers && st.offers.length > 0 && (
         <div className="mt-2 space-y-1.5">
-          <p className="text-[10px] font-bold uppercase tracking-wide text-stone-400">Top {st.offers.length} cheapest (round-trip)</p>
+          <p className="text-xs font-bold uppercase tracking-wide text-stone-500">Top {st.offers.length} cheapest (round-trip)</p>
           {st.offers.map((o, i) => (
             <a key={i} href={gf} target="_blank" rel="noreferrer" className="flex items-center justify-between gap-2 rounded-xl bg-white px-3 py-2 text-xs transition-transform hover:scale-[1.01]" style={{ border: "1px solid #EBE5DB" }}>
               <span className="font-bold text-stone-700">S${o.price.toFixed(0)} <span className="font-semibold text-stone-500">· {o.airlines.join(" / ")}</span></span>
-              <span className="text-[11px] text-stone-400">{o.outStops === 0 ? "direct" : o.outStops + " stop"} · 🧳 {o.bags}</span>
+              <span className="text-xs text-stone-500">{o.outStops === 0 ? "direct" : o.outStops + " stop"} · 🧳 {o.bags}</span>
             </a>
           ))}
         </div>
@@ -885,17 +885,17 @@ function PassportCard({ dest, votes, onVote, isOpen, onToggle, plans, onAddPlan,
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-2">
             {E("name", dest.name, { className: "text-lg font-extrabold text-stone-800" })}
-            {isTopPick && <span className="flex items-center gap-0.5 rounded-full bg-amber-100 px-1.5 py-0.5 text-[9px] font-extrabold uppercase text-amber-600"><Crown size={9} strokeWidth={3} fill="#FCD34D" />Top</span>}
-            {planCount > 0 && <span className="flex items-center gap-0.5 rounded-full px-1.5 py-0.5 text-[9px] font-extrabold" style={{ backgroundColor: accent.soft, color: accent.text }}><NotebookPen size={9} strokeWidth={3} />{planCount}</span>}
-            {!isOpen && unread > 0 && <span key={unread} className="flex animate-pop items-center gap-0.5 rounded-full bg-rose-500 px-1.5 py-0.5 text-[9px] font-extrabold text-white"><MessageCircle size={9} strokeWidth={3} />{unread} new</span>}
+            {isTopPick && <span className="flex items-center gap-0.5 rounded-full bg-amber-100 px-1.5 py-0.5 text-xs font-extrabold uppercase text-amber-600"><Crown size={9} strokeWidth={3} fill="#FCD34D" />Top</span>}
+            {planCount > 0 && <span className="flex items-center gap-0.5 rounded-full px-1.5 py-0.5 text-xs font-extrabold" style={{ backgroundColor: accent.soft, color: accent.text }}><NotebookPen size={9} strokeWidth={3} />{planCount}</span>}
+            {!isOpen && unread > 0 && <span key={unread} className="flex animate-pop items-center gap-0.5 rounded-full bg-rose-500 px-1.5 py-0.5 text-xs font-extrabold text-white"><MessageCircle size={9} strokeWidth={3} />{unread} new</span>}
           </div>
-          <p className="mt-0.5 text-xs text-stone-400"><span className="font-bold" style={{ color: accent.text }}>{t("flightPrice", dest.flight.price)}</span> · {t("weatherRange", dest.weather.range)} · sunset {t("sunset", dest.sunset)}</p>
+          <p className="mt-0.5 text-xs text-stone-500"><span className="font-bold" style={{ color: accent.text }}>{t("flightPrice", dest.flight.price)}</span> · {t("weatherRange", dest.weather.range)} · sunset {t("sunset", dest.sunset)}</p>
         </div>
         <div className="flex items-center gap-1 rounded-xl px-2.5 py-1.5" style={{ backgroundColor: accent.soft }}>
           <Heart size={15} strokeWidth={2.5} style={{ color: accent.text, fill: total > 0 ? accent.hex : "transparent" }} />
           <span className="text-sm font-extrabold tabular-nums" style={{ color: accent.text }}>{total}</span>
         </div>
-        <ChevronDown size={18} strokeWidth={2.8} className="text-stone-300 transition-transform duration-300" style={{ transform: isOpen ? "rotate(180deg)" : "rotate(0deg)" }} />
+        <ChevronDown size={18} strokeWidth={2.8} className="text-stone-400 transition-transform duration-300" style={{ transform: isOpen ? "rotate(180deg)" : "rotate(0deg)" }} />
       </div>
 
       {/* Expandable detail */}
@@ -904,11 +904,11 @@ function PassportCard({ dest, votes, onVote, isOpen, onToggle, plans, onAddPlan,
           <div className="space-y-4 px-5 pb-6" style={{ borderTop: `1.5px dashed ${accent.border}` }}>
             <div className="pt-4">
               <p className="text-sm italic text-stone-500">{E("tagline", dest.tagline, { multiline: true, className: "italic" })}</p>
-              <p className="mt-1 flex items-center gap-1 text-xs text-stone-400"><MapPin size={11} strokeWidth={2.6} />{E("region", dest.region, { className: "text-xs" })}</p>
+              <p className="mt-1 flex items-center gap-1 text-xs text-stone-500"><MapPin size={11} strokeWidth={2.6} />{E("region", dest.region, { className: "text-xs" })}</p>
             </div>
 
             <div>
-              <p className="mb-2 text-[11px] font-bold uppercase tracking-wide text-stone-400">Who wants it?</p>
+              <p className="mb-2 text-xs font-bold uppercase tracking-wide text-stone-500">Who wants it?</p>
               <div className="grid grid-cols-2 gap-2">
                 {["max", "partner"].map((who) => (
                   <button key={who} onClick={(e) => { e.stopPropagation(); onVote(dest.id, who); }} className="flex items-center justify-center gap-2 rounded-2xl px-3 py-2.5 transition-all hover:scale-[1.02] active:scale-95" style={{ backgroundColor: "var(--surface)", border: `1.5px solid ${accent.border}` }}>
@@ -926,7 +926,7 @@ function PassportCard({ dest, votes, onVote, isOpen, onToggle, plans, onAddPlan,
               <StatRow icon={Plane} label="Flight" value={E("flightPrice", dest.flight.price, { className: "text-sm font-semibold text-stone-700" })} accent={accent} />
               <StatRow icon={Wallet} label="Stay / night" value={E("stayPrice", dest.basecamp.price, { className: "text-sm font-semibold text-stone-700" })} accent={accent} />
             </div>
-            <p className="text-xs text-stone-400">{budget.emoji} {budget.label} · {E("carrier", dest.flight.carrier, { className: "text-xs" })} · {E("weatherLabel", dest.weather.label, { className: "text-xs" })}, {E("weatherSnow", dest.weather.snow, { multiline: true, className: "text-xs" })}</p>
+            <p className="text-xs text-stone-500">{budget.emoji} {budget.label} · {E("carrier", dest.flight.carrier, { className: "text-xs" })} · {E("weatherLabel", dest.weather.label, { className: "text-xs" })}, {E("weatherSnow", dest.weather.snow, { multiline: true, className: "text-xs" })}</p>
 
             <FlightPrices dest={dest} />
             <LiveWeather coords={dest.coords} accent={accent} />
@@ -1003,7 +1003,7 @@ function Editable({ value, onSave, className = "", rows = 4, center = true }) {
         <textarea autoFocus value={v} onChange={(e) => setV(e.target.value)} rows={rows} className="w-full resize-y rounded-2xl border-2 border-rose-200 bg-white px-3 py-2 text-sm text-stone-600 outline-none" />
         <div className={`mt-2 flex gap-2 ${center ? "justify-center" : ""}`}>
           <button onClick={() => { onSave(v.trim() || value); setEditing(false); }} className="flex items-center gap-1 rounded-full bg-rose-100 px-3 py-1.5 text-xs font-extrabold text-rose-500 transition hover:bg-rose-200"><Check size={13} strokeWidth={3} /> Save for both</button>
-          <button onClick={() => { setV(value); setEditing(false); }} className="rounded-full px-3 py-1.5 text-xs font-extrabold text-stone-400 transition hover:text-stone-600">Cancel</button>
+          <button onClick={() => { setV(value); setEditing(false); }} className="rounded-full px-3 py-1.5 text-xs font-extrabold text-stone-500 transition hover:text-stone-600">Cancel</button>
         </div>
       </div>
     );
@@ -1011,7 +1011,7 @@ function Editable({ value, onSave, className = "", rows = 4, center = true }) {
   return (
     <span className="group relative inline">
       <span className={className}>{value}</span>
-      <button onClick={() => setEditing(true)} title="Edit — saved for both of you" className="ml-1.5 inline-flex translate-y-[1px] align-middle text-stone-300 opacity-60 transition-opacity hover:text-rose-400 sm:opacity-0 sm:group-hover:opacity-100"><PenLine size={13} /></button>
+      <button onClick={() => setEditing(true)} title="Edit — saved for both of you" className="ml-1.5 inline-flex translate-y-[1px] align-middle text-stone-400 opacity-60 transition-opacity hover:text-rose-400 sm:opacity-0 sm:group-hover:opacity-100"><PenLine size={13} /></button>
     </span>
   );
 }
@@ -1035,8 +1035,8 @@ function EditText({ value, onSave, className = "", multiline = false, placeholde
   }
   return (
     <span onClick={(e) => { stop(e); setEditing(true); }} className={`cursor-text rounded px-1 py-0.5 underline decoration-dashed decoration-stone-300 underline-offset-2 transition-colors hover:bg-rose-50 hover:decoration-rose-300 ${className}`} title="Tap to edit — saved for both">
-      {value || <span className="italic text-stone-300">{placeholder}</span>}
-      <PenLine size={10} strokeWidth={2.6} className="ml-0.5 inline-block translate-y-[-1px] align-middle text-stone-300" />
+      {value || <span className="italic text-stone-400">{placeholder}</span>}
+      <PenLine size={10} strokeWidth={2.6} className="ml-0.5 inline-block translate-y-[-1px] align-middle text-stone-400" />
     </span>
   );
 }
@@ -1080,7 +1080,7 @@ function MemeWall() {
       <h2 className="flex items-center justify-center gap-2 text-center text-xl font-black text-stone-700">
         <ImageIcon size={18} strokeWidth={2.8} className="text-rose-300" /> Photos &amp; Memes
       </h2>
-      <p className="mt-1 text-center text-sm text-stone-400">Post pics &amp; silly memes — or just paste (⌘/Ctrl+V) — they pop up on both our screens in real time 💕</p>
+      <p className="mt-1 text-center text-sm text-stone-500">Post pics &amp; silly memes — or just paste (⌘/Ctrl+V) — they pop up on both our screens in real time 💕</p>
 
       <div className="mx-auto mt-5 flex max-w-2xl flex-col gap-2 rounded-3xl border-2 border-rose-100 bg-white/85 p-4 shadow-sm backdrop-blur sm:flex-row sm:items-center">
         <span className="rounded-xl px-3 py-2.5 text-sm font-extrabold" style={{ backgroundColor: (me === "baby" ? ACCENTS.blush : ACCENTS.winter).soft, color: (me === "baby" ? ACCENTS.blush : ACCENTS.winter).text }} title="Posting as you">{WHO_NAME[me]}</span>
@@ -1099,9 +1099,9 @@ function MemeWall() {
             return (
               <div key={it.id} className="group relative break-inside-avoid overflow-hidden rounded-2xl border-2 border-white bg-white shadow-sm">
                 <img src={it.url} alt={it.caption || "meme"} onClick={() => openLightbox(items.map((x) => x.url), idx)} className="w-full cursor-zoom-in object-cover" loading="lazy" />
-                <button onClick={() => deleteImage(it).then(refresh)} className="absolute right-2 top-2 rounded-full bg-white/80 p-1.5 text-stone-400 opacity-100 shadow transition-opacity hover:text-rose-500 sm:opacity-0 sm:group-hover:opacity-100" aria-label="Delete"><Trash2 size={14} /></button>
+                <button onClick={() => deleteImage(it).then(refresh)} className="absolute right-2 top-2 rounded-full bg-white/80 p-1.5 text-stone-500 opacity-100 shadow transition-opacity hover:text-rose-500 sm:opacity-0 sm:group-hover:opacity-100" aria-label="Delete"><Trash2 size={14} /></button>
                 <div className="flex items-center gap-2 px-3 py-2">
-                  <span className="rounded-md px-1.5 py-0.5 text-[10px] font-extrabold capitalize" style={{ backgroundColor: wa.soft, color: wa.text }}>{it.who || "?"}</span>
+                  <span className="rounded-md px-1.5 py-0.5 text-xs font-extrabold capitalize" style={{ backgroundColor: wa.soft, color: wa.text }}>{it.who || "?"}</span>
                   {it.caption && <span className="truncate text-xs text-stone-500">{it.caption}</span>}
                 </div>
               </div>
@@ -1213,7 +1213,7 @@ function SpinWheel() {
     <>
       <div className="mx-auto mt-3 flex max-w-md items-center justify-center gap-2 rounded-2xl border border-stone-200 bg-white/70 px-4 py-2 backdrop-blur">
         <span className="text-base">🎡</span>
-        <span className="text-xs font-extrabold uppercase tracking-wide text-stone-400">Can't decide?</span>
+        <span className="text-xs font-extrabold uppercase tracking-wide text-stone-500">Can't decide?</span>
         <button onClick={() => { setOpen(true); setWinner(null); }} className="ml-1 rounded-full px-3 py-1 text-xs font-extrabold transition-all hover:scale-105 active:scale-95" style={{ backgroundColor: ACCENTS.blush.hex, color: ACCENTS.blush.text, border: `1.5px solid ${ACCENTS.blush.border}` }}>Spin the wheel</button>
       </div>
       {open && (
@@ -1221,14 +1221,14 @@ function SpinWheel() {
           <div className="flex flex-col items-center rounded-3xl bg-white p-6 shadow-xl" onClick={(e) => e.stopPropagation()}>
             <div className="mb-1 flex w-full items-center justify-between">
               <span className="text-sm font-black text-stone-700">🎡 Where to?!</span>
-              <button onClick={() => setOpen(false)} className="text-stone-400 hover:text-rose-400" aria-label="Close"><X size={18} /></button>
+              <button onClick={() => setOpen(false)} className="text-stone-500 hover:text-rose-400" aria-label="Close"><X size={18} /></button>
             </div>
             <div className="relative mt-2" style={{ width: 260, height: 260 }}>
               <div className="absolute left-1/2 top-[-6px] z-10 -translate-x-1/2" style={{ width: 0, height: 0, borderLeft: "10px solid transparent", borderRight: "10px solid transparent", borderTop: "16px solid #E5484D" }} />
               <canvas ref={canvasRef} width={260} height={260} style={{ transform: `rotate(${rot}deg)`, transition: "transform 4.2s cubic-bezier(.15,.9,.25,1)" }} />
             </div>
             <div className="mt-4 h-8 text-center">
-              {winner ? <p className="animate-pop text-lg font-black" style={{ color: winner.accent.text }}>{winner.emoji} {winner.name}!</p> : spinning ? <p className="text-sm font-bold text-stone-400">spinning…</p> : <p className="text-sm font-bold text-stone-400">give it a spin 👇</p>}
+              {winner ? <p className="animate-pop text-lg font-black" style={{ color: winner.accent.text }}>{winner.emoji} {winner.name}!</p> : spinning ? <p className="text-sm font-bold text-stone-500">spinning…</p> : <p className="text-sm font-bold text-stone-500">give it a spin 👇</p>}
             </div>
             <button onClick={spin} disabled={spinning} className="rounded-full px-6 py-2.5 text-sm font-extrabold transition-all hover:scale-105 active:scale-95 disabled:opacity-50" style={{ backgroundColor: ACCENTS.blush.hex, color: ACCENTS.blush.text, border: `1.5px solid ${ACCENTS.blush.border}` }}>{spinning ? "…" : winner ? "Spin again" : "SPIN"}</button>
           </div>
@@ -1305,7 +1305,7 @@ function GlaggleGame({ high, onHigh }) {
       {/* high-score chip — top of the site */}
       <div className="mx-auto mt-4 flex max-w-md items-center justify-center gap-2 rounded-2xl border border-stone-200 bg-white/70 px-4 py-2 backdrop-blur">
         <img src="/glaggle.png" alt="Glaggle" className="h-6 w-6 object-contain" />
-        <span className="text-xs font-extrabold uppercase tracking-wide text-stone-400">Glaggle Game</span>
+        <span className="text-xs font-extrabold uppercase tracking-wide text-stone-500">Glaggle Game</span>
         <span className="text-sm font-extrabold text-stone-600">
           {high?.score ? <>🏆 {high.score} · {WHO_NAME[high.who] || "?"}</> : "no high score yet"}
         </span>
@@ -1316,7 +1316,7 @@ function GlaggleGame({ high, onHigh }) {
         )}
       </div>
       {ended != null && !playing && (
-        <p className="mt-1.5 text-center text-xs font-bold text-stone-400">Glaggle escaped! You scored {ended}{ended > 0 && ended >= (high?.score || 0) ? " — new high score! 🎉" : ""}</p>
+        <p className="mt-1.5 text-center text-xs font-bold text-stone-500">Glaggle escaped! You scored {ended}{ended > 0 && ended >= (high?.score || 0) ? " — new high score! 🎉" : ""}</p>
       )}
 
       {/* live game overlay */}
@@ -1326,7 +1326,7 @@ function GlaggleGame({ high, onHigh }) {
             <span className="text-sm font-extrabold text-stone-600">Score {score}</span>
             <span className={`text-sm font-extrabold tabular-nums ${timeLeft <= 3 ? "animate-pop text-rose-500" : "text-stone-500"}`} key={timeLeft}>⏱ {timeLeft}s</span>
             {score >= GLAGGLE_LOOSE_AT && <span className="text-xs font-extrabold text-rose-500">HE'S LOOSE!!</span>}
-            <button onClick={() => { setPlaying(false); setEnded(scoreRef.current); }} className="text-stone-300 hover:text-rose-400" aria-label="Give up"><X size={14} /></button>
+            <button onClick={() => { setPlaying(false); setEnded(scoreRef.current); }} className="text-stone-400 hover:text-rose-400" aria-label="Give up"><X size={14} /></button>
           </div>
           <button
             onClick={bop}
@@ -1352,12 +1352,12 @@ function BudgetRow({ item, onChange, onRemove }) {
   return (
     <div className="flex items-center gap-2">
       <input value={label} onChange={(e) => setLabel(e.target.value)} onBlur={() => label !== item.label && onChange(item.id, { label })} placeholder="e.g. Hotel, flights, food…" className="min-w-0 flex-1 rounded-lg border border-stone-200 px-2 py-1.5 text-sm outline-none focus:border-rose-200" />
-      <div className="flex items-center gap-1"><span className="text-xs font-bold text-stone-400">S$</span>
+      <div className="flex items-center gap-1"><span className="text-xs font-bold text-stone-500">S$</span>
         <input type="number" inputMode="decimal" value={amount} onChange={(e) => setAmount(e.target.value)} onBlur={() => (Number(amount) || 0) !== item.amount && onChange(item.id, { amount: Number(amount) || 0 })} className="w-16 rounded-lg border border-stone-200 px-2 py-1.5 text-sm outline-none focus:border-rose-200" /></div>
       <select value={item.who || "shared"} onChange={(e) => onChange(item.id, { who: e.target.value })} className="rounded-lg border border-stone-200 px-1 py-1.5 text-xs font-bold text-stone-500 outline-none focus:border-rose-200">
         <option value="shared">Split</option><option value="me">Me</option><option value="baby">Ants</option>
       </select>
-      <button onClick={() => onRemove(item.id)} className="text-stone-300 hover:text-rose-400" aria-label="Remove"><Trash2 size={13} /></button>
+      <button onClick={() => onRemove(item.id)} className="text-stone-400 hover:text-rose-400" aria-label="Remove"><Trash2 size={13} /></button>
     </div>
   );
 }
@@ -1368,8 +1368,8 @@ function PackingRow({ item, onToggle, onChange, onRemove }) {
   return (
     <div className="flex items-center gap-2">
       <button onClick={() => onToggle(item.id)} className="flex h-5 w-5 flex-shrink-0 items-center justify-center rounded-md border-2 transition-colors" style={{ borderColor: item.done ? ACCENTS.mint.border : "#D6D3D1", backgroundColor: item.done ? ACCENTS.mint.hex : "var(--surface)", color: ACCENTS.mint.text }}>{item.done && <Check size={12} strokeWidth={3.5} />}</button>
-      <input value={text} onChange={(e) => setText(e.target.value)} onBlur={() => text !== item.text && onChange(item.id, { text })} placeholder="item…" className={`min-w-0 flex-1 rounded-lg border border-stone-200 px-2 py-1.5 text-sm outline-none focus:border-rose-200 ${item.done ? "text-stone-400 line-through" : ""}`} />
-      <button onClick={() => onRemove(item.id)} className="text-stone-300 hover:text-rose-400" aria-label="Remove"><X size={13} /></button>
+      <input value={text} onChange={(e) => setText(e.target.value)} onBlur={() => text !== item.text && onChange(item.id, { text })} placeholder="item…" className={`min-w-0 flex-1 rounded-lg border border-stone-200 px-2 py-1.5 text-sm outline-none focus:border-rose-200 ${item.done ? "text-stone-500 line-through" : ""}`} />
+      <button onClick={() => onRemove(item.id)} className="text-stone-400 hover:text-rose-400" aria-label="Remove"><X size={13} /></button>
     </div>
   );
 }
@@ -1382,7 +1382,7 @@ function BookingRow({ item, onChange, onRemove }) {
     <div className="flex items-center gap-2">
       <input value={label} onChange={(e) => setLabel(e.target.value)} onBlur={() => label !== item.label && onChange(item.id, { label })} placeholder="e.g. Flight PNR" className="w-1/3 min-w-0 rounded-lg border border-stone-200 px-2 py-1.5 text-xs font-bold outline-none focus:border-rose-200" />
       <input value={value} onChange={(e) => setValue(e.target.value)} onBlur={() => value !== item.value && onChange(item.id, { value })} placeholder="confirmation # / details" className="min-w-0 flex-1 rounded-lg border border-stone-200 px-2 py-1.5 text-sm outline-none focus:border-rose-200" />
-      <button onClick={() => onRemove(item.id)} className="text-stone-300 hover:text-rose-400" aria-label="Remove"><Trash2 size={13} /></button>
+      <button onClick={() => onRemove(item.id)} className="text-stone-400 hover:text-rose-400" aria-label="Remove"><Trash2 size={13} /></button>
     </div>
   );
 }
@@ -1406,23 +1406,23 @@ function CurrencyCard() {
     <div className="rounded-3xl border-2 border-stone-100 bg-white/85 p-5 shadow-sm backdrop-blur">
       <div className="flex items-center justify-between">
         <h3 className="flex items-center gap-2 text-base font-black text-stone-700">💱 Currency</h3>
-        <button onClick={load} className="rounded-full p-1.5 text-stone-300 transition-transform hover:rotate-90 hover:text-rose-400" aria-label="Refresh rates"><RefreshCw size={14} strokeWidth={2.6} /></button>
+        <button onClick={load} className="rounded-full p-1.5 text-stone-400 transition-transform hover:rotate-90 hover:text-rose-400" aria-label="Refresh rates"><RefreshCw size={14} strokeWidth={2.6} /></button>
       </div>
       <div className="mt-3 flex items-center gap-2">
         <span className="text-sm font-extrabold text-stone-500">S$</span>
         <input type="number" inputMode="decimal" value={amt} onChange={(e) => setAmt(e.target.value)} className="w-28 rounded-xl border-2 border-stone-200 px-3 py-2 text-sm font-bold outline-none focus:border-rose-200" />
-        <span className="text-xs text-stone-400">SGD equals…</span>
+        <span className="text-xs text-stone-500">SGD equals…</span>
       </div>
       <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-4">
         {TARGETS.map(([code, flag, name]) => (
           <div key={code} className="rounded-2xl p-3 text-center" style={{ backgroundColor: ACCENTS.mint.soft }}>
             <div className="text-lg">{flag}</div>
             <div className="text-sm font-extrabold text-stone-700">{(((Number(amt) || 0) * (r[code] || 0))).toLocaleString(undefined, { maximumFractionDigits: 0 })}</div>
-            <div className="text-[10px] font-bold uppercase text-stone-400">{code} · {name}</div>
+            <div className="text-xs font-bold uppercase text-stone-500">{code} · {name}</div>
           </div>
         ))}
       </div>
-      <p className="mt-2 text-center text-[10px] text-stone-400">{status === "loading" ? "fetching live rates…" : status === "fallback" ? "approx rates (offline) — tap ↻ to retry" : "live rates via open.er-api.com"}</p>
+      <p className="mt-2 text-center text-xs text-stone-500">{status === "loading" ? "fetching live rates…" : status === "fallback" ? "approx rates (offline) — tap ↻ to retry" : "live rates via open.er-api.com"}</p>
     </div>
   );
 }
@@ -1449,14 +1449,14 @@ function EssentialsView({ copy, updateCopy }) {
           {budget.map((b) => (
             <BudgetRow key={b.id} item={b} onChange={(id, patch) => updateCopy("budget", budget.map((x) => (x.id === id ? { ...x, ...patch } : x)))} onRemove={(id) => updateCopy("budget", budget.filter((x) => x.id !== id))} />
           ))}
-          {budget.length === 0 && <p className="py-2 text-center text-xs text-stone-400">No costs yet — add flights, hotel, food, activities…</p>}
+          {budget.length === 0 && <p className="py-2 text-center text-xs text-stone-500">No costs yet — add flights, hotel, food, activities…</p>}
         </div>
-        <button onClick={() => updateCopy("budget", [...budget, { id: uid("b"), label: "", amount: 0, who: "shared" }])} className="mt-2 flex items-center gap-1.5 rounded-xl border-2 border-dashed border-stone-300 px-3 py-1.5 text-xs font-extrabold text-stone-400 transition-colors hover:border-rose-200 hover:text-rose-400"><Plus size={13} strokeWidth={2.8} /> Add cost</button>
+        <button onClick={() => updateCopy("budget", [...budget, { id: uid("b"), label: "", amount: 0, who: "shared" }])} className="mt-2 flex items-center gap-1.5 rounded-xl border-2 border-dashed border-stone-300 px-3 py-1.5 text-xs font-extrabold text-stone-500 transition-colors hover:border-rose-200 hover:text-rose-400"><Plus size={13} strokeWidth={2.8} /> Add cost</button>
         {total > 0 && (
           <div className="mt-3 grid grid-cols-3 gap-2 border-t border-stone-100 pt-3 text-center">
-            <div><div className="text-lg font-black text-stone-700">S${total.toLocaleString(undefined, { maximumFractionDigits: 0 })}</div><div className="text-[10px] font-bold uppercase text-stone-400">total</div></div>
-            <div style={{ color: ACCENTS.winter.text }}><div className="text-lg font-black">S${meOwe.toLocaleString(undefined, { maximumFractionDigits: 0 })}</div><div className="text-[10px] font-bold uppercase opacity-70">Me pays</div></div>
-            <div style={{ color: ACCENTS.blush.text }}><div className="text-lg font-black">S${antsOwe.toLocaleString(undefined, { maximumFractionDigits: 0 })}</div><div className="text-[10px] font-bold uppercase opacity-70">Ants pays</div></div>
+            <div><div className="text-lg font-black text-stone-700">S${total.toLocaleString(undefined, { maximumFractionDigits: 0 })}</div><div className="text-xs font-bold uppercase text-stone-500">total</div></div>
+            <div style={{ color: ACCENTS.winter.text }}><div className="text-lg font-black">S${meOwe.toLocaleString(undefined, { maximumFractionDigits: 0 })}</div><div className="text-xs font-bold uppercase opacity-70">Me pays</div></div>
+            <div style={{ color: ACCENTS.blush.text }}><div className="text-lg font-black">S${antsOwe.toLocaleString(undefined, { maximumFractionDigits: 0 })}</div><div className="text-xs font-bold uppercase opacity-70">Ants pays</div></div>
           </div>
         )}
       </div>
@@ -1465,7 +1465,7 @@ function EssentialsView({ copy, updateCopy }) {
       <div className="rounded-3xl border-2 border-stone-100 bg-white/85 p-5 shadow-sm backdrop-blur">
         <div className="flex items-center justify-between">
           <h3 className="flex items-center gap-2 text-base font-black text-stone-700">🧳 Packing</h3>
-          {packing.length > 0 && <span className="text-xs font-bold text-stone-400">{packedCount}/{packing.length} packed</span>}
+          {packing.length > 0 && <span className="text-xs font-bold text-stone-500">{packedCount}/{packing.length} packed</span>}
         </div>
         <div className="mt-3 space-y-2">
           {packing.map((p) => (
@@ -1473,7 +1473,7 @@ function EssentialsView({ copy, updateCopy }) {
           ))}
         </div>
         <div className="mt-2 flex flex-wrap gap-2">
-          <button onClick={() => updateCopy("packing", [...packing, { id: uid("p"), text: "", done: false }])} className="flex items-center gap-1.5 rounded-xl border-2 border-dashed border-stone-300 px-3 py-1.5 text-xs font-extrabold text-stone-400 transition-colors hover:border-rose-200 hover:text-rose-400"><Plus size={13} strokeWidth={2.8} /> Add item</button>
+          <button onClick={() => updateCopy("packing", [...packing, { id: uid("p"), text: "", done: false }])} className="flex items-center gap-1.5 rounded-xl border-2 border-dashed border-stone-300 px-3 py-1.5 text-xs font-extrabold text-stone-500 transition-colors hover:border-rose-200 hover:text-rose-400"><Plus size={13} strokeWidth={2.8} /> Add item</button>
           {packing.length === 0 && <button onClick={() => updateCopy("packing", PACKING_PRESET.map((t) => ({ id: uid("p"), text: t, done: false })))} className="rounded-xl px-3 py-1.5 text-xs font-extrabold" style={{ backgroundColor: ACCENTS.mint.soft, color: ACCENTS.mint.text }}>✨ Start with a winter list</button>}
         </div>
       </div>
@@ -1481,14 +1481,14 @@ function EssentialsView({ copy, updateCopy }) {
       {/* Booking vault */}
       <div className="rounded-3xl border-2 border-stone-100 bg-white/85 p-5 shadow-sm backdrop-blur">
         <h3 className="flex items-center gap-2 text-base font-black text-stone-700">🔑 Booking vault</h3>
-        <p className="mt-0.5 text-xs text-stone-400">Flight PNRs, hotel confirmations, e-sim codes — kept together, synced.</p>
+        <p className="mt-0.5 text-xs text-stone-500">Flight PNRs, hotel confirmations, e-sim codes — kept together, synced.</p>
         <div className="mt-3 space-y-2">
           {bookings.map((bk) => (
             <BookingRow key={bk.id} item={bk} onChange={(id, patch) => updateCopy("bookings", bookings.map((x) => (x.id === id ? { ...x, ...patch } : x)))} onRemove={(id) => updateCopy("bookings", bookings.filter((x) => x.id !== id))} />
           ))}
-          {bookings.length === 0 && <p className="py-2 text-center text-xs text-stone-400">Nothing saved yet.</p>}
+          {bookings.length === 0 && <p className="py-2 text-center text-xs text-stone-500">Nothing saved yet.</p>}
         </div>
-        <button onClick={() => updateCopy("bookings", [...bookings, { id: uid("k"), label: "", value: "" }])} className="mt-2 flex items-center gap-1.5 rounded-xl border-2 border-dashed border-stone-300 px-3 py-1.5 text-xs font-extrabold text-stone-400 transition-colors hover:border-rose-200 hover:text-rose-400"><Plus size={13} strokeWidth={2.8} /> Add booking</button>
+        <button onClick={() => updateCopy("bookings", [...bookings, { id: uid("k"), label: "", value: "" }])} className="mt-2 flex items-center gap-1.5 rounded-xl border-2 border-dashed border-stone-300 px-3 py-1.5 text-xs font-extrabold text-stone-500 transition-colors hover:border-rose-200 hover:text-rose-400"><Plus size={13} strokeWidth={2.8} /> Add booking</button>
       </div>
 
       <CurrencyCard />
@@ -1597,10 +1597,10 @@ function StopCard({ item, index, total, selected, distanceToNext, next, image, o
     } catch (e) { setDir({ error: e?.message || "Couldn't get directions." }); } finally { setDirBusy(false); }
   };
   const badge = (
-    <span className="flex h-6 w-6 items-center justify-center rounded-full text-[11px] font-black text-white ring-2 ring-white" style={{ background: pinColor }}>{index + 1}</span>
+    <span className="flex h-6 w-6 items-center justify-center rounded-full text-xs font-black text-white ring-2 ring-white" style={{ background: pinColor }}>{index + 1}</span>
   );
   const kindChip = (
-    <span className="whitespace-nowrap rounded-full px-1.5 py-[1px] text-[9px] font-extrabold shadow-sm" style={{ background: c.soft, color: c.text }}>{meta.emoji} {meta.label}</span>
+    <span className="whitespace-nowrap rounded-full px-1.5 py-[1px] text-xs font-extrabold shadow-sm" style={{ background: c.soft, color: c.text }}>{meta.emoji} {meta.label}</span>
   );
   return (
     <div>
@@ -1622,12 +1622,12 @@ function StopCard({ item, index, total, selected, distanceToNext, next, image, o
           {!image && <div className="flex-shrink-0">{badge}</div>}
           <div className="min-w-0 flex-1 leading-tight">
             <div className="flex items-center gap-1">
-              {item.start_time && <span className="flex-shrink-0 text-[10px] font-bold" style={{ color: c.text }}>{item.start_time}</span>}
+              {item.start_time && <span className="flex-shrink-0 text-xs font-bold" style={{ color: c.text }}>{item.start_time}</span>}
               <span className="truncate text-[13px] font-extrabold text-stone-800" title={item.title || ""}>{readable(item.title) || "Untitled stop"}</span>
               {!image && <span className="flex-shrink-0">{kindChip}</span>}
             </div>
             {item.place && (
-              <div className="flex items-center gap-0.5 text-[10px] text-stone-500">
+              <div className="flex items-center gap-0.5 text-xs text-stone-500">
                 <MapPin size={10} className="flex-shrink-0" /> <span className="truncate" title={item.place}>{hasHangul(item.place) ? enPlaceLine(item.place) : item.place}</span>
                 {noGeo && <span className="flex-shrink-0 text-amber-500">· locating…</span>}
               </div>
@@ -1640,7 +1640,7 @@ function StopCard({ item, index, total, selected, distanceToNext, next, image, o
       </div>
       {distanceToNext && (
         <div className="ml-3.5 py-1">
-          <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[10px] font-semibold text-stone-400">
+          <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs font-semibold text-stone-500">
             <span className="flex items-center gap-1"><Navigation size={10} /> {distanceToNext}</span>
             {next && (item.lat != null || item.place) && (next.lat != null || next.place) && (
               <button onClick={getDirections} className="flex items-center gap-1 rounded-full border border-stone-200 bg-white px-2 py-0.5 font-bold text-stone-500 transition-colors hover:border-sky-300 hover:text-sky-600">
@@ -1657,19 +1657,19 @@ function StopCard({ item, index, total, selected, distanceToNext, next, image, o
           </div>
           {dir && !dir.error && (
             <div className="mt-1.5 max-w-md rounded-xl border border-sky-100 bg-sky-50/60 p-2.5">
-              <p className="text-[11px] font-black text-sky-700">🚇 {dir.summary}{dir.totalMinutes ? ` · ~${dir.totalMinutes} min` : ""}</p>
+              <p className="text-xs font-black text-sky-700">🚇 {dir.summary}{dir.totalMinutes ? ` · ~${dir.totalMinutes} min` : ""}</p>
               <ol className="mt-1.5 space-y-1">
                 {(dir.steps || []).map((s, i) => (
-                  <li key={i} className="flex items-start gap-1.5 text-[11px] leading-snug text-stone-600">
+                  <li key={i} className="flex items-start gap-1.5 text-xs leading-snug text-stone-600">
                     <span className="flex-shrink-0">{DIR_ICON[s.mode] || "•"}</span>
-                    <span className="min-w-0"><span className="font-semibold">{s.text}</span>{s.minutes ? <span className="text-stone-400"> · {s.minutes} min</span> : null}</span>
+                    <span className="min-w-0"><span className="font-semibold">{s.text}</span>{s.minutes ? <span className="text-stone-500"> · {s.minutes} min</span> : null}</span>
                   </li>
                 ))}
               </ol>
-              <p className="mt-1.5 text-[9px] text-stone-400">AI estimate — double-check live times in Naver Map / KakaoMap.</p>
+              <p className="mt-1.5 text-xs text-stone-500">AI estimate — double-check live times in Naver Map / KakaoMap.</p>
             </div>
           )}
-          {dir && dir.error && <p className="mt-1 text-[10px] font-bold text-rose-400">⚠️ {dir.error}</p>}
+          {dir && dir.error && <p className="mt-1 text-xs font-bold text-rose-400">⚠️ {dir.error}</p>}
         </div>
       )}
     </div>
@@ -1716,7 +1716,7 @@ function ItemEditor({ item, onUpdate, onRemove, onClose }) {
             const active = item.kind === k.kind;
             const c = KIND_COLOR[k.kind];
             return (
-              <button key={k.kind} onClick={() => onUpdate(item.id, { kind: k.kind })} className="flex flex-1 flex-col items-center gap-1 rounded-xl px-2 py-2 text-[10px] font-extrabold transition-all" style={{ backgroundColor: active ? c.hex : "var(--surface)", color: active ? c.text : "#A8A29E", border: `1.5px solid ${active ? c.border : "#E7E1D8"}` }}>
+              <button key={k.kind} onClick={() => onUpdate(item.id, { kind: k.kind })} className="flex flex-1 flex-col items-center gap-1 rounded-xl px-2 py-2 text-xs font-extrabold transition-all" style={{ backgroundColor: active ? c.hex : "var(--surface)", color: active ? c.text : "#A8A29E", border: `1.5px solid ${active ? c.border : "#E7E1D8"}` }}>
                 <k.icon size={15} strokeWidth={2.6} /> {KIND_META[k.kind].label}
               </button>
             );
@@ -1728,11 +1728,11 @@ function ItemEditor({ item, onUpdate, onRemove, onClose }) {
             {Array.from({ length: TRIP_DAYS }).map((_, dd) => (<option key={dd} value={dd}>Day {dd + 1} · {dayLabel(dd)}</option>))}
           </select>
           <input type="time" value={item.start_time || ""} onChange={(e) => onUpdate(item.id, { start_time: e.target.value })} className="rounded-xl border-2 border-stone-200 px-2 py-1.5 text-xs outline-none focus:border-rose-200" />
-          <span className="text-xs font-bold text-stone-400">→</span>
+          <span className="text-xs font-bold text-stone-500">→</span>
           <input type="time" value={item.end_time || ""} onChange={(e) => onUpdate(item.id, { end_time: e.target.value })} className="rounded-xl border-2 border-stone-200 px-2 py-1.5 text-xs outline-none focus:border-rose-200" />
         </div>
         <div className="flex items-center gap-1.5">
-          <MapPin size={13} className="flex-shrink-0 text-stone-400" />
+          <MapPin size={13} className="flex-shrink-0 text-stone-500" />
           <input defaultValue={item.place || ""} onBlur={(e) => e.target.value !== (item.place || "") && onUpdate(item.id, { place: e.target.value })} placeholder="address / place (powers the movement map)" className="w-full rounded-xl border-2 border-stone-200 px-3 py-2 text-xs outline-none focus:border-rose-200" />
         </div>
         <textarea defaultValue={item.notes || ""} onBlur={(e) => e.target.value !== (item.notes || "") && onUpdate(item.id, { notes: e.target.value })} placeholder="notes…" rows={2} className="w-full resize-y rounded-xl border-2 border-stone-200 px-3 py-2 text-xs outline-none focus:border-rose-200" />
@@ -1959,7 +1959,7 @@ function ItineraryView({ plans, onAddIdea }) {
   if (!hasSupabase) {
     return (
       <section className="mt-8">
-        <div className="mx-auto max-w-2xl rounded-3xl border border-dashed border-stone-300 bg-white/70 p-8 text-center text-sm text-stone-400">🗓️ The trip planner turns on once Supabase sync is connected.</div>
+        <div className="mx-auto max-w-2xl rounded-3xl border border-dashed border-stone-300 bg-white/70 p-8 text-center text-sm text-stone-500">🗓️ The trip planner turns on once Supabase sync is connected.</div>
       </section>
     );
   }
@@ -1968,7 +1968,7 @@ function ItineraryView({ plans, onAddIdea }) {
     <section className="mt-8">
       <div className="text-center">
         <h2 className="text-xl font-black text-stone-700">{city.emoji} Our {city.name} Trip</h2>
-        <p className="mt-1 text-sm text-stone-400">Nov 27 – Dec 4 · build each day so it flows — add a stop and watch it pin on the map 📍</p>
+        <p className="mt-1 text-sm text-stone-500">Nov 27 – Dec 4 · build each day so it flows — add a stop and watch it pin on the map 📍</p>
         <button onClick={() => generatePlan()} className="mt-3 inline-flex items-center gap-1.5 rounded-full px-4 py-2 text-sm font-extrabold text-white shadow-sm transition-transform hover:scale-105 active:scale-95" style={{ background: "linear-gradient(135deg,#f472b6,#a78bfa)" }}>✨ Auto-plan my trip</button>
       </div>
 
@@ -1979,9 +1979,9 @@ function ItineraryView({ plans, onAddIdea }) {
           const count = items.filter((it) => it.day === dd).length;
           return (
             <button key={dd} onClick={() => { setDay(dd); setSelected(null); }} className="flex-shrink-0 rounded-2xl px-3 py-2 text-center transition-all" style={{ backgroundColor: active ? accent.hex : "var(--surface)", border: `1.5px solid ${active ? accent.border : "#E7E1D8"}`, color: active ? accent.text : "#A8A29E" }}>
-              <div className="text-[10px] font-bold uppercase">Day {dd + 1}</div>
+              <div className="text-xs font-bold uppercase">Day {dd + 1}</div>
               <div className="text-xs font-extrabold">{dayLabel(dd)}</div>
-              <div className="text-[9px] font-bold opacity-70">{count > 0 ? `${count} stop${count > 1 ? "s" : ""}` : "—"}</div>
+              <div className="text-xs font-bold opacity-70">{count > 0 ? `${count} stop${count > 1 ? "s" : ""}` : "—"}</div>
             </button>
           );
         })}
@@ -1991,7 +1991,7 @@ function ItineraryView({ plans, onAddIdea }) {
       {!isWide && (
         <div className="mx-auto mt-3 flex w-44 gap-1 rounded-full bg-stone-100 p-1 text-xs font-extrabold">
           {[{ id: "list", label: "List", Icon: List }, { id: "map", label: "Map", Icon: MapIcon }].map((t) => (
-            <button key={t.id} onClick={() => setTab(t.id)} className={`flex flex-1 items-center justify-center gap-1 rounded-full py-1.5 transition-colors ${tab === t.id ? "bg-white text-stone-700 shadow-sm" : "text-stone-400"}`}>
+            <button key={t.id} onClick={() => setTab(t.id)} className={`flex flex-1 items-center justify-center gap-1 rounded-full py-1.5 transition-colors ${tab === t.id ? "bg-white text-stone-700 shadow-sm" : "text-stone-500"}`}>
               <t.Icon size={13} /> {t.label}
             </button>
           ))}
@@ -2003,12 +2003,12 @@ function ItineraryView({ plans, onAddIdea }) {
         {(isWide || tab === "list") && (
           <div className={isWide ? "min-w-0 flex-1" : ""}>
             {numbered.length === 0 ? (
-              <p className="rounded-2xl border border-dashed border-stone-300 bg-white/60 p-6 text-center text-sm text-stone-400">No stops yet for {dayLabel(day)}. Add one below 👇</p>
+              <p className="rounded-2xl border border-dashed border-stone-300 bg-white/60 p-6 text-center text-sm text-stone-500">No stops yet for {dayLabel(day)}. Add one below 👇</p>
             ) : (
               <>
               {dayCoords.length >= 3 && (
                 <div className="mb-2 flex flex-wrap items-center justify-end gap-2">
-                  {optMsg && <span className="text-[11px] font-bold text-emerald-600">{optMsg}</span>}
+                  {optMsg && <span className="text-xs font-bold text-emerald-600">{optMsg}</span>}
                   <button onClick={optimiseDay} className="flex items-center gap-1.5 rounded-xl border-2 border-stone-200 bg-white px-3 py-1.5 text-xs font-extrabold text-stone-500 transition-colors hover:border-violet-300 hover:text-violet-600" title="Reorder this day's stops to walk the least">
                     <Sparkles size={13} strokeWidth={2.8} /> Optimise route
                   </button>
@@ -2048,23 +2048,23 @@ function ItineraryView({ plans, onAddIdea }) {
                   <input value={linkUrl} onChange={(e) => setLinkUrl(e.target.value)} onKeyDown={(e) => e.key === "Enter" && addFromLink(linkUrl)} placeholder="paste a link…" className="flex-1 rounded-xl border-2 border-stone-200 bg-white px-3 py-2 text-sm outline-none focus:border-rose-200" />
                   <button onClick={() => addFromLink(linkUrl)} disabled={gapBusy || !linkUrl.trim()} className="flex items-center rounded-xl px-3 py-2 text-sm font-extrabold text-white transition-transform hover:scale-105 active:scale-95 disabled:opacity-50" style={{ background: "linear-gradient(135deg,#f472b6,#a78bfa)" }}>{gapBusy ? <Loader2 size={15} className="animate-spin" /> : "Add"}</button>
                 </div>
-                {gapErr && <p className="mt-2 text-[11px] font-bold text-rose-500">⚠️ {gapErr}</p>}
+                {gapErr && <p className="mt-2 text-xs font-bold text-rose-500">⚠️ {gapErr}</p>}
                 {dayCentroid && (
                   <button onClick={() => fetchSuggestions(gapKind)} disabled={gapBusy} className="mt-2 text-xs font-bold underline decoration-dashed underline-offset-2 disabled:opacity-50" style={{ color: accent.text }}>🔮 or suggest {gapKind === "food" ? "food" : "an activity"} near here</button>
                 )}
                 {suggestions && (
                   <div className="mt-2 space-y-1.5">
                     {suggestions.length === 0 ? (
-                      <p className="text-[11px] text-stone-400">Nothing found nearby — try pasting a link instead.</p>
+                      <p className="text-xs text-stone-500">Nothing found nearby — try pasting a link instead.</p>
                     ) : suggestions.map((pl, i) => (
                       <button key={i} onClick={() => addSuggestion(pl)} className="flex w-full items-center gap-2 rounded-xl border border-stone-200 bg-white p-2 text-left transition-colors hover:border-rose-200">
                         <span className="text-base">{(KIND_META[pl.kind] || KIND_META.activity).emoji}</span>
                         <span className="min-w-0 flex-1">
                           <span className="block truncate text-[12px] font-extrabold text-stone-700">{pl.en || romanize(pl.name)}</span>
-                          <span className="block truncate text-[10px] text-stone-400">{[pl.catEn || enCategory(pl.cat), enPlaceLine(pl.address)].filter(Boolean).join(" · ")}</span>
-                          <span className="block truncate text-[10px] text-stone-300">{pl.name}{pl.address ? ` · ${pl.address}` : ""}</span>
+                          <span className="block truncate text-xs text-stone-500">{[pl.catEn || enCategory(pl.cat), enPlaceLine(pl.address)].filter(Boolean).join(" · ")}</span>
+                          <span className="block truncate text-xs text-stone-400">{pl.name}{pl.address ? ` · ${pl.address}` : ""}</span>
                         </span>
-                        <Plus size={14} className="flex-shrink-0 text-stone-300" />
+                        <Plus size={14} className="flex-shrink-0 text-stone-400" />
                       </button>
                     ))}
                   </div>
@@ -2097,9 +2097,9 @@ function ItineraryView({ plans, onAddIdea }) {
                             )}
                             <span className="min-w-0 flex-1">
                               <span className="block truncate text-[12px] font-extrabold text-stone-700">{p.title || "Untitled idea"}</span>
-                              <span className="text-[10px] font-bold" style={{ color: kc.text }}>{km.emoji} {km.label}</span>
+                              <span className="text-xs font-bold" style={{ color: kc.text }}>{km.emoji} {km.label}</span>
                             </span>
-                            <Plus size={14} className="flex-shrink-0 text-stone-300" />
+                            <Plus size={14} className="flex-shrink-0 text-stone-400" />
                           </button>
                         );
                       })}
@@ -2126,29 +2126,29 @@ function ItineraryView({ plans, onAddIdea }) {
           <div className="flex max-h-[86vh] w-full max-w-lg flex-col rounded-3xl bg-white shadow-xl" onClick={(e) => e.stopPropagation()}>
             <div className="p-5 pb-3">
               <h3 className="text-lg font-black text-stone-800">✨ Recommended plan</h3>
-              <p className="mt-0.5 text-xs text-stone-400">Geo-clustered &amp; category-balanced from your pinned ideas. Fills your empty days — drag or edit anything after.</p>
+              <p className="mt-0.5 text-xs text-stone-500">Geo-clustered &amp; category-balanced from your pinned ideas. Fills your empty days — drag or edit anything after.</p>
               <div className="mt-3 flex gap-1.5">
                 {["relaxed", "balanced", "packed", "extreme"].map((d) => {
                   const active = planDensity === d;
                   const label = { relaxed: "🍃 Relaxed", balanced: "⚖️ Balanced", packed: "🔥 Packed", extreme: "💥 Extreme" }[d];
                   return (
-                    <button key={d} onClick={() => generatePlan(d)} className="flex-1 rounded-xl px-1 py-1.5 text-[11px] font-extrabold transition-all" style={{ backgroundColor: active ? accent.hex : "var(--surface)", color: active ? accent.text : "#A8A29E", border: `1.5px solid ${active ? accent.border : "#E7E1D8"}` }}>{label}</button>
+                    <button key={d} onClick={() => generatePlan(d)} className="flex-1 rounded-xl px-1 py-1.5 text-xs font-extrabold transition-all" style={{ backgroundColor: active ? accent.hex : "var(--surface)", color: active ? accent.text : "#A8A29E", border: `1.5px solid ${active ? accent.border : "#E7E1D8"}` }}>{label}</button>
                   );
                 })}
               </div>
             </div>
             <div className="min-h-0 flex-1 overflow-y-auto px-5">
               {planPreview.length === 0 ? (
-                <p className="py-8 text-center text-sm text-stone-400">No pinned ideas to plan yet — add some ideas with locations first.</p>
+                <p className="py-8 text-center text-sm text-stone-500">No pinned ideas to plan yet — add some ideas with locations first.</p>
               ) : (
                 <div className="space-y-2">
                   {planPreview.map((day, i) => (
                     <div key={i} className="rounded-xl border border-stone-200 p-2.5">
-                      <div className="text-xs font-extrabold text-stone-600">Day {i + 1} · {dayLabel(i)} <span className="font-bold text-stone-300">· {day.length} stop{day.length > 1 ? "s" : ""}</span></div>
+                      <div className="text-xs font-extrabold text-stone-600">Day {i + 1} · {dayLabel(i)} <span className="font-bold text-stone-400">· {day.length} stop{day.length > 1 ? "s" : ""}</span></div>
                       <div className="mt-1 space-y-0.5">
                         {day.map((s, j) => (
                           <div key={j} className="flex items-center gap-1.5 text-[12px] text-stone-600">
-                            {s._time && <span className="flex-shrink-0 font-bold text-stone-400">{s._time}</span>}
+                            {s._time && <span className="flex-shrink-0 font-bold text-stone-500">{s._time}</span>}
                             <span>{(KIND_META[s.kind] || KIND_META.activity).emoji}</span>
                             <span className="truncate">{s.title || "Untitled"}</span>
                           </div>
@@ -2160,7 +2160,7 @@ function ItineraryView({ plans, onAddIdea }) {
               )}
             </div>
             <div className="flex justify-end gap-2 p-5 pt-3">
-              <button onClick={() => setPlanPreview(null)} className="rounded-xl border-2 border-stone-200 px-3.5 py-2 text-sm font-extrabold text-stone-400 transition-colors hover:text-stone-600">Cancel</button>
+              <button onClick={() => setPlanPreview(null)} className="rounded-xl border-2 border-stone-200 px-3.5 py-2 text-sm font-extrabold text-stone-500 transition-colors hover:text-stone-600">Cancel</button>
               <button onClick={applyPlan} disabled={!planPreview.length} className="rounded-xl px-4 py-2 text-sm font-extrabold text-white transition-transform hover:scale-105 active:scale-95 disabled:opacity-50" style={{ background: "linear-gradient(135deg,#f472b6,#a78bfa)" }}>Apply to empty days</button>
             </div>
           </div>
@@ -2255,15 +2255,15 @@ function ConciergePanel({ plans, onAddIdea }) {
         <div className="fixed bottom-24 right-5 z-[60] flex max-h-[70vh] w-[min(92vw,380px)] flex-col overflow-hidden rounded-3xl border border-stone-200 bg-white shadow-2xl">
           <div className="flex items-center gap-2 border-b border-stone-100 px-4 py-3">
             <Sparkles size={16} className="text-violet-500" strokeWidth={2.8} />
-            <div><p className="text-sm font-black text-stone-700">Trip concierge</p><p className="text-[10px] text-stone-400">Knows your Seoul plan · ask anything</p></div>
+            <div><p className="text-sm font-black text-stone-700">Trip concierge</p><p className="text-xs text-stone-500">Knows your Seoul plan · ask anything</p></div>
           </div>
           <div ref={scroller} className="flex-1 space-y-3 overflow-y-auto px-4 py-3">
             {msgs.length === 0 && (
               <div className="space-y-2">
-                <p className="text-xs leading-relaxed text-stone-400">Hi! I know your whole itinerary. Ask me to tighten a day, find a spot, or spot what's missing. 💛</p>
+                <p className="text-xs leading-relaxed text-stone-500">Hi! I know your whole itinerary. Ask me to tighten a day, find a spot, or spot what's missing. 💛</p>
                 <div className="flex flex-wrap gap-1.5">
                   {CONCIERGE_STARTERS.map((s) => (
-                    <button key={s} onClick={() => ask(s)} className="rounded-full border border-stone-200 bg-stone-50 px-2.5 py-1 text-left text-[11px] font-bold text-stone-500 transition-colors hover:border-violet-300 hover:text-violet-600">{s}</button>
+                    <button key={s} onClick={() => ask(s)} className="rounded-full border border-stone-200 bg-stone-50 px-2.5 py-1 text-left text-xs font-bold text-stone-500 transition-colors hover:border-violet-300 hover:text-violet-600">{s}</button>
                   ))}
                 </div>
               </div>
@@ -2282,9 +2282,9 @@ function ConciergePanel({ plans, onAddIdea }) {
                         <div key={j} className="flex items-center gap-2 rounded-xl border border-stone-200 bg-white p-2">
                           <div className="min-w-0 flex-1">
                             <p className="truncate text-[12px] font-extrabold text-stone-700">{pl.name}</p>
-                            <p className="truncate text-[10px] text-stone-400">{[pl.area, pl.why].filter(Boolean).join(" · ")}</p>
+                            <p className="truncate text-xs text-stone-500">{[pl.area, pl.why].filter(Boolean).join(" · ")}</p>
                           </div>
-                          <button onClick={() => addPlace(pl)} disabled={!!added[pl.name]} className="flex flex-shrink-0 items-center gap-1 rounded-lg px-2.5 py-1 text-[11px] font-extrabold text-white disabled:opacity-70" style={{ background: added[pl.name] === "added" ? "#34C759" : "linear-gradient(135deg,#f472b6,#a78bfa)" }}>
+                          <button onClick={() => addPlace(pl)} disabled={!!added[pl.name]} className="flex flex-shrink-0 items-center gap-1 rounded-lg px-2.5 py-1 text-xs font-extrabold text-white disabled:opacity-70" style={{ background: added[pl.name] === "added" ? "#34C759" : "linear-gradient(135deg,#f472b6,#a78bfa)" }}>
                             {added[pl.name] === "adding" ? <Loader2 size={11} className="animate-spin" /> : added[pl.name] === "added" ? "✓ Added" : <><Plus size={11} strokeWidth={3} /> Add</>}
                           </button>
                         </div>
@@ -2294,7 +2294,7 @@ function ConciergePanel({ plans, onAddIdea }) {
                 </div>
               )
             ))}
-            {busy && <div className="flex justify-start"><div className="rounded-2xl bg-stone-100 px-3 py-2 text-stone-400"><Loader2 size={14} className="animate-spin" /></div></div>}
+            {busy && <div className="flex justify-start"><div className="rounded-2xl bg-stone-100 px-3 py-2 text-stone-500"><Loader2 size={14} className="animate-spin" /></div></div>}
           </div>
           <div className="flex items-center gap-2 border-t border-stone-100 p-2.5">
             <input value={input} onChange={(e) => setInput(e.target.value)} onKeyDown={(e) => e.key === "Enter" && ask()} placeholder="Ask about your trip…" className="min-w-0 flex-1 rounded-xl border-2 border-stone-200 bg-white px-3 py-2 text-sm outline-none focus:border-violet-300" />
@@ -2342,6 +2342,9 @@ export default function App() {
   const [muted, setMuted] = useState(sound.muted);
   const [dark, setDark] = useState(() => { try { const s = localStorage.getItem("site.theme"); if (s) return s === "dark"; return !!(window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches); } catch (e) { return false; } });
   useEffect(() => { try { document.documentElement.classList.toggle("dark", dark); localStorage.setItem("site.theme", dark ? "dark" : "light"); } catch (e) {} }, [dark]);
+  // 🫧 Frutiger Aero (pixel) skin — a whole-app vibe swap, mutually exclusive with dark.
+  const [aero, setAero] = useState(() => { try { return localStorage.getItem("site.aero") === "1"; } catch (e) { return false; } });
+  useEffect(() => { try { document.documentElement.classList.toggle("aero", aero); localStorage.setItem("site.aero", aero ? "1" : "0"); } catch (e) {} }, [aero]);
   // hidden easter egg — press & hold anywhere for 4s and botanicals bloom from the spot
   const [blooms, setBlooms] = useState([]);
   useEffect(() => {
@@ -2561,7 +2564,7 @@ export default function App() {
       <div className="fixed inset-0 z-50 flex items-center justify-center bg-stone-900/20 p-4 backdrop-blur-sm">
         <div className="w-full max-w-sm rounded-3xl border-2 border-rose-100 bg-white p-6 text-center shadow-xl">
           <h2 className="text-xl font-black text-stone-800">Who's on this device? 💕</h2>
-          <p className="mt-1 text-sm text-stone-400">So your messages, comments &amp; memes get tagged as you. You can switch anytime.</p>
+          <p className="mt-1 text-sm text-stone-500">So your messages, comments &amp; memes get tagged as you. You can switch anytime.</p>
           <div className="mt-5 grid grid-cols-2 gap-3">
             <button onClick={() => setMe("me")} className="rounded-2xl px-4 py-5 text-lg font-extrabold transition-transform hover:scale-[1.03] active:scale-95" style={{ backgroundColor: ACCENTS.winter.soft, color: ACCENTS.winter.text, border: `2px solid ${ACCENTS.winter.border}` }}>{WHO_NAME.me}</button>
             <button onClick={() => setMe("baby")} className="rounded-2xl px-4 py-5 text-lg font-extrabold transition-transform hover:scale-[1.03] active:scale-95" style={{ backgroundColor: ACCENTS.blush.hex, color: ACCENTS.blush.text, border: `2px solid ${ACCENTS.blush.border}` }}>{WHO_NAME.baby}</button>
@@ -2598,7 +2601,7 @@ export default function App() {
 
         {/* Live reactions dock — floats on both screens */}
         <div className="mx-auto mt-3 flex max-w-md items-center justify-center gap-1 rounded-2xl border border-stone-200 bg-white/70 px-3 py-1.5 backdrop-blur">
-          <span className="mr-1 text-[10px] font-bold uppercase tracking-wide text-stone-400">send love →</span>
+          <span className="mr-1 text-xs font-bold uppercase tracking-wide text-stone-500">send love →</span>
           {REACTIONS.map((e) => (
             <button key={e} onClick={() => sendReaction(e)} className="rounded-lg px-1.5 py-0.5 text-lg transition-transform hover:scale-125 active:scale-90" aria-label={"react " + e}>{e}</button>
           ))}
@@ -2616,7 +2619,7 @@ export default function App() {
             return (
               <button key={t.id} onClick={() => setView(t.id)} className="relative flex flex-shrink-0 items-center justify-center gap-1.5 whitespace-nowrap rounded-xl px-3 py-2 text-sm font-extrabold transition-all" style={{ backgroundColor: active ? ACCENTS.blush.hex : "transparent", color: active ? ACCENTS.blush.text : "#A8A29E" }}>
                 <t.icon size={15} strokeWidth={2.8} /> {t.label}
-                {t.id === "plan" && totalUnread > 0 && <span key={totalUnread} className="animate-pop rounded-full bg-rose-500 px-1.5 text-[10px] font-extrabold text-white">{totalUnread}</span>}
+                {t.id === "plan" && totalUnread > 0 && <span key={totalUnread} className="animate-pop rounded-full bg-rose-500 px-1.5 text-xs font-extrabold text-white">{totalUnread}</span>}
               </button>
             );
           })}
@@ -2627,7 +2630,7 @@ export default function App() {
         {/* Status bar (voting retired — the trip is booked) */}
         <div className="mx-auto mt-8 flex max-w-4xl flex-wrap items-center justify-center gap-3">
           <div className="flex items-center gap-2 rounded-2xl border border-stone-200 bg-white/70 px-4 py-2.5 backdrop-blur" title={synced ? "Both phones sync live" : "Saving on this device only"}>
-            {synced ? <Cloud size={16} strokeWidth={2.6} style={{ color: ACCENTS.mint.text }} /> : <CloudOff size={16} strokeWidth={2.6} className="text-stone-400" />}
+            {synced ? <Cloud size={16} strokeWidth={2.6} style={{ color: ACCENTS.mint.text }} /> : <CloudOff size={16} strokeWidth={2.6} className="text-stone-500" />}
             <span className="text-sm font-bold text-stone-500">{synced ? "Synced live" : "Local only"}</span>
           </div>
           {me && (
@@ -2636,11 +2639,15 @@ export default function App() {
               <span className="text-sm font-bold text-stone-500">You: {WHO_NAME[me]}</span>
             </button>
           )}
-          <button onClick={() => { setDark((d) => !d); sound.pop(); }} className="flex items-center gap-2 rounded-2xl border border-stone-200 bg-white/70 px-4 py-2.5 backdrop-blur transition-colors hover:border-rose-200" title={dark ? "Light mode" : "Dark mode"}>
-            {dark ? <Sun size={16} strokeWidth={2.6} style={{ color: "#E0A94A" }} /> : <Moon size={16} strokeWidth={2.6} className="text-stone-400" />}
+          <button onClick={() => { setDark((d) => { const n = !d; if (n) setAero(false); return n; }); sound.pop(); }} className="flex items-center gap-2 rounded-2xl border border-stone-200 bg-white/70 px-4 py-2.5 backdrop-blur transition-colors hover:border-rose-200" title={dark ? "Light mode" : "Dark mode"}>
+            {dark ? <Sun size={16} strokeWidth={2.6} style={{ color: "#E0A94A" }} /> : <Moon size={16} strokeWidth={2.6} className="text-stone-500" />}
+          </button>
+          <button onClick={() => { setAero((a) => { const n = !a; if (n) setDark(false); return n; }); sound.pop(); }} className="flex items-center gap-2 rounded-2xl border border-stone-200 bg-white/70 px-4 py-2.5 backdrop-blur transition-colors hover:border-sky-300" title={aero ? "Back to cozy theme" : "Frutiger Aero mode 🫧"}>
+            <span className="text-base leading-none">🫧</span>
+            <span className="text-sm font-bold text-stone-500">{aero ? "Aero on" : "Aero"}</span>
           </button>
           <button onClick={() => { const m = sound.toggle(); setMuted(m); if (!m) sound.pop(); }} className="flex items-center gap-2 rounded-2xl border border-stone-200 bg-white/70 px-4 py-2.5 backdrop-blur transition-colors hover:border-rose-200" title={muted ? "Sound off" : "Sound on"}>
-            {muted ? <VolumeX size={16} strokeWidth={2.6} className="text-stone-400" /> : <Volume2 size={16} strokeWidth={2.6} style={{ color: ACCENTS.mint.text }} />}
+            {muted ? <VolumeX size={16} strokeWidth={2.6} className="text-stone-500" /> : <Volume2 size={16} strokeWidth={2.6} style={{ color: ACCENTS.mint.text }} />}
             <span className="text-sm font-bold text-stone-500">{muted ? "Muted" : "Sound"}</span>
           </button>
           {hasSupabase && me && (() => {
@@ -2673,7 +2680,7 @@ export default function App() {
             <ChevronDown size={15} className={showArchive ? "" : "-rotate-90"} /> 🗄️ Archived trip ideas ({ARCHIVED_DESTS.length}) — {ARCHIVED_DESTS.map((d) => d.name).join(", ")}
           </button>
           {showArchive && (<>
-            <p className="mx-auto mt-3 max-w-xl text-center text-xs leading-relaxed text-stone-400">The maybe-someday cities from before Seoul got booked. Kept here — ideas, votes and all — in case you revisit one on another trip.</p>
+            <p className="mx-auto mt-3 max-w-xl text-center text-xs leading-relaxed text-stone-500">The maybe-someday cities from before Seoul got booked. Kept here — ideas, votes and all — in case you revisit one on another trip.</p>
             <div className="mt-5 flex justify-center"><SpinWheel /></div>
             <div className="mx-auto mt-6 max-w-3xl rounded-3xl border border-amber-100 bg-white/80 p-5 backdrop-blur">
               <div className="flex items-start gap-3">
@@ -2698,14 +2705,14 @@ export default function App() {
               <div className="mt-5 overflow-x-auto rounded-3xl border-2 border-stone-100 bg-white/85 shadow-sm backdrop-blur">
                 <table className="w-full min-w-[760px] text-left text-sm">
                   <thead>
-                    <tr className="text-[11px] uppercase tracking-wide text-stone-400">
+                    <tr className="text-xs uppercase tracking-wide text-stone-500">
                       <th className="px-5 py-4 font-extrabold">Destination</th><th className="px-4 py-4 font-extrabold">Flight</th><th className="px-4 py-4 font-extrabold">Weather</th><th className="px-4 py-4 font-extrabold">Sunset</th><th className="px-4 py-4 font-extrabold">Ideas</th><th className="px-4 py-4 font-extrabold">Me</th><th className="px-4 py-4 font-extrabold">Ants</th>
                     </tr>
                   </thead>
                   <tbody>
                     {DESTINATIONS.map((d) => (
                       <tr key={d.id} className="border-t border-stone-100 transition-colors hover:bg-stone-50/60">
-                        <td className="px-5 py-4"><span className="flex items-center gap-2 font-extrabold text-stone-700"><span className="text-lg">{d.emoji}</span> {d.name}</span><span className="text-xs text-stone-400">{d.region}</span></td>
+                        <td className="px-5 py-4"><span className="flex items-center gap-2 font-extrabold text-stone-700"><span className="text-lg">{d.emoji}</span> {d.name}</span><span className="text-xs text-stone-500">{d.region}</span></td>
                         <td className="px-4 py-4"><Pill accent={BUDGET_TONE[d.flight.budget].chip} soft={false}>{d.flight.price}</Pill></td>
                         <td className="px-4 py-4 font-semibold text-stone-600">{d.weather.range}</td>
                         <td className="px-4 py-4 font-semibold text-stone-600">{d.sunset}</td>
@@ -2731,7 +2738,7 @@ export default function App() {
 
         <ConciergePanel plans={plans} onAddIdea={(idea) => addPlan("seoul", idea)} />
 
-        <footer className="mt-12 text-center text-xs text-stone-400">
+        <footer className="mt-12 text-center text-xs text-stone-500">
           <p className="font-semibold">Made with ❄️ 🍱 🦦 🧸 ✨ for a very specific kind of cozy winter trip.</p>
           <p className="mt-1">Prices in SGD per pax · planning weather &amp; sunset for late Nov / early Dec · live temps via Open-Meteo · plan scrubbing via Claude.</p>
         </footer>
