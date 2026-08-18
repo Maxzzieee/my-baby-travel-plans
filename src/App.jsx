@@ -1577,7 +1577,7 @@ function DayMap({ stops, selectedId, onSelect }) {
 
 // One stop in the day list — number badge matches its map pin.
 const DIR_ICON = { walk: "🚶", subway: "🚇", bus: "🚌", taxi: "🚕", transfer: "🔄" };
-function StopCard({ item, index, total, selected, distanceToNext, next, image, onOpen, onMove, onSelect, onDelete, dragging }) {
+function StopCard({ item, index, total, selected, distanceToNext, next, image, onOpen, onMove, onSelect, onDelete, dragging, done, onToggleDone }) {
   const c = KIND_COLOR[item.kind] || KIND_COLOR.activity;
   const meta = KIND_META[item.kind] || KIND_META.activity;
   const noGeo = item.place && (item.lat == null || item.lng == null);
@@ -1624,7 +1624,7 @@ function StopCard({ item, index, total, selected, distanceToNext, next, image, o
           <div className="min-w-0 flex-1 leading-tight">
             <div className="flex items-center gap-1">
               {item.start_time && <span className="flex-shrink-0 text-xs font-bold" style={{ color: c.text }}>{item.start_time}</span>}
-              <span className="truncate text-[13px] font-extrabold text-stone-800" title={item.title || ""}>{readable(item.title) || "Untitled stop"}</span>
+              <span className={`truncate text-[13px] font-extrabold text-stone-800 ${done ? "line-through opacity-50" : ""}`} title={item.title || ""}>{readable(item.title) || "Untitled stop"}</span>
               {!image && <span className="flex-shrink-0">{kindChip}</span>}
             </div>
             {item.place && (
@@ -1634,6 +1634,9 @@ function StopCard({ item, index, total, selected, distanceToNext, next, image, o
               </div>
             )}
           </div>
+          {onToggleDone && (
+            <button onPointerDown={(e) => e.stopPropagation()} onClick={(e) => { e.stopPropagation(); onToggleDone(item.id); }} className={`flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl border-2 transition-colors ${done ? "border-emerald-400 bg-emerald-400 text-white" : "border-stone-200 bg-white text-stone-300 hover:border-emerald-300 hover:text-emerald-400"}`} aria-label={done ? "Done — tap to undo" : "Mark done"} title={done ? "Done ✓ (tap to undo)" : "Mark done"}><Check size={17} strokeWidth={3} /></button>
+          )}
           <a href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(((hasHangul(item.place) ? item.place.split("·")[0] : (item.title || item.place)) || "").trim())}`} target="_blank" rel="noreferrer" onPointerDown={(e) => e.stopPropagation()} onClick={(e) => e.stopPropagation()} className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl bg-sky-50 text-sky-500 transition-colors hover:bg-sky-100 hover:text-sky-700" aria-label="Look up on Google Maps" title="See what this is — opens Google Maps"><Search size={16} /></a>
           <button onPointerDown={(e) => e.stopPropagation()} onClick={(e) => { e.stopPropagation(); onOpen(item.id); }} className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl bg-stone-100 text-stone-600 transition-colors hover:bg-stone-200 hover:text-stone-800" aria-label="Edit stop" title="Edit"><PenLine size={17} /></button>
           <DeleteButton onConfirm={() => onDelete(item.id)} variant="icon-box" size={17} />
@@ -1762,6 +1765,9 @@ function ItineraryView({ plans, onAddIdea }) {
 
   const [items, setItems] = useState([]);
   const [day, setDay] = useState(0);
+  // "done" ticks for in-trip use — local to this device, no schema change
+  const [done, setDone] = useState(() => { try { return JSON.parse(localStorage.getItem(`trip.done.${dest}`) || "{}"); } catch (e) { return {}; } });
+  const toggleDone = (id) => setDone((d) => { const n = { ...d, [id]: !d[id] }; try { localStorage.setItem(`trip.done.${dest}`, JSON.stringify(n)); } catch (e) {} return n; });
   const [editing, setEditing] = useState(null);
   const [selected, setSelected] = useState(null);
   const [tab, setTab] = useState("list"); // narrow screens: list | map
@@ -1798,6 +1804,23 @@ function ItineraryView({ plans, onAddIdea }) {
 
   const dayItems = items.filter((it) => it.day === day).sort((a, b) => (a.position ?? 0) - (b.position ?? 0));
   const numbered = dayItems.map((it, i) => ({ ...it, n: i + 1 }));
+  // Which trip day is *today* (only during the trip window); drives the Today view.
+  const todayIdx = (() => {
+    const s = new Date(TRIP_START.getFullYear(), TRIP_START.getMonth(), TRIP_START.getDate());
+    const t = new Date(); t.setHours(0, 0, 0, 0);
+    const i = Math.round((t - s) / 86400000);
+    return i >= 0 && i < TRIP_DAYS ? i : -1;
+  })();
+  // Now / next for the day being viewed (live if it's actually today, else a preview).
+  const nowNext = (() => {
+    const timed = numbered.filter((s) => s.start_time).sort((a, b) => a.start_time.localeCompare(b.start_time));
+    if (day === todayIdx && timed.length) {
+      const d = new Date(); const t = `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
+      const past = timed.filter((s) => s.start_time <= t);
+      return { live: true, now: past[past.length - 1] || null, next: timed.find((s) => s.start_time > t) || null };
+    }
+    return { live: false, now: null, next: timed[0] || numbered[0] || null };
+  })();
   const addedIdeaIds = new Set(items.filter((i) => i.idea_id).map((i) => i.idea_id));
   const availIdeas = ideas.filter((p) => !addedIdeaIds.has(p.id));
   // idea_id -> its photo, so a stop can show the place's picture instead of a cryptic title
@@ -1979,7 +2002,10 @@ function ItineraryView({ plans, onAddIdea }) {
       <div className="text-center">
         <h2 className="text-xl font-black text-stone-700">{city.emoji} Our {city.name} Trip</h2>
         <p className="mt-1 text-sm text-stone-500">Nov 27 – Dec 4 · build each day so it flows — add a stop and watch it pin on the map 📍</p>
-        <button onClick={() => generatePlan()} className="mt-3 inline-flex items-center gap-1.5 rounded-full px-4 py-2 text-sm font-extrabold text-white shadow-sm transition-transform hover:scale-105 active:scale-95" style={{ background: "linear-gradient(135deg,#f472b6,#a78bfa)" }}>✨ Auto-plan my trip</button>
+        <div className="mt-3 flex flex-wrap justify-center gap-2">
+          <button onClick={() => generatePlan()} className="inline-flex items-center gap-1.5 rounded-full px-4 py-2 text-sm font-extrabold text-white shadow-sm transition-transform hover:scale-105 active:scale-95" style={{ background: "linear-gradient(135deg,#f472b6,#a78bfa)" }}>✨ Auto-plan my trip</button>
+          <button onClick={() => { setDay(todayIdx >= 0 ? todayIdx : 0); setSelected(null); setTab("list"); }} className="inline-flex items-center gap-1.5 rounded-full border-2 px-4 py-2 text-sm font-extrabold transition-transform hover:scale-105 active:scale-95" style={{ borderColor: accent.border, color: accent.text, backgroundColor: accent.soft }}>▶ {todayIdx >= 0 ? `Today · Day ${todayIdx + 1}` : "Start trip (preview)"}</button>
+        </div>
       </div>
 
       {/* day selector */}
@@ -1989,7 +2015,7 @@ function ItineraryView({ plans, onAddIdea }) {
           const count = items.filter((it) => it.day === dd).length;
           return (
             <button key={dd} onClick={() => { setDay(dd); setSelected(null); }} className="flex-shrink-0 rounded-2xl px-3 py-2 text-center transition-all" style={{ backgroundColor: active ? accent.hex : "var(--surface)", border: `1.5px solid ${active ? accent.border : "#E7E1D8"}`, color: active ? accent.text : "#A8A29E" }}>
-              <div className="text-xs font-bold uppercase">Day {dd + 1}</div>
+              <div className="text-xs font-bold uppercase">Day {dd + 1}{dd === todayIdx ? " · TODAY" : ""}</div>
               <div className="text-xs font-extrabold">{dayLabel(dd)}</div>
               <div className="text-xs font-bold opacity-70">{count > 0 ? `${count} stop${count > 1 ? "s" : ""}` : "—"}</div>
             </button>
@@ -2005,6 +2031,22 @@ function ItineraryView({ plans, onAddIdea }) {
               <t.Icon size={13} /> {t.label}
             </button>
           ))}
+        </div>
+      )}
+
+      {/* Now / Next — the glanceable in-trip banner */}
+      {numbered.length > 0 && nowNext.next && (
+        <div className="mt-3 rounded-2xl border-2 p-3" style={{ borderColor: accent.border, backgroundColor: accent.soft }}>
+          {nowNext.live ? (
+            <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
+              {nowNext.now && <span className="text-sm font-black" style={{ color: accent.text }}>▶ Now · {nowNext.now.start_time} {readable(nowNext.now.title)}</span>}
+              {nowNext.next ? <span className="text-sm font-bold text-stone-600">⏭ Next · {nowNext.next.start_time} {readable(nowNext.next.title)}</span> : <span className="text-sm font-bold text-stone-600">🎉 Last stop — enjoy!</span>}
+            </div>
+          ) : (
+            <span className="text-sm font-bold" style={{ color: accent.text }}>
+              {todayIdx >= 0 ? `Previewing Day ${day + 1}` : "Trip starts Nov 27"} · First up · {nowNext.next.start_time ? `${nowNext.next.start_time} ` : ""}{readable(nowNext.next.title)}
+            </span>
+          )}
         </div>
       )}
 
@@ -2041,6 +2083,8 @@ function ItineraryView({ plans, onAddIdea }) {
                         onMove={move}
                         onSelect={setSelected}
                         onDelete={remove}
+                        done={!!done[it.id]}
+                        onToggleDone={toggleDone}
                       />
                     ))}
                   </div>
