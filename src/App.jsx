@@ -1821,6 +1821,34 @@ function ItineraryView({ plans, onAddIdea }) {
     }
     return { live: false, now: null, next: timed[0] || numbered[0] || null };
   })();
+
+  // Printable day-by-day timeline → opens a clean page you can "Save as PDF".
+  const exportPdf = () => {
+    const esc = (s) => String(s || "").replace(/[&<>]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" }[c]));
+    const byDay = {}; for (const it of items) (byDay[it.day] ||= []).push(it);
+    const daysHtml = Object.keys(byDay).map(Number).sort((a, b) => a - b).map((d) => {
+      const rows = byDay[d].slice().sort((a, b) => (a.position ?? 0) - (b.position ?? 0)).map((s) =>
+        `<div class="stop"><span class="t">${esc(s.start_time || "—")}</span><div><div class="ti">${esc(readable(s.title) || "Untitled")}</div>${s.place ? `<div class="pl">${esc(hasHangul(s.place) ? enPlaceLine(s.place) : s.place)}</div>` : ""}${s.notes ? `<div class="nt">${esc(s.notes)}</div>` : ""}</div></div>`).join("");
+      return `<section><h2>Day ${d + 1} · ${esc(dayLabel(d))}</h2>${rows || '<p class="empty">No stops yet</p>'}</section>`;
+    }).join("");
+    const css = "body{font-family:ui-sans-serif,system-ui,'Segoe UI',sans-serif;color:#292524;max-width:640px;margin:24px auto;padding:0 20px;line-height:1.5}h1{font-size:24px;margin:0 0 2px}.sub{color:#78716c;font-size:13px;margin:0 0 20px}section{margin:0 0 18px}h2{font-size:15px;border-bottom:2px solid #f0d9cf;padding-bottom:4px;margin:0 0 8px}.stop{display:flex;gap:12px;padding:6px 0;border-bottom:1px solid #f2efeb;break-inside:avoid}.t{flex:0 0 46px;font-weight:700;color:#b45c48;font-size:13px}.ti{font-weight:700;font-size:14px}.pl{color:#78716c;font-size:12px}.nt{color:#a8a29e;font-size:12px;font-style:italic}.empty{color:#a8a29e;font-size:13px}footer{margin-top:24px;text-align:center;color:#a8a29e;font-size:12px}@media print{body{margin:0}}";
+    const html = `<!doctype html><html><head><meta charset="utf-8"><title>Our ${esc(city.name)} Trip</title><style>${css}</style></head><body><h1>${city.emoji} Our ${esc(city.name)} Trip</h1><p class="sub">Nov 27 – Dec 4, 2026 · base camp Jongno-gu</p>${daysHtml || '<p class="empty">No itinerary yet.</p>'}<footer>Me &amp; Ants ♥ · use ⌘/Ctrl+P → Save as PDF</footer></body></html>`;
+    const w = window.open("", "_blank");
+    if (!w) { alert("Please allow pop-ups to export the PDF."); return; }
+    w.document.write(html); w.document.close(); w.focus();
+    setTimeout(() => { try { w.print(); } catch (e) {} }, 400);
+  };
+
+  // One-tap JSON snapshot of the whole trip — pure insurance.
+  const exportBackup = () => {
+    const data = { exportedAt: new Date().toISOString(), trip: "seoul-2026", ideas: (plans && plans[dest]) || [], itinerary: items };
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url; a.download = `me-and-ants-seoul-backup-${new Date().toISOString().slice(0, 10)}.json`;
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 2000);
+  };
   const addedIdeaIds = new Set(items.filter((i) => i.idea_id).map((i) => i.idea_id));
   const availIdeas = ideas.filter((p) => !addedIdeaIds.has(p.id));
   // idea_id -> its photo, so a stop can show the place's picture instead of a cryptic title
@@ -2005,6 +2033,8 @@ function ItineraryView({ plans, onAddIdea }) {
         <div className="mt-3 flex flex-wrap justify-center gap-2">
           <button onClick={() => generatePlan()} className="inline-flex items-center gap-1.5 rounded-full px-4 py-2 text-sm font-extrabold text-white shadow-sm transition-transform hover:scale-105 active:scale-95" style={{ background: "linear-gradient(135deg,#f472b6,#a78bfa)" }}>✨ Auto-plan my trip</button>
           <button onClick={() => { setDay(todayIdx >= 0 ? todayIdx : 0); setSelected(null); setTab("list"); }} className="inline-flex items-center gap-1.5 rounded-full border-2 px-4 py-2 text-sm font-extrabold transition-transform hover:scale-105 active:scale-95" style={{ borderColor: accent.border, color: accent.text, backgroundColor: accent.soft }}>▶ {todayIdx >= 0 ? `Today · Day ${todayIdx + 1}` : "Start trip (preview)"}</button>
+          <button onClick={exportPdf} className="inline-flex items-center gap-1.5 rounded-full border-2 border-stone-200 bg-white px-3.5 py-2 text-xs font-extrabold text-stone-500 transition-colors hover:border-rose-300 hover:text-rose-500" title="Print / save the itinerary as a PDF">📄 Export PDF</button>
+          <button onClick={exportBackup} className="inline-flex items-center gap-1.5 rounded-full border-2 border-stone-200 bg-white px-3.5 py-2 text-xs font-extrabold text-stone-500 transition-colors hover:border-sky-300 hover:text-sky-600" title="Download a JSON backup of the whole trip">💾 Backup</button>
         </div>
       </div>
 
