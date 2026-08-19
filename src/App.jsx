@@ -411,7 +411,7 @@ function SavedIdea({ plan, accent, onDelete, onAddComment, onEdit, onAddToItiner
             <EditText value={plan.location || ""} onSave={(v) => onEdit(plan.id, { location: v, lat: null, lng: null })} placeholder="add address / place…" className="text-xs" />
           </div>
         </div>
-        <DeleteButton onConfirm={() => onDelete(plan.id)} variant="icon-soft" size={14} />
+        <DeleteButton onConfirm={() => onDelete(plan.id)} variant="icon-soft" size={17} />
       </div>
 
       <div className="mt-2 flex flex-wrap gap-2">
@@ -2480,7 +2480,7 @@ function DeleteButton({ onConfirm, variant = "icon-soft", size = 14 }) {
   }
   const base = variant === "icon-box"
     ? "flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl bg-rose-50 text-rose-500 transition-colors hover:bg-rose-100 hover:text-rose-700"
-    : "flex-shrink-0 text-stone-400 transition-colors hover:text-rose-400";
+    : "flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-lg text-stone-400 transition-colors hover:bg-rose-50 hover:text-rose-500";
   return (
     <button onPointerDown={pd} onClick={arm} className={base} aria-label="Delete" title="Delete">
       <Trash2 size={size} />
