@@ -2460,26 +2460,29 @@ function DeleteButton({ onConfirm, variant = "icon-soft", size = 14 }) {
   const [armed, setArmed] = useState(false);
   const t = useRef();
   useEffect(() => () => clearTimeout(t.current), []);
-  const fire = (e) => {
-    e.stopPropagation();
-    if (armed) { clearTimeout(t.current); setArmed(false); onConfirm(); }
-    else { setArmed(true); t.current = setTimeout(() => setArmed(false), 3000); }
-  };
+  const arm = (e) => { e.stopPropagation(); setArmed(true); clearTimeout(t.current); t.current = setTimeout(() => setArmed(false), 4000); };
+  const confirm = (e) => { e.stopPropagation(); clearTimeout(t.current); setArmed(false); onConfirm(); };
   const pd = (e) => e.stopPropagation();
-  if (variant === "text") {
+  // Armed → an unmistakable labelled "Delete?" pill so it's obvious you tap again.
+  if (armed) {
     return (
-      <button onPointerDown={pd} onClick={fire} className={`flex items-center gap-1.5 rounded-xl px-3 py-2 text-xs font-extrabold transition-colors ${armed ? "bg-rose-500 text-white" : "text-rose-400 hover:bg-rose-50"}`}>
-        <Trash2 size={size} /> {armed ? "Tap again to confirm" : "Delete"}
+      <button onPointerDown={pd} onClick={confirm} className="flex flex-shrink-0 items-center gap-1 rounded-xl bg-rose-500 px-2.5 py-2 text-xs font-extrabold text-white shadow-sm animate-pulse" title="Tap to confirm delete" aria-label="Confirm delete">
+        <Trash2 size={size} /> Delete?
       </button>
     );
   }
-  const V = {
-    "icon-soft": { base: "flex-shrink-0 text-stone-400 transition-colors hover:text-rose-400", armed: "flex-shrink-0 rounded-full bg-rose-500 p-0.5 text-white animate-pulse" },
-    "icon-box": { base: "flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl bg-rose-50 text-rose-500 transition-colors hover:bg-rose-100 hover:text-rose-700", armed: "flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl bg-rose-500 text-white animate-pulse" },
-  };
-  const s = V[variant] || V["icon-soft"];
+  if (variant === "text") {
+    return (
+      <button onPointerDown={pd} onClick={arm} className="flex items-center gap-1.5 rounded-xl px-3 py-2 text-xs font-extrabold text-rose-400 transition-colors hover:bg-rose-50">
+        <Trash2 size={size} /> Delete
+      </button>
+    );
+  }
+  const base = variant === "icon-box"
+    ? "flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl bg-rose-50 text-rose-500 transition-colors hover:bg-rose-100 hover:text-rose-700"
+    : "flex-shrink-0 text-stone-400 transition-colors hover:text-rose-400";
   return (
-    <button onPointerDown={pd} onClick={fire} className={armed ? s.armed : s.base} aria-label={armed ? "Tap again to delete" : "Delete"} title={armed ? "Tap again to delete" : "Delete"}>
+    <button onPointerDown={pd} onClick={arm} className={base} aria-label="Delete" title="Delete">
       <Trash2 size={size} />
     </button>
   );
