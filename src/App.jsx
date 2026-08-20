@@ -381,9 +381,11 @@ function SavedIdea({ plan, accent, onDelete, onAddComment, onEdit, onAddToItiner
       const res = await fetch("/api/voice", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ title: plan.title, place: plan.location, summary: plan.summary, dial }) });
       const d = await res.json().catch(() => ({}));
       if (!res.ok || d.error) throw new Error(d.error || `error ${res.status}`);
-      onEdit(plan.id, { summary: d.summary || plan.summary, activities: (d.activities && d.activities.length) ? d.activities : acts });
+      // preserve the ORIGINAL (first time only) so a cringe rewrite can be reverted
+      onEdit(plan.id, { summary: d.summary || plan.summary, activities: (d.activities && d.activities.length) ? d.activities : acts, voicedFrom: plan.voicedFrom || { summary: plan.summary || "", activities: acts } });
     } catch (e) { console.warn("[voice]", e?.message || e); } finally { setVoiceBusy(false); }
   };
+  const revertVoice = () => onEdit(plan.id, { summary: plan.voicedFrom?.summary || "", activities: plan.voicedFrom?.activities || [], voicedFrom: null });
   const photos = plan.photos || [];
   const allPhotos = [plan.thumb, ...photos].filter(Boolean);
   const lbBase = plan.thumb ? 1 : 0;
@@ -467,7 +469,8 @@ function SavedIdea({ plan, accent, onDelete, onAddComment, onEdit, onAddToItiner
         <span className="rounded-lg px-2 py-1 text-xs font-semibold" style={{ backgroundColor: ACCENTS.mint.soft, color: ACCENTS.mint.text }}>🎯 <EditText value={plan.want || ""} onSave={(v) => onEdit(plan.id, { want: v })} placeholder="what to do…" className="text-xs" /></span>
         <span className="rounded-lg px-2 py-1 text-xs text-stone-500" style={{ backgroundColor: accent.soft }}>💬 <EditText value={plan.comment || ""} onSave={(v) => onEdit(plan.id, { comment: v })} placeholder="note…" className="text-xs" /></span>
         {plan.sourceUrl && <a href={plan.sourceUrl} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 rounded-lg bg-stone-100 px-2 py-1 text-xs font-semibold text-stone-500 hover:text-rose-400"><ExternalLink size={11} /> source</a>}
-        <button onClick={voiceIt} disabled={voiceBusy} className="inline-flex items-center gap-1 rounded-lg px-2 py-1 text-xs font-extrabold text-white transition-transform hover:scale-105 active:scale-95 disabled:opacity-60" style={{ background: "linear-gradient(135deg,#f472b6,#a78bfa)" }} title="Rewrite these details in our voice">{voiceBusy ? <Loader2 size={11} className="animate-spin" /> : "🎙️"} our voice</button>
+        <button onClick={voiceIt} disabled={voiceBusy} className="inline-flex items-center gap-1 rounded-lg px-2 py-1 text-xs font-extrabold text-white transition-transform hover:scale-105 active:scale-95 disabled:opacity-60" style={{ background: "linear-gradient(135deg,#f472b6,#a78bfa)" }} title="Rewrite these details in our voice">{voiceBusy ? <Loader2 size={11} className="animate-spin" /> : "🎙️"} {plan.voicedFrom ? "re-voice" : "our voice"}</button>
+        {plan.voicedFrom && <button onClick={revertVoice} className="inline-flex items-center gap-1 rounded-lg border border-stone-200 bg-white px-2 py-1 text-xs font-extrabold text-stone-500 transition-colors hover:text-rose-500" title="Revert to the original details">↩ revert</button>}
       </div>
 
       {/* septic-fuck rating slider */}
@@ -1792,6 +1795,17 @@ function ItineraryView({ plans, onAddIdea }) {
   // "done" ticks for in-trip use — local to this device, no schema change
   const [done, setDone] = useState(() => { try { return JSON.parse(localStorage.getItem(`trip.done.${dest}`) || "{}"); } catch (e) { return {}; } });
   const toggleDone = (id) => setDone((d) => { const n = { ...d, [id]: !d[id] }; try { localStorage.setItem(`trip.done.${dest}`, JSON.stringify(n)); } catch (e) {} return n; });
+  const [myPos, setMyPos] = useState(null); // {lat,lng} — in-trip "you are here"
+  const [locating, setLocating] = useState(false);
+  const locate = () => {
+    if (!navigator.geolocation) return;
+    setLocating(true);
+    navigator.geolocation.getCurrentPosition(
+      (p) => { setMyPos({ lat: p.coords.latitude, lng: p.coords.longitude }); setLocating(false); },
+      () => setLocating(false),
+      { enableHighAccuracy: true, timeout: 8000, maximumAge: 30000 }
+    );
+  };
   const [editing, setEditing] = useState(null);
   const [selected, setSelected] = useState(null);
   const [tab, setTab] = useState("list"); // narrow screens: list | map
@@ -1845,6 +1859,15 @@ function ItineraryView({ plans, onAddIdea }) {
     }
     return { live: false, now: null, next: timed[0] || numbered[0] || null };
   })();
+  // In-trip navigation from "you are here" → next stop, + ideas near you now.
+  const nextKm = (myPos && nowNext.next && nowNext.next.lat != null) ? haversineKm(myPos, { lat: nowNext.next.lat, lng: nowNext.next.lng }) : null;
+  const nextWalkMin = nextKm != null ? Math.max(1, Math.round(nextKm * 12)) : null;
+  const leaveBy = (nextWalkMin != null && nowNext.next?.start_time) ? (() => { const [h, m] = nowNext.next.start_time.split(":").map(Number); let t = h * 60 + m - nextWalkMin; if (t < 0) t += 1440; return `${String(Math.floor(t / 60)).padStart(2, "0")}:${String(t % 60).padStart(2, "0")}`; })() : null;
+  const nearbyIdeas = (() => {
+    if (!myPos) return [];
+    const scheduled = new Set(items.map((i) => i.idea_id).filter(Boolean));
+    return ideas.filter((i) => !scheduled.has(i.id) && i.lat != null).map((i) => ({ ...i, km: haversineKm(myPos, { lat: i.lat, lng: i.lng }) })).filter((i) => i.km <= 0.7).sort((a, b) => a.km - b.km).slice(0, 3);
+  })();
 
   // Printable day-by-day timeline → opens a clean page you can "Save as PDF".
   const exportPdf = () => {
@@ -1861,6 +1884,28 @@ function ItineraryView({ plans, onAddIdea }) {
     if (!w) { alert("Please allow pop-ups to export the PDF."); return; }
     w.document.write(html); w.document.close(); w.focus();
     setTimeout(() => { try { w.print(); } catch (e) {} }, 400);
+  };
+
+  // Itinerary → .ics so it lands in the phone calendar (floating local KST time).
+  const exportIcs = () => {
+    const pad = (n) => String(n).padStart(2, "0");
+    const esc = (s) => String(s || "").replace(/([,;\\])/g, "\\$1").replace(/\n/g, " ");
+    const stamp = new Date().toISOString().replace(/[-:]/g, "").split(".")[0] + "Z";
+    const dt = (d, hhmm) => { const day = dayDate(d); const [h, m] = (hhmm || "09:00").split(":").map(Number); return `${day.getFullYear()}${pad(day.getMonth() + 1)}${pad(day.getDate())}T${pad(h)}${pad(m)}00`; };
+    const addMin = (hhmm, mins) => { const [h, m] = (hhmm || "09:00").split(":").map(Number); const t = h * 60 + m + mins; return `${pad(Math.floor(t / 60) % 24)}:${pad(t % 60)}`; };
+    const events = items.filter((it) => it.start_time).map((it) => [
+      "BEGIN:VEVENT", `UID:${it.id}@meants`, `DTSTAMP:${stamp}`,
+      `DTSTART:${dt(it.day, it.start_time)}`, `DTEND:${dt(it.day, it.end_time || addMin(it.start_time, 60))}`,
+      `SUMMARY:${esc(readable(it.title) || "Stop")}`,
+      it.place ? `LOCATION:${esc(hasHangul(it.place) ? enPlaceLine(it.place) : it.place)}` : "",
+      it.notes ? `DESCRIPTION:${esc(it.notes)}` : "",
+      "END:VEVENT",
+    ].filter(Boolean).join("\r\n"));
+    if (!events.length) { alert("Add some stops with times first — set a time on a stop via its ✏️ pencil."); return; }
+    const ics = ["BEGIN:VCALENDAR", "VERSION:2.0", "PRODID:-//Me & Ants//Seoul Trip//EN", "CALSCALE:GREGORIAN", ...events, "END:VCALENDAR"].join("\r\n");
+    const url = URL.createObjectURL(new Blob([ics], { type: "text/calendar" }));
+    const a = document.createElement("a"); a.href = url; a.download = "me-and-ants-seoul.ics"; document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 2000);
   };
 
   // One-tap JSON snapshot of the whole trip — pure insurance.
@@ -2058,6 +2103,7 @@ function ItineraryView({ plans, onAddIdea }) {
           <button onClick={() => generatePlan()} className="inline-flex items-center gap-1.5 rounded-full px-4 py-2 text-sm font-extrabold text-white shadow-sm transition-transform hover:scale-105 active:scale-95" style={{ background: "linear-gradient(135deg,#f472b6,#a78bfa)" }}>✨ Auto-plan my trip</button>
           <button onClick={() => { setDay(todayIdx >= 0 ? todayIdx : 0); setSelected(null); setTab("list"); }} className="inline-flex items-center gap-1.5 rounded-full border-2 px-4 py-2 text-sm font-extrabold transition-transform hover:scale-105 active:scale-95" style={{ borderColor: accent.border, color: accent.text, backgroundColor: accent.soft }}>▶ {todayIdx >= 0 ? `Today · Day ${todayIdx + 1}` : "Start trip (preview)"}</button>
           <button onClick={exportPdf} className="inline-flex items-center gap-1.5 rounded-full border-2 border-stone-200 bg-white px-3.5 py-2 text-xs font-extrabold text-stone-500 transition-colors hover:border-rose-300 hover:text-rose-500" title="Print / save the itinerary as a PDF">📄 Export PDF</button>
+          <button onClick={exportIcs} className="inline-flex items-center gap-1.5 rounded-full border-2 border-stone-200 bg-white px-3.5 py-2 text-xs font-extrabold text-stone-500 transition-colors hover:border-emerald-300 hover:text-emerald-600" title="Add the itinerary to your phone calendar (.ics)">📅 Calendar</button>
           <button onClick={exportBackup} className="inline-flex items-center gap-1.5 rounded-full border-2 border-stone-200 bg-white px-3.5 py-2 text-xs font-extrabold text-stone-500 transition-colors hover:border-sky-300 hover:text-sky-600" title="Download a JSON backup of the whole trip">💾 Backup</button>
         </div>
       </div>
@@ -2101,6 +2147,20 @@ function ItineraryView({ plans, onAddIdea }) {
               {todayIdx >= 0 ? `Previewing Day ${day + 1}` : "Trip starts Nov 27"} · First up · {nowNext.next.start_time ? `${nowNext.next.start_time} ` : ""}{readable(nowNext.next.title)}
             </span>
           )}
+          {/* you-are-here nav (geolocation) */}
+          <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1.5 border-t border-white/60 pt-2 text-xs">
+            <button onClick={locate} disabled={locating} className="inline-flex items-center gap-1 rounded-full bg-white px-2.5 py-1 font-extrabold text-stone-600 transition-colors hover:text-emerald-600 disabled:opacity-60">{locating ? <Loader2 size={11} className="animate-spin" /> : "📍"} where am i</button>
+            {myPos && nextKm != null && (
+              <span className="font-bold text-stone-600">→ next: {nextKm < 1 ? `${Math.round(nextKm * 1000)} m` : `${nextKm.toFixed(1)} km`} · ~{nextWalkMin} min walk{leaveBy ? ` · leave by ${leaveBy}` : ""}</span>
+            )}
+            {nearbyIdeas.length > 0 && (
+              <span className="flex flex-wrap items-center gap-1 font-bold text-stone-600">📌 near you:
+                {nearbyIdeas.map((i) => (
+                  <button key={i.id} onClick={() => addStop({ title: i.title, place: i.location || i.title, notes: i.summary || "", lat: i.lat, lng: i.lng, kind: i.kind, idea_id: i.id })} className="rounded-full border border-stone-200 bg-white px-2 py-0.5 hover:border-emerald-300 hover:text-emerald-600" title="Add to today">{readable(i.title)} +</button>
+                ))}
+              </span>
+            )}
+          </div>
         </div>
       )}
 
