@@ -378,3 +378,50 @@ export async function runPlace(q) {
     thumb, photos: thumb ? [thumb] : [],
   } } };
 }
+
+// ---------------------------------------------------------------------------
+// House voice — rewrite an idea's details in the couple's own register:
+// first-person, broken Singlish, weird/dumb/random, NOT horny, NOT Western wit.
+// Two dials. Facts stay real; the delivery goes feral.
+// ---------------------------------------------------------------------------
+const VOICE_SYSTEM =
+  "You rewrite a travel place's details in a very specific couple's private writing voice. Match the REGISTER exactly:\n" +
+  "- FIRST PERSON always ('i go', 'i see', 'i cannot', 'me n ants'). Never third-person description.\n" +
+  "- BROKEN SINGLISH GRAMMAR is mandatory — the sentence STRUCTURE must break, not just the words: drop articles + 'is/are', reduplicate (walk walk, see see), pile on particles (lah leh lor liao sia hor one ah meh), direct-translate-from-chinese phrasing ('where got', 'can already', 'die die must', 'confirm plus chop', 'so near', 'i whack u', 'cannot'), broken tense ('i eats', 'i become').\n" +
+  "- WEIRD + DUMB + RANDOM. Deadpan, low-effort, chronically-online brainrot. NOT clever/witty (no constructed metaphors, no punchlines), NOT horny/sexual, not edgy. Just genuinely random slightly-questionable thoughts ('the cat is management', 'i own nothing not even my life', 'i lie on the floor for no reason', 'wah. old.').\n" +
+  "- Keep the REAL facts (place name, area, near base, walk time, what it is) but bury them in the chaos.\n" +
+  "- Sprinkle sparingly: chaotic emoji (💀 😐 🏯), the occasional keyboard-mash when overwhelmed (e.g. HVAJKFPAOW), CAPS for random emphasis.\n" +
+  "Reference examples of the voice: 'i go 북촌한옥마을 the hanok one. wah house so old i think i also become old just by looking 🏯 i walk walk act like i own but i own nothing not even my life. got cat i think the cat is my ancestor i say hi ancestor. base so near i walk can already i cab for what, to insult my own legs meh'. Also: 'steak got that tic tac toe', 'i eats the fish over the charcoal', 'own house where got 💀'.";
+
+const VOICE_SCHEMA = {
+  type: "object",
+  properties: {
+    summary: { type: "string", description: "2-4 sentences in the house voice about THIS place. First person, broken Singlish, weird/dumb/random." },
+    activities: { type: "array", description: "3-6 very short first-person 'what to do' fragments in the same broken voice.", items: { type: "string" } },
+  },
+  required: ["summary", "activities"], additionalProperties: false,
+};
+
+export async function runVoice({ title, place, summary, dial = "max" }) {
+  const client = getClient();
+  if (!client) return { status: 500, json: { error: "AI not configured (ANTHROPIC_API_KEY missing)." } };
+  if (!title && !place && !summary) return { status: 400, json: { error: "Nothing to rewrite." } };
+  const intensity = dial === "mild"
+    ? "DIAL = MILD: light touch — a little Singlish flavour + first person, still mostly readable and sane. Keep it short."
+    : "DIAL = MAX: full feral — maximum broken grammar, particles, random dumb brainrot, keyboard-mash allowed. Go off.";
+  try {
+    const response = await client.messages.create({
+      model: MODEL, max_tokens: 700,
+      system: VOICE_SYSTEM,
+      output_config: { format: { type: "json_schema", schema: VOICE_SCHEMA }, effort: "low" },
+      messages: [{ role: "user", content:
+        `${intensity}\n\nRewrite THIS place's details in our voice:\nPLACE: ${title || "(unknown)"}${place ? `\nWHERE: ${place}` : ""}${summary ? `\nWHAT IT IS (facts to keep): ${summary}` : ""}` }],
+    });
+    if (response.stop_reason === "refusal") return { status: 422, json: { error: "Voice engine declined this one." } };
+    const textBlock = response.content.find((b) => b.type === "text");
+    const out = JSON.parse(textBlock?.text || "{}");
+    return { status: 200, json: { summary: out.summary || "", activities: Array.isArray(out.activities) ? out.activities.slice(0, 6) : [] } };
+  } catch (e) {
+    return { status: 500, json: { error: e?.message || "Voice rewrite failed." } };
+  }
+}

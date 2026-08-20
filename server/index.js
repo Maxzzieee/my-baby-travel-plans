@@ -1,7 +1,7 @@
 import express from "express";
 import cors from "cors";
 import Anthropic from "@anthropic-ai/sdk";
-import { runExtract, runSuggest, runGeocode, runDirections, runConcierge, runPlace, getClient, MODEL } from "../api/_lib/core.js";
+import { runExtract, runSuggest, runGeocode, runDirections, runConcierge, runPlace, runVoice, getClient, MODEL } from "../api/_lib/core.js";
 
 /**
  * Local dev backend for "My Baby Travel Plans". Mirrors the Vercel functions in
@@ -35,6 +35,15 @@ app.get("/api/geocode", async (req, res) => {
 app.get("/api/place", async (req, res) => {
   const { status, json } = await runPlace((req.query && req.query.q) || "");
   res.status(status).json(json);
+});
+app.post("/api/voice", async (req, res) => {
+  try {
+    const { status, json } = await runVoice(req.body || {});
+    res.status(status).json(json);
+  } catch (err) {
+    console.error("voice error:", err?.message || err);
+    res.status(500).json({ error: err?.message || "Voice rewrite failed." });
+  }
 });
 app.post("/api/directions", async (req, res) => {
   try {

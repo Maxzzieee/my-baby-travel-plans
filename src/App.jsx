@@ -370,6 +370,20 @@ function SavedIdea({ plan, accent, onDelete, onAddComment, onEdit, onAddToItiner
   };
   const comments = plan.comments || [];
   const acts = plan.activities || [];
+
+  // 🎙️ House voice — rewrite this idea's details in the couple's own register.
+  const [voiceBusy, setVoiceBusy] = useState(false);
+  const voiceIt = async () => {
+    if (voiceBusy) return;
+    setVoiceBusy(true);
+    let dial = "max"; try { dial = localStorage.getItem("site.voice.dial") || "max"; } catch (e) {}
+    try {
+      const res = await fetch("/api/voice", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ title: plan.title, place: plan.location, summary: plan.summary, dial }) });
+      const d = await res.json().catch(() => ({}));
+      if (!res.ok || d.error) throw new Error(d.error || `error ${res.status}`);
+      onEdit(plan.id, { summary: d.summary || plan.summary, activities: (d.activities && d.activities.length) ? d.activities : acts });
+    } catch (e) { console.warn("[voice]", e?.message || e); } finally { setVoiceBusy(false); }
+  };
   const photos = plan.photos || [];
   const allPhotos = [plan.thumb, ...photos].filter(Boolean);
   const lbBase = plan.thumb ? 1 : 0;
@@ -453,6 +467,7 @@ function SavedIdea({ plan, accent, onDelete, onAddComment, onEdit, onAddToItiner
         <span className="rounded-lg px-2 py-1 text-xs font-semibold" style={{ backgroundColor: ACCENTS.mint.soft, color: ACCENTS.mint.text }}>🎯 <EditText value={plan.want || ""} onSave={(v) => onEdit(plan.id, { want: v })} placeholder="what to do…" className="text-xs" /></span>
         <span className="rounded-lg px-2 py-1 text-xs text-stone-500" style={{ backgroundColor: accent.soft }}>💬 <EditText value={plan.comment || ""} onSave={(v) => onEdit(plan.id, { comment: v })} placeholder="note…" className="text-xs" /></span>
         {plan.sourceUrl && <a href={plan.sourceUrl} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 rounded-lg bg-stone-100 px-2 py-1 text-xs font-semibold text-stone-500 hover:text-rose-400"><ExternalLink size={11} /> source</a>}
+        <button onClick={voiceIt} disabled={voiceBusy} className="inline-flex items-center gap-1 rounded-lg px-2 py-1 text-xs font-extrabold text-white transition-transform hover:scale-105 active:scale-95 disabled:opacity-60" style={{ background: "linear-gradient(135deg,#f472b6,#a78bfa)" }} title="Rewrite these details in our voice">{voiceBusy ? <Loader2 size={11} className="animate-spin" /> : "🎙️"} our voice</button>
       </div>
 
       {/* septic-fuck rating slider */}
@@ -545,6 +560,9 @@ function IdeaBoard({ dest, plans, onAdd, onDelete, onAddComment, onEdit, onAddTo
   const [error, setError] = useState("");
   const fileRef = useRef(null);
   const photoRef = useRef(null);
+  // Global house-voice dial (mild ↔ unhinged) for the "🎙️ our voice" buttons.
+  const [voiceDial, setVoiceDial] = useState(() => { try { return localStorage.getItem("site.voice.dial") || "max"; } catch (e) { return "max"; } });
+  const setDial = (v) => { setVoiceDial(v); try { localStorage.setItem("site.voice.dial", v); } catch (e) {} };
 
   const reset = () => { setDraft(EMPTY_DRAFT); setHasDraft(false); setUrl(""); setError(""); };
 
@@ -719,6 +737,12 @@ function IdeaBoard({ dest, plans, onAdd, onDelete, onAddComment, onEdit, onAddTo
       {/* saved ideas */}
       {plans.length > 0 && (
         <div className="mt-4 space-y-2.5">
+          <div className="flex items-center justify-end gap-1.5 text-xs">
+            <span className="font-bold text-stone-400">🎙️ our-voice dial:</span>
+            {["mild", "max"].map((v) => (
+              <button key={v} onClick={() => setDial(v)} className={`rounded-full px-2.5 py-1 font-extrabold transition-colors ${voiceDial === v ? "bg-violet-500 text-white" : "border border-stone-200 text-stone-500 hover:text-violet-600"}`}>{v === "max" ? "unhinged" : "mild"}</button>
+            ))}
+          </div>
           {plans.map((p) => (
             <SavedIdea key={p.id} plan={p} accent={accent} onDelete={(planId) => onDelete(dest.id, planId)} onAddComment={(planId, comment) => onAddComment(dest.id, planId, comment)} onEdit={onEdit} onAddToItinerary={(day) => onAddToItinerary(day, p)} />
           ))}
