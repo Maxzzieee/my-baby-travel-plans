@@ -500,6 +500,21 @@ function SavedIdea({ plan, accent, onDelete, onAddComment, onEdit, onAddToItiner
         </div>
       )}
 
+      {/* tags */}
+      <div className="mt-2 flex flex-wrap items-center gap-1.5">
+        {tags.map((t) => (
+          <span key={t} className="inline-flex items-center gap-1 rounded-full bg-stone-100 px-2 py-0.5 text-xs font-bold text-stone-600">{t}<button onClick={() => toggleTag(t)} className="text-stone-400 hover:text-rose-400" aria-label={`Remove ${t}`}><X size={10} /></button></span>
+        ))}
+        <button onClick={() => setTagOpen((o) => !o)} className="inline-flex items-center gap-1 rounded-full border border-dashed border-stone-300 px-2 py-0.5 text-xs font-bold text-stone-400 transition-colors hover:text-stone-600"><Plus size={10} strokeWidth={3} /> tag</button>
+      </div>
+      {tagOpen && (
+        <div className="mt-1 flex flex-wrap gap-1">
+          {TAG_PRESETS.map((t) => (
+            <button key={t} onClick={() => toggleTag(t)} className={`rounded-full px-2 py-0.5 text-xs font-bold transition-colors ${tags.includes(t) ? "bg-violet-500 text-white" : "border border-stone-200 text-stone-500 hover:text-violet-600"}`}>{t}</button>
+          ))}
+        </div>
+      )}
+
       {/* septic-fuck rating slider */}
       <div className="relative mt-2.5 rounded-xl border border-stone-100 bg-stone-50/70 px-3 py-2">
         {floater && (
@@ -589,6 +604,7 @@ function IdeaBoard({ dest, plans, onAdd, onDelete, onAddComment, onEdit, onAddTo
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [shortOnly, setShortOnly] = useState(false); // ⭐ must-do filter
+  const [activeTag, setActiveTag] = useState(null); // tag filter
   const fileRef = useRef(null);
   const photoRef = useRef(null);
 
@@ -765,12 +781,15 @@ function IdeaBoard({ dest, plans, onAdd, onDelete, onAddComment, onEdit, onAddTo
       {/* saved ideas */}
       {plans.length > 0 && (
         <div className="mt-4 space-y-2.5">
-          {plans.some((p) => p.shortlist) && (
-            <div className="flex justify-end">
-              <button onClick={() => setShortOnly((o) => !o)} className={`rounded-full px-2.5 py-1 text-xs font-extrabold transition-colors ${shortOnly ? "bg-amber-400 text-white" : "border border-stone-200 text-stone-500 hover:text-amber-500"}`}>⭐ must-do only</button>
+          {(plans.some((p) => p.shortlist) || plans.some((p) => (p.tags || []).length)) && (
+            <div className="flex flex-wrap items-center justify-end gap-1.5">
+              {[...new Set(plans.flatMap((p) => p.tags || []))].map((t) => (
+                <button key={t} onClick={() => setActiveTag(activeTag === t ? null : t)} className={`rounded-full px-2.5 py-1 text-xs font-extrabold transition-colors ${activeTag === t ? "bg-violet-500 text-white" : "border border-stone-200 text-stone-500 hover:text-violet-600"}`}>{t}</button>
+              ))}
+              {plans.some((p) => p.shortlist) && <button onClick={() => setShortOnly((o) => !o)} className={`rounded-full px-2.5 py-1 text-xs font-extrabold transition-colors ${shortOnly ? "bg-amber-400 text-white" : "border border-stone-200 text-stone-500 hover:text-amber-500"}`}>⭐ must-do</button>}
             </div>
           )}
-          {plans.filter((p) => !shortOnly || p.shortlist).map((p) => (
+          {plans.filter((p) => (!shortOnly || p.shortlist) && (!activeTag || (p.tags || []).includes(activeTag))).map((p) => (
             <SavedIdea key={p.id} plan={p} accent={accent} onDelete={(planId) => onDelete(dest.id, planId)} onAddComment={(planId, comment) => onAddComment(dest.id, planId, comment)} onEdit={onEdit} onAddToItinerary={(day) => onAddToItinerary(day, p)} />
           ))}
         </div>
