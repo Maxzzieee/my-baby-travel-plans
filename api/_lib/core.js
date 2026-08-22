@@ -329,8 +329,23 @@ const CONCIERGE_SCHEMA = {
         required: ["name", "area", "why"], additionalProperties: false,
       },
     },
+    actions: {
+      type: "array",
+      description: "Concrete edits to APPLY to the itinerary, referencing the [handles] in the trip context (like d2s1). Empty unless the user asked you to tidy/reorder/drop/add. `reply` still explains it in words.",
+      items: {
+        type: "object",
+        properties: {
+          type: { type: "string", enum: ["reorder", "remove", "add"], description: "reorder a day; remove a stop; add a place to a day." },
+          day: { type: "integer", description: "1-based day number (for reorder / add)." },
+          order: { type: "array", items: { type: "string" }, description: "reorder only: the day's stop handles in the NEW order — include EVERY stop staying in that day." },
+          ref: { type: "string", description: "remove only: the stop handle to delete (e.g. d2s5)." },
+          name: { type: "string", description: "add only: the real place name to add (Korean preferred)." },
+        },
+        required: ["type"], additionalProperties: false,
+      },
+    },
   },
-  required: ["reply", "places"], additionalProperties: false,
+  required: ["reply", "places", "actions"], additionalProperties: false,
 };
 export async function runConcierge({ message, context = "", history = [] }) {
   const client = getClient();
@@ -340,7 +355,7 @@ export async function runConcierge({ message, context = "", history = [] }) {
     "You are the warm, witty travel concierge for a couple's cozy winter trip to Seoul (27 Nov – 4 Dec 2026), base camp in Jongno-gu. " +
     "Help them plan and adjust: be SPECIFIC and practical — name real Seoul places, group things by area to cut travel, suggest subway lines, respect a cozy-cold couple's vibe (cafés, hanok, markets, warm food). " +
     "Keep `reply` short and scannable: a sentence or two, or a tight bullet list. Use the couple's own itinerary below when relevant; if a day is packed or scattered, say so and suggest a fix. " +
-    "You don't edit the plan yourself. Whenever you recommend concrete places, ALSO put them in `places` (real map-searchable names, Korean preferred) so they can add them in one tap; leave `places` empty for general chat.\n\n" +
+    "You CAN edit the plan. Each stop in the trip context is tagged with a [handle] like d2s1 (day 2, stop 1). When they ask you to tidy / reorder / drop / build a day, put concrete edits in `actions` using those handles: a 'reorder' carries the day's FULL new order of handles; a 'remove' carries one handle; an 'add' carries a real place name + day. Only reference handles that appear in the context, and always EXPLAIN what you changed in `reply`. For pure recommendations (not editing existing stops), use `places` and leave `actions` empty. For general questions leave both empty.\n\n" +
     "THEIR CURRENT TRIP:\n" + (context || "(no itinerary yet)");
   const msgs = [
     ...(Array.isArray(history) ? history : []).slice(-8).map((m) => ({ role: m.role === "assistant" ? "assistant" : "user", content: String(m.content || "") })),
@@ -355,7 +370,7 @@ export async function runConcierge({ message, context = "", history = [] }) {
     if (response.stop_reason === "refusal") return { status: 422, json: { error: "I'd rather not answer that one." } };
     const textBlock = response.content.find((b) => b.type === "text");
     const parsed = JSON.parse(textBlock?.text || "{}");
-    return { status: 200, json: { reply: parsed.reply || "(no reply)", places: Array.isArray(parsed.places) ? parsed.places.slice(0, 4) : [] } };
+    return { status: 200, json: { reply: parsed.reply || "(no reply)", places: Array.isArray(parsed.places) ? parsed.places.slice(0, 4) : [], actions: Array.isArray(parsed.actions) ? parsed.actions.slice(0, 12) : [] } };
   } catch (e) {
     return { status: 500, json: { error: e?.message || "Concierge failed." } };
   }

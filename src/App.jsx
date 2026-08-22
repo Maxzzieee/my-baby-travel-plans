@@ -2464,7 +2464,7 @@ function buildTripContext(items, plans) {
   const byDay = {};
   for (const it of items || []) (byDay[it.day] ??= []).push(it);
   const lines = Object.keys(byDay).map(Number).sort((a, b) => a - b).map((d) => {
-    const stops = byDay[d].slice().sort((a, b) => (a.position ?? 0) - (b.position ?? 0)).map((s) => `${s.start_time || "—"} ${s.title || "?"}${s.place ? ` @ ${s.place}` : ""}`);
+    const stops = byDay[d].slice().sort((a, b) => (a.position ?? 0) - (b.position ?? 0)).map((s, i) => `[d${d + 1}s${i + 1}] ${s.start_time || "—"} ${s.title || "?"}${s.place ? ` @ ${s.place}` : ""}`);
     return `Day ${d + 1}: ${stops.join(" | ") || "(empty)"}`;
   });
   const scheduled = new Set((items || []).map((i) => i.idea_id).filter(Boolean));
@@ -2500,6 +2500,7 @@ function ConciergePanel({ plans, onAddIdea, preferences = "", onSetPreferences }
   const [input, setInput] = useState("");
   const [busy, setBusy] = useState(false);
   const [added, setAdded] = useState({}); // place name -> "adding" | "added"
+  const [applied, setApplied] = useState({}); // message index -> "applying" | "applied" | "error"
   const [health, setHealth] = useState([]); // proactive trip-health issues
   const ctx = useRef("");
   const scroller = useRef(null);
@@ -2517,7 +2518,7 @@ function ConciergePanel({ plans, onAddIdea, preferences = "", onSetPreferences }
       const res = await fetch("/api/concierge", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ message: m, context: ctx.current + (preferences ? `\n\nOUR TASTES (respect these strongly): ${preferences}` : ""), history }) });
       const d = await res.json().catch(() => ({}));
       if (!res.ok || d.error) throw new Error(d.error || `error ${res.status}`);
-      setMsgs((xs) => [...xs, { role: "assistant", content: d.reply || "(no reply)", places: Array.isArray(d.places) ? d.places : [] }]);
+      setMsgs((xs) => [...xs, { role: "assistant", content: d.reply || "(no reply)", places: Array.isArray(d.places) ? d.places : [], actions: Array.isArray(d.actions) ? d.actions : [] }]);
     } catch (e) { setMsgs((xs) => [...xs, { role: "assistant", content: `⚠️ ${e?.message || "Something went wrong — try again."}` }]); }
     finally { setBusy(false); }
   };
@@ -2552,6 +2553,33 @@ function ConciergePanel({ plans, onAddIdea, preferences = "", onSetPreferences }
         lat: b.lat ?? null, lng: b.lng ?? null, idea_id: null });
       setAdded((a) => ({ ...a, [pl.name]: "added" }));
     } catch { setAdded((a) => { const n = { ...a }; delete n[pl.name]; return n; }); }
+  };
+  // Agentic: APPLY the concierge's proposed edits (reorder / remove / add) to the
+  // real itinerary via the shared helpers. Reloads fresh items so handles resolve.
+  const applyActions = async (actions, key) => {
+    setApplied((a) => ({ ...a, [key]: "applying" }));
+    try {
+      const its = (await loadItinerary("seoul")) || [];
+      const byDay = {}; for (const it of its) (byDay[it.day] ??= []).push(it);
+      Object.values(byDay).forEach((arr) => arr.sort((x, y) => (x.position ?? 0) - (y.position ?? 0)));
+      const resolve = (h) => { const m = /d(\d+)s(\d+)/i.exec(h || ""); if (!m) return null; return (byDay[+m[1] - 1] || [])[+m[2] - 1] || null; };
+      const removed = new Set();
+      for (const a of actions) if (a.type === "remove") { const it = resolve(a.ref); if (it) { removed.add(it.id); await deleteItineraryItem(it.id); } }
+      for (const a of actions) if (a.type === "reorder") {
+        const day = (a.day || 1) - 1;
+        const ordered = (a.order || []).map(resolve).filter((it) => it && it.day === day && !removed.has(it.id));
+        const seen = new Set(ordered.map((it) => it.id));
+        const rest = (byDay[day] || []).filter((it) => !seen.has(it.id) && !removed.has(it.id));
+        const ids = [...ordered, ...rest].map((it) => it.id);
+        if (ids.length) await reorderItinerary(ids);
+      }
+      for (const a of actions) if (a.type === "add" && a.name) {
+        const res = await fetch(`/api/place?q=${encodeURIComponent(a.name)}`);
+        const d = await res.json().catch(() => ({})); const b = d.idea || {};
+        await addItineraryItem({ dest: "seoul", day: (a.day || 1) - 1, position: 0, kind: b.kind || "activity", start_time: "", end_time: "", title: b.title || a.name, place: b.location || a.name, notes: "", lat: b.lat ?? null, lng: b.lng ?? null, idea_id: null });
+      }
+      setApplied((a) => ({ ...a, [key]: "applied" }));
+    } catch (e) { setApplied((a) => ({ ...a, [key]: "error" })); }
   };
   return (
     <>
@@ -2600,6 +2628,17 @@ function ConciergePanel({ plans, onAddIdea, preferences = "", onSetPreferences }
               ) : (
                 <div key={i} className="space-y-2">
                   <div className="max-w-[92%] rounded-2xl bg-stone-100 px-3 py-2 text-[12px] leading-relaxed text-stone-700"><MdLite text={m.content} /></div>
+                  {m.actions && m.actions.length > 0 && (
+                    <div className="rounded-xl border border-emerald-200 bg-emerald-50/60 p-2.5">
+                      <p className="text-xs font-black text-emerald-700">✨ {m.actions.length} change{m.actions.length > 1 ? "s" : ""} ready to apply</p>
+                      <ul className="mt-1 space-y-0.5 text-xs text-stone-600">
+                        {m.actions.map((a, k) => (<li key={k}>• {a.type === "reorder" ? `reorder Day ${a.day}` : a.type === "remove" ? "drop a stop" : `add ${a.name} → Day ${a.day}`}</li>))}
+                      </ul>
+                      <button onClick={() => applyActions(m.actions, i)} disabled={applied[i] === "applying" || applied[i] === "applied"} className="mt-1.5 flex items-center gap-1 rounded-lg px-3 py-1.5 text-xs font-extrabold text-white disabled:opacity-60" style={{ background: applied[i] === "applied" ? "#34C759" : "linear-gradient(135deg,#f472b6,#a78bfa)" }}>
+                        {applied[i] === "applying" ? <Loader2 size={11} className="animate-spin" /> : applied[i] === "applied" ? "✓ Applied to itinerary" : applied[i] === "error" ? "⚠️ retry" : "✨ Apply to itinerary"}
+                      </button>
+                    </div>
+                  )}
                   {m.places && m.places.length > 0 && (
                     <div className="space-y-1.5">
                       {m.places.map((pl, j) => (
