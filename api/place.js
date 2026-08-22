@@ -5,7 +5,7 @@
  */
 import { runPlace } from "./_lib/core.js";
 
-export const config = { maxDuration: 20 };
+export const config = { maxDuration: 45 };
 
 export default async function handler(req, res) {
   const { status, json } = await runPlace((req.query && req.query.q) || "");

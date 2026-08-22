@@ -5,7 +5,7 @@
  */
 import { runDare } from "./_lib/core.js";
 
-export const config = { maxDuration: 20 };
+export const config = { maxDuration: 45 };
 
 export default async function handler(req, res) {
   if (req.method !== "POST") return res.status(405).json({ error: "Method not allowed." });
