@@ -1951,6 +1951,16 @@ function ItineraryView({ plans, onAddIdea }) {
     return { km, walkMin, cost, flags };
   })();
   const tripCost = items.reduce((s, it) => s + (Number(it.cost) || 0), 0);
+  const tripOverview = (() => {
+    const byDay = {}; for (const it of items) (byDay[it.day] ??= []).push(it);
+    let km = 0;
+    Object.values(byDay).forEach((stops) => {
+      const pts = stops.filter((s) => s.lat != null).sort((a, b) => (a.position ?? 0) - (b.position ?? 0));
+      for (let i = 0; i < pts.length - 1; i++) km += haversineKm({ lat: pts[i].lat, lng: pts[i].lng }, { lat: pts[i + 1].lat, lng: pts[i + 1].lng });
+    });
+    const scheduled = new Set(items.map((i) => i.idea_id).filter(Boolean)).size;
+    return { daysPlanned: Object.keys(byDay).length, stops: items.length, km, scheduled, ideaTotal: ideas.length };
+  })();
   const fmtWalk = (m) => (m < 60 ? `${m}m` : `${Math.floor(m / 60)}h${String(m % 60).padStart(2, "0")}`);
 
   // Printable day-by-day timeline → opens a clean page you can "Save as PDF".
@@ -2183,6 +2193,9 @@ function ItineraryView({ plans, onAddIdea }) {
       <div className="text-center">
         <h2 className="text-xl font-black text-stone-700">{city.emoji} Our {city.name} Trip</h2>
         <p className="mt-1 text-sm text-stone-500">Nov 27 – Dec 4 · {(() => { const d = Math.ceil((TRIP_START.getTime() - Date.now()) / 86400000); return d > 0 ? `✈️ ${d} day${d === 1 ? "" : "s"} to go` : todayIdx >= 0 ? "🎉 we're in Seoul!" : "trip's a wrap 🥲"; })()} · add a stop and watch it pin 📍</p>
+        {items.length > 0 && (
+          <p className="mt-1 text-xs font-bold text-stone-400">{tripOverview.daysPlanned}/{TRIP_DAYS} days planned · {tripOverview.stops} stops · ~{tripOverview.km.toFixed(0)}km{tripCost > 0 ? ` · S$${tripCost.toLocaleString()}` : ""}{tripOverview.ideaTotal > 0 ? ` · ${tripOverview.scheduled}/${tripOverview.scheduled + tripOverview.ideaTotal} ideas scheduled` : ""}</p>
+        )}
         <div className="mt-3 flex flex-wrap justify-center gap-2">
           <button onClick={() => generatePlan()} className="inline-flex items-center gap-1.5 rounded-full px-4 py-2 text-sm font-extrabold text-white shadow-sm transition-transform hover:scale-105 active:scale-95" style={{ background: "linear-gradient(135deg,#f472b6,#a78bfa)" }}>✨ Auto-plan my trip</button>
           <button onClick={() => { setDay(todayIdx >= 0 ? todayIdx : 0); setSelected(null); setTab("list"); }} className="inline-flex items-center gap-1.5 rounded-full border-2 px-4 py-2 text-sm font-extrabold transition-transform hover:scale-105 active:scale-95" style={{ borderColor: accent.border, color: accent.text, backgroundColor: accent.soft }}>▶ {todayIdx >= 0 ? `Today · Day ${todayIdx + 1}` : "Start trip (preview)"}</button>
