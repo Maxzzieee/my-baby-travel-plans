@@ -2407,6 +2407,7 @@ function ConciergePanel({ plans, onAddIdea }) {
     } catch (e) { setMsgs((xs) => [...xs, { role: "assistant", content: `⚠️ ${e?.message || "Something went wrong — try again."}` }]); }
     finally { setBusy(false); }
   };
+  const [dayPick, setDayPick] = useState(null); // place name whose day-picker is open
   // "Add to ideas" — scrape a photo + address for the recommended name, then add.
   const addPlace = async (pl) => {
     if (!pl?.name || added[pl.name]) return;
@@ -2422,6 +2423,19 @@ function ConciergePanel({ plans, onAddIdea }) {
         lat: b.lat ?? null, lng: b.lng ?? null, kind: b.kind || "activity",
         thumb: b.thumb || "", photos: b.photos || [], createdAt: Date.now(),
       });
+      setAdded((a) => ({ ...a, [pl.name]: "added" }));
+    } catch { setAdded((a) => { const n = { ...a }; delete n[pl.name]; return n; }); }
+  };
+  // Agentic: drop a recommended place straight onto a specific itinerary DAY.
+  const addToDay = async (pl, day) => {
+    setAdded((a) => ({ ...a, [pl.name]: "adding" })); setDayPick(null);
+    try {
+      const res = await fetch(`/api/place?q=${encodeURIComponent(pl.name)}`);
+      const d = await res.json().catch(() => ({}));
+      const b = d.idea || {};
+      await addItineraryItem({ dest: "seoul", day, position: 0, kind: b.kind || "activity", start_time: "", end_time: "",
+        title: b.title || pl.name, place: b.location || pl.area || pl.name, notes: pl.why || "",
+        lat: b.lat ?? null, lng: b.lng ?? null, idea_id: null });
       setAdded((a) => ({ ...a, [pl.name]: "added" }));
     } catch { setAdded((a) => { const n = { ...a }; delete n[pl.name]; return n; }); }
   };
@@ -2458,14 +2472,25 @@ function ConciergePanel({ plans, onAddIdea }) {
                   {m.places && m.places.length > 0 && (
                     <div className="space-y-1.5">
                       {m.places.map((pl, j) => (
-                        <div key={j} className="flex items-center gap-2 rounded-xl border border-stone-200 bg-white p-2">
-                          <div className="min-w-0 flex-1">
-                            <p className="truncate text-[12px] font-extrabold text-stone-700">{pl.name}</p>
-                            <p className="truncate text-xs text-stone-500">{[pl.area, pl.why].filter(Boolean).join(" · ")}</p>
+                        <div key={j} className="rounded-xl border border-stone-200 bg-white p-2">
+                          <div className="flex items-center gap-2">
+                            <div className="min-w-0 flex-1">
+                              <p className="truncate text-[12px] font-extrabold text-stone-700">{pl.name}</p>
+                              <p className="truncate text-xs text-stone-500">{[pl.area, pl.why].filter(Boolean).join(" · ")}</p>
+                            </div>
+                            <button onClick={() => setDayPick(dayPick === pl.name ? null : pl.name)} disabled={added[pl.name] === "added" || added[pl.name] === "adding"} className="flex flex-shrink-0 items-center gap-1 rounded-lg border border-stone-200 px-2 py-1 text-xs font-extrabold text-stone-500 transition-colors hover:border-violet-300 hover:text-violet-600 disabled:opacity-50" title="Add to a day of the itinerary">📅 day</button>
+                            <button onClick={() => addPlace(pl)} disabled={!!added[pl.name]} className="flex flex-shrink-0 items-center gap-1 rounded-lg px-2.5 py-1 text-xs font-extrabold text-white disabled:opacity-70" style={{ background: added[pl.name] === "added" ? "#34C759" : "linear-gradient(135deg,#f472b6,#a78bfa)" }}>
+                              {added[pl.name] === "adding" ? <Loader2 size={11} className="animate-spin" /> : added[pl.name] === "added" ? "✓ Added" : <><Plus size={11} strokeWidth={3} /> Ideas</>}
+                            </button>
                           </div>
-                          <button onClick={() => addPlace(pl)} disabled={!!added[pl.name]} className="flex flex-shrink-0 items-center gap-1 rounded-lg px-2.5 py-1 text-xs font-extrabold text-white disabled:opacity-70" style={{ background: added[pl.name] === "added" ? "#34C759" : "linear-gradient(135deg,#f472b6,#a78bfa)" }}>
-                            {added[pl.name] === "adding" ? <Loader2 size={11} className="animate-spin" /> : added[pl.name] === "added" ? "✓ Added" : <><Plus size={11} strokeWidth={3} /> Add</>}
-                          </button>
+                          {dayPick === pl.name && (
+                            <div className="mt-1.5 flex flex-wrap items-center gap-1">
+                              <span className="text-xs font-bold text-stone-400">to day:</span>
+                              {Array.from({ length: TRIP_DAYS }).map((_, dd) => (
+                                <button key={dd} onClick={() => addToDay(pl, dd)} className="rounded-md border border-stone-200 px-2 py-0.5 text-xs font-extrabold text-stone-500 transition-colors hover:border-violet-300 hover:text-violet-600" title={dayLabel(dd)}>{dd + 1}</button>
+                              ))}
+                            </div>
+                          )}
                         </div>
                       ))}
                     </div>
