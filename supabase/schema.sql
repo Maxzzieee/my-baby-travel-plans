@@ -59,6 +59,7 @@ create table if not exists public.itinerary (
   created_at timestamptz default now()
 );
 alter table public.itinerary add column if not exists end_time text; -- calendar-grid upgrade
+alter table public.itinerary add column if not exists cost float8;    -- per-stop cost (SGD) for the live budget
 alter table public.itinerary enable row level security;
 drop policy if exists "itinerary anon all" on public.itinerary;
 create policy "itinerary anon all" on public.itinerary for all using (true) with check (true);

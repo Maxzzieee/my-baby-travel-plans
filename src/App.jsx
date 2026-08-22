@@ -1837,6 +1837,10 @@ function ItemEditor({ item, onUpdate, onRemove, onClose }) {
           <input type="time" value={item.end_time || ""} onChange={(e) => onUpdate(item.id, { end_time: e.target.value })} className="rounded-xl border-2 border-stone-200 px-2 py-1.5 text-xs outline-none focus:border-rose-200" />
         </div>
         <div className="flex items-center gap-1.5">
+          <span className="text-xs font-bold text-stone-500">💸 S$</span>
+          <input type="number" min="0" step="1" defaultValue={item.cost || ""} onBlur={(e) => { const v = e.target.value === "" ? null : Number(e.target.value); if (v !== (item.cost ?? null)) onUpdate(item.id, { cost: v }); }} placeholder="cost (optional)" className="w-32 rounded-xl border-2 border-stone-200 px-3 py-1.5 text-xs outline-none focus:border-rose-200" />
+        </div>
+        <div className="flex items-center gap-1.5">
           <MapPin size={13} className="flex-shrink-0 text-stone-500" />
           <input defaultValue={item.place || ""} onBlur={(e) => e.target.value !== (item.place || "") && onUpdate(item.id, { place: e.target.value })} placeholder="address / place (powers the movement map)" className="w-full rounded-xl border-2 border-stone-200 px-3 py-2 text-xs outline-none focus:border-rose-200" />
         </div>
@@ -1940,11 +1944,13 @@ function ItineraryView({ plans, onAddIdea }) {
     let km = 0, maxLeg = 0;
     for (let i = 0; i < pts.length - 1; i++) { const d = haversineKm({ lat: pts[i].lat, lng: pts[i].lng }, { lat: pts[i + 1].lat, lng: pts[i + 1].lng }); km += d; if (d > maxLeg) maxLeg = d; }
     const walkMin = Math.round(km * 12);
+    const cost = numbered.reduce((s, it) => s + (Number(it.cost) || 0), 0);
     const flags = [];
     if (numbered.length >= 6 || km > 10) flags.push("packed — maybe split or trim");
     if (maxLeg > 6) flags.push(`a ${maxLeg.toFixed(0)}km hop — bit scattered`);
-    return { km, walkMin, flags };
+    return { km, walkMin, cost, flags };
   })();
+  const tripCost = items.reduce((s, it) => s + (Number(it.cost) || 0), 0);
   const fmtWalk = (m) => (m < 60 ? `${m}m` : `${Math.floor(m / 60)}h${String(m % 60).padStart(2, "0")}`);
 
   // Printable day-by-day timeline → opens a clean page you can "Save as PDF".
@@ -2245,8 +2251,9 @@ function ItineraryView({ plans, onAddIdea }) {
       {/* Day-doctor: walking load + packed/scattered flags */}
       {numbered.length > 0 && (
         <div className="mt-2 flex flex-wrap items-center gap-2 text-xs">
-          <span className="rounded-full bg-stone-100 px-2.5 py-1 font-bold text-stone-600">{numbered.length} stop{numbered.length > 1 ? "s" : ""}{dayStats.km >= 0.1 ? ` · ~${dayStats.km.toFixed(1)} km · ~${fmtWalk(dayStats.walkMin)} walking` : ""}</span>
+          <span className="rounded-full bg-stone-100 px-2.5 py-1 font-bold text-stone-600">{numbered.length} stop{numbered.length > 1 ? "s" : ""}{dayStats.km >= 0.1 ? ` · ~${dayStats.km.toFixed(1)} km · ~${fmtWalk(dayStats.walkMin)} walking` : ""}{dayStats.cost > 0 ? ` · 💸 S$${dayStats.cost.toLocaleString()}` : ""}</span>
           {dayStats.flags.map((f, i) => (<span key={i} className="rounded-full bg-amber-100 px-2.5 py-1 font-bold text-amber-700">⚠️ {f}</span>))}
+          {tripCost > 0 && <span className="rounded-full bg-emerald-100 px-2.5 py-1 font-bold text-emerald-700">trip 💸 S${tripCost.toLocaleString()}</span>}
         </div>
       )}
 
