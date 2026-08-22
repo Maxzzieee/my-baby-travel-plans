@@ -2502,11 +2502,18 @@ function ConciergePanel({ plans, onAddIdea, preferences = "", onSetPreferences }
   const [added, setAdded] = useState({}); // place name -> "adding" | "added"
   const [applied, setApplied] = useState({}); // message index -> "applying" | "applied" | "error"
   const [health, setHealth] = useState([]); // proactive trip-health issues
+  const [tripItems, setTripItems] = useState([]); // loaded itinerary (to name handles in summaries)
+  const handleTitle = (h) => {
+    const m = /d(\d+)s(\d+)/i.exec(h || ""); if (!m) return null;
+    const stops = tripItems.filter((x) => x.day === +m[1] - 1).sort((a, b) => (a.position ?? 0) - (b.position ?? 0));
+    const it = stops[+m[2] - 1];
+    return it ? (readable(it.title) || it.title || "a stop") : null;
+  };
   const ctx = useRef("");
   const scroller = useRef(null);
   useEffect(() => {
     if (!open) return;
-    (async () => { const items = (await loadItinerary("seoul")) || []; ctx.current = buildTripContext(items, plans); setHealth(tripHealth(items)); })();
+    (async () => { const items = (await loadItinerary("seoul")) || []; ctx.current = buildTripContext(items, plans); setHealth(tripHealth(items)); setTripItems(items); })();
   }, [open, plans]);
   useEffect(() => { const el = scroller.current; if (el) el.scrollTop = el.scrollHeight; }, [msgs, busy]);
   const ask = async (text) => {
@@ -2632,7 +2639,7 @@ function ConciergePanel({ plans, onAddIdea, preferences = "", onSetPreferences }
                     <div className="rounded-xl border border-emerald-200 bg-emerald-50/60 p-2.5">
                       <p className="text-xs font-black text-emerald-700">✨ {m.actions.length} change{m.actions.length > 1 ? "s" : ""} ready to apply</p>
                       <ul className="mt-1 space-y-0.5 text-xs text-stone-600">
-                        {m.actions.map((a, k) => (<li key={k}>• {a.type === "reorder" ? `reorder Day ${a.day}` : a.type === "remove" ? "drop a stop" : `add ${a.name} → Day ${a.day}`}</li>))}
+                        {m.actions.map((a, k) => (<li key={k}>• {a.type === "reorder" ? `reorder Day ${a.day} (${(a.order || []).length} stops)` : a.type === "remove" ? `drop ${handleTitle(a.ref) || "a stop"}` : `add ${a.name} → Day ${a.day}`}</li>))}
                       </ul>
                       <button onClick={() => applyActions(m.actions, i)} disabled={applied[i] === "applying" || applied[i] === "applied"} className="mt-1.5 flex items-center gap-1 rounded-lg px-3 py-1.5 text-xs font-extrabold text-white disabled:opacity-60" style={{ background: applied[i] === "applied" ? "#34C759" : "linear-gradient(135deg,#f472b6,#a78bfa)" }}>
                         {applied[i] === "applying" ? <Loader2 size={11} className="animate-spin" /> : applied[i] === "applied" ? "✓ Applied to itinerary" : applied[i] === "error" ? "⚠️ retry" : "✨ Apply to itinerary"}
