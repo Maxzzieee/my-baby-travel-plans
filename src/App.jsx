@@ -2399,6 +2399,23 @@ function buildTripContext(items, plans) {
 
 const CONCIERGE_STARTERS = ["Make a day less scattered", "Cozy rainy-day plan near Jongno", "Best area for a romantic dinner?", "What am I missing on this trip?"];
 
+// Client-side trip-health scan (no AI) — foodless / packed / scattered days.
+function tripHealth(items) {
+  const byDay = {};
+  for (const it of items || []) (byDay[it.day] ??= []).push(it);
+  const issues = [];
+  Object.keys(byDay).map(Number).sort((a, b) => a - b).forEach((d) => {
+    const stops = byDay[d];
+    if (stops.length >= 2 && !stops.some((s) => s.kind === "food")) issues.push({ day: d, text: `Day ${d + 1} has no food yet` });
+    const pts = stops.filter((s) => s.lat != null);
+    let km = 0, maxLeg = 0;
+    for (let i = 0; i < pts.length - 1; i++) { const dd = haversineKm({ lat: pts[i].lat, lng: pts[i].lng }, { lat: pts[i + 1].lat, lng: pts[i + 1].lng }); km += dd; if (dd > maxLeg) maxLeg = dd; }
+    if (stops.length >= 6 || km > 10) issues.push({ day: d, text: `Day ${d + 1} looks packed (~${km.toFixed(0)}km)` });
+    else if (maxLeg > 6) issues.push({ day: d, text: `Day ${d + 1} is a bit scattered` });
+  });
+  return issues.slice(0, 4);
+}
+
 // Floating trip-aware chat. Read-only: it advises, you apply. Loads the live
 // itinerary each time it opens so its advice matches the current plan.
 function ConciergePanel({ plans, onAddIdea, preferences = "", onSetPreferences }) {
@@ -2408,11 +2425,12 @@ function ConciergePanel({ plans, onAddIdea, preferences = "", onSetPreferences }
   const [input, setInput] = useState("");
   const [busy, setBusy] = useState(false);
   const [added, setAdded] = useState({}); // place name -> "adding" | "added"
+  const [health, setHealth] = useState([]); // proactive trip-health issues
   const ctx = useRef("");
   const scroller = useRef(null);
   useEffect(() => {
     if (!open) return;
-    (async () => { const items = (await loadItinerary("seoul")) || []; ctx.current = buildTripContext(items, plans); })();
+    (async () => { const items = (await loadItinerary("seoul")) || []; ctx.current = buildTripContext(items, plans); setHealth(tripHealth(items)); })();
   }, [open, plans]);
   useEffect(() => { const el = scroller.current; if (el) el.scrollTop = el.scrollHeight; }, [msgs, busy]);
   const ask = async (text) => {
@@ -2482,6 +2500,16 @@ function ConciergePanel({ plans, onAddIdea, preferences = "", onSetPreferences }
             {msgs.length === 0 && (
               <div className="space-y-2">
                 <p className="text-xs leading-relaxed text-stone-500">Hi! I know your whole itinerary. Ask me to tighten a day, find a spot, or spot what's missing. 💛</p>
+                {health.length > 0 && (
+                  <div className="rounded-xl border border-amber-200 bg-amber-50/70 p-2.5">
+                    <p className="text-xs font-black text-amber-700">👀 heads up:</p>
+                    <ul className="mt-1 space-y-1">
+                      {health.map((h, i) => (
+                        <li key={i}><button onClick={() => ask(`Fix Day ${h.day + 1}: ${h.text.replace(/^Day \d+ /, "")}`)} className="text-left text-xs font-semibold text-amber-800 underline decoration-dotted underline-offset-2 hover:text-amber-900">{h.text} — fix it?</button></li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
                 <div className="flex flex-wrap gap-1.5">
                   {CONCIERGE_STARTERS.map((s) => (
                     <button key={s} onClick={() => ask(s)} className="rounded-full border border-stone-200 bg-stone-50 px-2.5 py-1 text-left text-xs font-bold text-stone-500 transition-colors hover:border-violet-300 hover:text-violet-600">{s}</button>
