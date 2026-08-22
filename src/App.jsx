@@ -1879,6 +1879,18 @@ function ItineraryView({ plans, onAddIdea }) {
     const scheduled = new Set(items.map((i) => i.idea_id).filter(Boolean));
     return ideas.filter((i) => !scheduled.has(i.id) && i.lat != null).map((i) => ({ ...i, km: haversineKm(myPos, { lat: i.lat, lng: i.lng }) })).filter((i) => i.km <= 0.7).sort((a, b) => a.km - b.km).slice(0, 3);
   })();
+  // Day-doctor: walking load + packed/scattered warnings, from the day's coords.
+  const dayStats = (() => {
+    const pts = numbered.filter((s) => s.lat != null);
+    let km = 0, maxLeg = 0;
+    for (let i = 0; i < pts.length - 1; i++) { const d = haversineKm(coordOf(pts[i]), coordOf(pts[i + 1])); km += d; if (d > maxLeg) maxLeg = d; }
+    const walkMin = Math.round(km * 12);
+    const flags = [];
+    if (numbered.length >= 6 || km > 10) flags.push("packed — maybe split or trim");
+    if (maxLeg > 6) flags.push(`a ${maxLeg.toFixed(0)}km hop — bit scattered`);
+    return { km, walkMin, flags };
+  })();
+  const fmtWalk = (m) => (m < 60 ? `${m}m` : `${Math.floor(m / 60)}h${String(m % 60).padStart(2, "0")}`);
 
   // Printable day-by-day timeline → opens a clean page you can "Save as PDF".
   const exportPdf = () => {
@@ -2172,6 +2184,14 @@ function ItineraryView({ plans, onAddIdea }) {
               </span>
             )}
           </div>
+        </div>
+      )}
+
+      {/* Day-doctor: walking load + packed/scattered flags */}
+      {numbered.length > 0 && (
+        <div className="mt-2 flex flex-wrap items-center gap-2 text-xs">
+          <span className="rounded-full bg-stone-100 px-2.5 py-1 font-bold text-stone-600">{numbered.length} stop{numbered.length > 1 ? "s" : ""}{dayStats.km >= 0.1 ? ` · ~${dayStats.km.toFixed(1)} km · ~${fmtWalk(dayStats.walkMin)} walking` : ""}</span>
+          {dayStats.flags.map((f, i) => (<span key={i} className="rounded-full bg-amber-100 px-2.5 py-1 font-bold text-amber-700">⚠️ {f}</span>))}
         </div>
       )}
 
