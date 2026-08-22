@@ -2176,7 +2176,7 @@ function ItineraryView({ plans, onAddIdea }) {
     <section className="mt-8">
       <div className="text-center">
         <h2 className="text-xl font-black text-stone-700">{city.emoji} Our {city.name} Trip</h2>
-        <p className="mt-1 text-sm text-stone-500">Nov 27 – Dec 4 · build each day so it flows — add a stop and watch it pin on the map 📍</p>
+        <p className="mt-1 text-sm text-stone-500">Nov 27 – Dec 4 · {(() => { const d = Math.ceil((TRIP_START.getTime() - Date.now()) / 86400000); return d > 0 ? `✈️ ${d} day${d === 1 ? "" : "s"} to go` : todayIdx >= 0 ? "🎉 we're in Seoul!" : "trip's a wrap 🥲"; })()} · add a stop and watch it pin 📍</p>
         <div className="mt-3 flex flex-wrap justify-center gap-2">
           <button onClick={() => generatePlan()} className="inline-flex items-center gap-1.5 rounded-full px-4 py-2 text-sm font-extrabold text-white shadow-sm transition-transform hover:scale-105 active:scale-95" style={{ background: "linear-gradient(135deg,#f472b6,#a78bfa)" }}>✨ Auto-plan my trip</button>
           <button onClick={() => { setDay(todayIdx >= 0 ? todayIdx : 0); setSelected(null); setTab("list"); }} className="inline-flex items-center gap-1.5 rounded-full border-2 px-4 py-2 text-sm font-extrabold transition-transform hover:scale-105 active:scale-95" style={{ borderColor: accent.border, color: accent.text, backgroundColor: accent.soft }}>▶ {todayIdx >= 0 ? `Today · Day ${todayIdx + 1}` : "Start trip (preview)"}</button>
@@ -3026,6 +3026,17 @@ export default function App() {
   }, [totals]);
 
   const totalIdeas = useMemo(() => Object.values(plans).reduce((n, arr) => n + arr.length, 0), [plans]);
+  // Milestone confetti every 10 ideas (remembered so it fires once)
+  const [celebrate, setCelebrate] = useState(null);
+  const lastMilestone = useRef(null);
+  useEffect(() => {
+    if (lastMilestone.current === null) { try { lastMilestone.current = Number(localStorage.getItem("trip.milestone") || 0); } catch (e) { lastMilestone.current = 0; } }
+    const m = Math.floor(totalIdeas / 10) * 10;
+    if (m >= 10 && m > lastMilestone.current) {
+      lastMilestone.current = m; try { localStorage.setItem("trip.milestone", String(m)); } catch (e) {}
+      setCelebrate(`🎉 ${m} ideas!`); setTimeout(() => setCelebrate(null), 2600);
+    }
+  }, [totalIdeas]);
   const totalUnread = DESTINATIONS.reduce((n, d) => n + unreadFor(d.id), 0);
 
   return (
@@ -3047,6 +3058,14 @@ export default function App() {
     )}
     <div className="relative isolate min-h-screen w-full font-sans text-stone-800" style={{ backgroundColor: dark ? "#0b0b12" : "#FFFDF9", backgroundImage: dark ? "radial-gradient(circle at 50% -5%, #1c1830 0, transparent 40%), radial-gradient(circle at 15% 12%, #141024 0, transparent 45%), radial-gradient(circle at 85% 88%, #0d1622 0, transparent 48%)" : "radial-gradient(circle at 15% 10%, #FFF5F0 0, transparent 45%), radial-gradient(circle at 85% 90%, #EEF6F1 0, transparent 48%)" }}>
       {aero && <><AeroBubbles /><AeroScene /><AeroCritters /></>}
+      {celebrate && (
+        <div className="pointer-events-none fixed inset-0 z-[70] flex items-center justify-center">
+          <div className="animate-pop rounded-3xl border-2 border-amber-200 bg-white/95 px-8 py-6 text-center shadow-2xl backdrop-blur">
+            <div className="text-4xl">{celebrate.split(" ")[0]}</div>
+            <div className="mt-1 text-lg font-black text-stone-700">{celebrate.replace(/^\S+\s/, "")}</div>
+          </div>
+        </div>
+      )}
       {!aero && <Sky dark={dark} />}
       <SiteDecor />
       <FlyingButterfly variant={1} />
