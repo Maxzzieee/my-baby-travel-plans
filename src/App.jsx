@@ -1471,6 +1471,8 @@ function EssentialsView({ copy, updateCopy }) {
   const budget = copy.budget || [];
   const packing = copy.packing || [];
   const bookings = copy.bookings || [];
+  const checklist = copy.checklist || [];
+  const setChecklist = (v) => updateCopy("checklist", v);
   const uid = (p) => p + Date.now() + Math.random().toString(36).slice(2, 6);
 
   const total = budget.reduce((n, b) => n + (b.amount || 0), 0);
@@ -1480,6 +1482,27 @@ function EssentialsView({ copy, updateCopy }) {
 
   return (
     <section className="mx-auto mt-8 max-w-3xl space-y-6">
+      {/* Prep checklist */}
+      <div className="rounded-3xl border-2 border-stone-100 bg-white/85 p-5 shadow-sm backdrop-blur">
+        <h3 className="flex items-center gap-2 text-base font-black text-stone-700">✅ Prep checklist</h3>
+        <div className="mt-3 space-y-1.5">
+          {checklist.map((c) => {
+            const a = c.who === "me" ? ACCENTS.winter : c.who === "ants" ? ACCENTS.blush : ACCENTS.mint;
+            return (
+              <div key={c.id} className="flex items-center gap-2">
+                <button onClick={() => setChecklist(checklist.map((x) => (x.id === c.id ? { ...x, done: !x.done } : x)))} className={`flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-md border-2 transition-colors ${c.done ? "border-emerald-400 bg-emerald-400 text-white" : "border-stone-300 text-transparent hover:border-emerald-300"}`} aria-label="Toggle done"><Check size={14} strokeWidth={3} /></button>
+                <input value={c.text} onChange={(e) => setChecklist(checklist.map((x) => (x.id === c.id ? { ...x, text: e.target.value } : x)))} placeholder="task…" className={`min-w-0 flex-1 border-none bg-transparent text-sm outline-none ${c.done ? "text-stone-400 line-through" : "text-stone-700"}`} />
+                <button onClick={() => setChecklist(checklist.map((x) => (x.id === c.id ? { ...x, who: c.who === "me" ? "ants" : c.who === "ants" ? "both" : "me" } : x)))} className="flex-shrink-0 rounded-full px-2 py-0.5 text-xs font-extrabold" style={{ backgroundColor: a.soft, color: a.text }} title="Assign">{c.who === "me" ? "Me" : c.who === "ants" ? "Ants" : "Both"}</button>
+                <button onClick={() => setChecklist(checklist.filter((x) => x.id !== c.id))} className="flex-shrink-0 text-stone-400 hover:text-rose-400" aria-label="Remove"><X size={13} /></button>
+              </div>
+            );
+          })}
+          {checklist.length === 0 && <p className="py-2 text-center text-xs text-stone-500">No tasks yet — eSIM, T-money card, hotel booking, travel insurance…</p>}
+        </div>
+        <button onClick={() => setChecklist([...checklist, { id: uid("t"), text: "", who: "both", done: false }])} className="mt-2 flex items-center gap-1.5 rounded-xl border-2 border-dashed border-stone-300 px-3 py-1.5 text-xs font-extrabold text-stone-500 transition-colors hover:border-rose-200 hover:text-rose-400"><Plus size={13} strokeWidth={2.8} /> Add task</button>
+        {checklist.length > 0 && <p className="mt-2 text-xs font-bold text-stone-500">{checklist.filter((c) => c.done).length}/{checklist.length} done</p>}
+      </div>
+
       {/* Budget */}
       <div className="rounded-3xl border-2 border-stone-100 bg-white/85 p-5 shadow-sm backdrop-blur">
         <h3 className="flex items-center gap-2 text-base font-black text-stone-700">💰 Budget</h3>
