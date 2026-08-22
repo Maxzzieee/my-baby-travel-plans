@@ -435,3 +435,33 @@ export async function runVoice({ title, place, summary, dial = "max" }) {
     return { status: 500, json: { error: e?.message || "Voice rewrite failed." } };
   }
 }
+
+// ---------------------------------------------------------------------------
+// Dare — the AI is an improv hype-man, NOT a ghostwriter. It throws ONE short
+// cursed prompt daring the couple to caption the place themselves. The human
+// writes the real thing → authentic, endlessly varied, never a fake impression.
+// ---------------------------------------------------------------------------
+const DARE_SCHEMA = {
+  type: "object",
+  properties: { dare: { type: "string", description: "One short punchy writing dare (max ~14 words) daring the writer to caption THIS place in a funny/cursed/unhinged way. A directive TO the writer, never the caption itself." } },
+  required: ["dare"], additionalProperties: false,
+};
+export async function runDare({ title, place, summary }) {
+  const client = getClient();
+  if (!client) return { status: 500, json: { error: "AI not configured (ANTHROPIC_API_KEY missing)." } };
+  try {
+    const response = await client.messages.create({
+      model: MODEL, max_tokens: 120,
+      output_config: { format: { type: "json_schema", schema: DARE_SCHEMA }, effort: "low" },
+      messages: [{ role: "user", content:
+        "You are an improv hype-man for a chaotic Singaporean couple's travel app. Give ONE short punchy DARE that dares them to caption the place below in a funny/cursed/unhinged/brainrot way. It is a directive TO the writer, NOT the caption itself. VARY WILDLY every time — angles like: pretend the place personally wronged you; describe it as your last meal; hannibal-style; exactly N cursed words; hype it like the best thing that ever happened; review as a disappointed food critic; talk to the place directly; rate it in animal noises; caption like you're crying. Playful, never horny. Max ~14 words.\n\nPLACE: " +
+        (title || "this place") + (place ? ` (${place})` : "") + (summary ? `\nwhat it is: ${summary}` : "") }],
+    });
+    if (response.stop_reason === "refusal") return { status: 200, json: { dare: "caption this place in exactly 5 cursed words" } };
+    const textBlock = response.content.find((b) => b.type === "text");
+    const out = JSON.parse(textBlock?.text || "{}");
+    return { status: 200, json: { dare: out.dare || "caption this place like it just insulted you" } };
+  } catch (e) {
+    return { status: 500, json: { error: e?.message || "Dare failed." } };
+  }
+}

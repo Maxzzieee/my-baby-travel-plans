@@ -371,19 +371,25 @@ function SavedIdea({ plan, accent, onDelete, onAddComment, onEdit, onAddToItiner
   const comments = plan.comments || [];
   const acts = plan.activities || [];
 
-  // 🎙️ House voice — rewrite this idea's details in the couple's own register.
-  const [voiceBusy, setVoiceBusy] = useState(false);
-  const voiceIt = async () => {
-    if (voiceBusy) return;
-    setVoiceBusy(true);
-    let dial = "max"; try { dial = localStorage.getItem("site.voice.dial") || "max"; } catch (e) {}
+  // 🎤 Dare — the AI throws a cursed prompt; YOU write the real caption. It never
+  // fakes the voice, it just launches you. The original is kept so you can revert.
+  const [dareOpen, setDareOpen] = useState(false);
+  const [dare, setDare] = useState("");
+  const [dareBusy, setDareBusy] = useState(false);
+  const [answer, setAnswer] = useState("");
+  const rollDare = async () => {
+    setDareBusy(true); setDare("");
     try {
-      const res = await fetch("/api/voice", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ title: plan.title, place: plan.location, summary: plan.summary, dial }) });
+      const res = await fetch("/api/dare", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ title: plan.title, place: plan.location, summary: plan.summary }) });
       const d = await res.json().catch(() => ({}));
-      if (!res.ok || d.error) throw new Error(d.error || `error ${res.status}`);
-      // preserve the ORIGINAL (first time only) so a cringe rewrite can be reverted
-      onEdit(plan.id, { summary: d.summary || plan.summary, activities: (d.activities && d.activities.length) ? d.activities : acts, voicedFrom: plan.voicedFrom || { summary: plan.summary || "", activities: acts } });
-    } catch (e) { console.warn("[voice]", e?.message || e); } finally { setVoiceBusy(false); }
+      setDare(d.dare || "caption this place like it just insulted you");
+    } catch (e) { setDare("caption this place in exactly 5 cursed words"); } finally { setDareBusy(false); }
+  };
+  const openDare = () => { setDareOpen((o) => !o); setAnswer(""); if (!dare) rollDare(); };
+  const saveDare = () => {
+    if (!answer.trim()) return;
+    onEdit(plan.id, { summary: answer.trim(), voicedFrom: plan.voicedFrom || { summary: plan.summary || "", activities: acts } });
+    setDareOpen(false);
   };
   const revertVoice = () => onEdit(plan.id, { summary: plan.voicedFrom?.summary || "", activities: plan.voicedFrom?.activities || [], voicedFrom: null });
   const photos = plan.photos || [];
@@ -469,9 +475,23 @@ function SavedIdea({ plan, accent, onDelete, onAddComment, onEdit, onAddToItiner
         <span className="rounded-lg px-2 py-1 text-xs font-semibold" style={{ backgroundColor: ACCENTS.mint.soft, color: ACCENTS.mint.text }}>🎯 <EditText value={plan.want || ""} onSave={(v) => onEdit(plan.id, { want: v })} placeholder="what to do…" className="text-xs" /></span>
         <span className="rounded-lg px-2 py-1 text-xs text-stone-500" style={{ backgroundColor: accent.soft }}>💬 <EditText value={plan.comment || ""} onSave={(v) => onEdit(plan.id, { comment: v })} placeholder="note…" className="text-xs" /></span>
         {plan.sourceUrl && <a href={plan.sourceUrl} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 rounded-lg bg-stone-100 px-2 py-1 text-xs font-semibold text-stone-500 hover:text-rose-400"><ExternalLink size={11} /> source</a>}
-        <button onClick={voiceIt} disabled={voiceBusy} className="inline-flex items-center gap-1 rounded-lg px-2 py-1 text-xs font-extrabold text-white transition-transform hover:scale-105 active:scale-95 disabled:opacity-60" style={{ background: "linear-gradient(135deg,#f472b6,#a78bfa)" }} title="Rewrite these details in our voice">{voiceBusy ? <Loader2 size={11} className="animate-spin" /> : "🎙️"} {plan.voicedFrom ? "re-voice" : "our voice"}</button>
+        <button onClick={openDare} className="inline-flex items-center gap-1 rounded-lg px-2 py-1 text-xs font-extrabold text-white transition-transform hover:scale-105 active:scale-95" style={{ background: "linear-gradient(135deg,#f472b6,#a78bfa)" }} title="AI dares you to caption this — you write it">🎤 dare us</button>
         {plan.voicedFrom && <button onClick={revertVoice} className="inline-flex items-center gap-1 rounded-lg border border-stone-200 bg-white px-2 py-1 text-xs font-extrabold text-stone-500 transition-colors hover:text-rose-500" title="Revert to the original details">↩ revert</button>}
       </div>
+
+      {dareOpen && (
+        <div className="mt-2 rounded-xl border-2 border-violet-200 bg-violet-50/50 p-3">
+          <div className="flex items-start justify-between gap-2">
+            <p className="text-xs font-black text-violet-700">🎤 {dareBusy ? "thinking of a dare…" : dare}</p>
+            <button onClick={rollDare} disabled={dareBusy} className="flex-shrink-0 rounded-lg border border-violet-200 bg-white px-2 py-1 text-xs font-bold text-violet-600 transition-colors hover:bg-violet-100 disabled:opacity-50" title="New dare">{dareBusy ? <Loader2 size={11} className="animate-spin" /> : "🎲 new"}</button>
+          </div>
+          <textarea value={answer} onChange={(e) => setAnswer(e.target.value)} rows={2} placeholder="…now YOU write it (this becomes the caption)" className="mt-2 w-full resize-y rounded-lg border-2 border-stone-200 bg-white px-3 py-2 text-sm outline-none focus:border-violet-300" />
+          <div className="mt-1.5 flex justify-end gap-2">
+            <button onClick={() => setDareOpen(false)} className="rounded-lg px-2.5 py-1 text-xs font-bold text-stone-500 hover:text-stone-700">cancel</button>
+            <button onClick={saveDare} disabled={!answer.trim()} className="rounded-lg px-3 py-1 text-xs font-extrabold text-white disabled:opacity-50" style={{ background: "linear-gradient(135deg,#f472b6,#a78bfa)" }}>save it</button>
+          </div>
+        </div>
+      )}
 
       {/* septic-fuck rating slider */}
       <div className="relative mt-2.5 rounded-xl border border-stone-100 bg-stone-50/70 px-3 py-2">
@@ -563,9 +583,6 @@ function IdeaBoard({ dest, plans, onAdd, onDelete, onAddComment, onEdit, onAddTo
   const [error, setError] = useState("");
   const fileRef = useRef(null);
   const photoRef = useRef(null);
-  // Global house-voice dial (mild ↔ unhinged) for the "🎙️ our voice" buttons.
-  const [voiceDial, setVoiceDial] = useState(() => { try { return localStorage.getItem("site.voice.dial") || "max"; } catch (e) { return "max"; } });
-  const setDial = (v) => { setVoiceDial(v); try { localStorage.setItem("site.voice.dial", v); } catch (e) {} };
 
   const reset = () => { setDraft(EMPTY_DRAFT); setHasDraft(false); setUrl(""); setError(""); };
 
@@ -740,12 +757,6 @@ function IdeaBoard({ dest, plans, onAdd, onDelete, onAddComment, onEdit, onAddTo
       {/* saved ideas */}
       {plans.length > 0 && (
         <div className="mt-4 space-y-2.5">
-          <div className="flex items-center justify-end gap-1.5 text-xs">
-            <span className="font-bold text-stone-400">🎙️ our-voice dial:</span>
-            {["mild", "max"].map((v) => (
-              <button key={v} onClick={() => setDial(v)} className={`rounded-full px-2.5 py-1 font-extrabold transition-colors ${voiceDial === v ? "bg-violet-500 text-white" : "border border-stone-200 text-stone-500 hover:text-violet-600"}`}>{v === "max" ? "unhinged" : "mild"}</button>
-            ))}
-          </div>
           {plans.map((p) => (
             <SavedIdea key={p.id} plan={p} accent={accent} onDelete={(planId) => onDelete(dest.id, planId)} onAddComment={(planId, comment) => onAddComment(dest.id, planId, comment)} onEdit={onEdit} onAddToItinerary={(day) => onAddToItinerary(day, p)} />
           ))}
