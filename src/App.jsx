@@ -340,6 +340,7 @@ const EMPTY_DRAFT = { title: "", summary: "", activities: [], location: "", comm
 // ---------------------------------------------------------------------------
 // A single saved idea, with its own comment thread
 // ---------------------------------------------------------------------------
+const TAG_PRESETS = ["rainy-day", "romantic", "cheap", "outdoor", "night", "photo", "must-see", "chill"];
 function SavedIdea({ plan, accent, onDelete, onAddComment, onEdit, onAddToItinerary }) {
   const me = useContext(IdentityContext);
   const openLightbox = useContext(LightboxContext);
@@ -370,6 +371,9 @@ function SavedIdea({ plan, accent, onDelete, onAddComment, onEdit, onAddToItiner
   };
   const comments = plan.comments || [];
   const acts = plan.activities || [];
+  const tags = plan.tags || [];
+  const [tagOpen, setTagOpen] = useState(false);
+  const toggleTag = (t) => onEdit(plan.id, { tags: tags.includes(t) ? tags.filter((x) => x !== t) : [...tags, t] });
 
   // 🎤 Dare — the AI throws a cursed prompt; YOU write the real caption. It never
   // fakes the voice, it just launches you. The original is kept so you can revert.
@@ -1915,7 +1919,7 @@ function ItineraryView({ plans, onAddIdea }) {
   const dayStats = (() => {
     const pts = numbered.filter((s) => s.lat != null);
     let km = 0, maxLeg = 0;
-    for (let i = 0; i < pts.length - 1; i++) { const d = haversineKm(coordOf(pts[i]), coordOf(pts[i + 1])); km += d; if (d > maxLeg) maxLeg = d; }
+    for (let i = 0; i < pts.length - 1; i++) { const d = haversineKm({ lat: pts[i].lat, lng: pts[i].lng }, { lat: pts[i + 1].lat, lng: pts[i + 1].lng }); km += d; if (d > maxLeg) maxLeg = d; }
     const walkMin = Math.round(km * 12);
     const flags = [];
     if (numbered.length >= 6 || km > 10) flags.push("packed — maybe split or trim");
