@@ -2401,8 +2401,9 @@ const CONCIERGE_STARTERS = ["Make a day less scattered", "Cozy rainy-day plan ne
 
 // Floating trip-aware chat. Read-only: it advises, you apply. Loads the live
 // itinerary each time it opens so its advice matches the current plan.
-function ConciergePanel({ plans, onAddIdea }) {
+function ConciergePanel({ plans, onAddIdea, preferences = "", onSetPreferences }) {
   const [open, setOpen] = useState(false);
+  const [prefsOpen, setPrefsOpen] = useState(false);
   const [msgs, setMsgs] = useState([]);
   const [input, setInput] = useState("");
   const [busy, setBusy] = useState(false);
@@ -2420,7 +2421,7 @@ function ConciergePanel({ plans, onAddIdea }) {
     const history = msgs.map((x) => ({ role: x.role, content: x.content }));
     setMsgs((xs) => [...xs, { role: "user", content: m }]); setBusy(true);
     try {
-      const res = await fetch("/api/concierge", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ message: m, context: ctx.current, history }) });
+      const res = await fetch("/api/concierge", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ message: m, context: ctx.current + (preferences ? `\n\nOUR TASTES (respect these strongly): ${preferences}` : ""), history }) });
       const d = await res.json().catch(() => ({}));
       if (!res.ok || d.error) throw new Error(d.error || `error ${res.status}`);
       setMsgs((xs) => [...xs, { role: "assistant", content: d.reply || "(no reply)", places: Array.isArray(d.places) ? d.places : [] }]);
@@ -2468,8 +2469,15 @@ function ConciergePanel({ plans, onAddIdea }) {
         <div className="fixed bottom-24 right-5 z-[60] flex max-h-[70vh] w-[min(92vw,380px)] flex-col overflow-hidden rounded-3xl border border-stone-200 bg-white shadow-2xl">
           <div className="flex items-center gap-2 border-b border-stone-100 px-4 py-3">
             <Sparkles size={16} className="text-violet-500" strokeWidth={2.8} />
-            <div><p className="text-sm font-black text-stone-700">Trip concierge</p><p className="text-xs text-stone-500">Knows your Seoul plan · ask anything</p></div>
+            <div className="flex-1"><p className="text-sm font-black text-stone-700">Trip concierge</p><p className="text-xs text-stone-500">Knows your Seoul plan · ask anything</p></div>
+            <button onClick={() => setPrefsOpen((o) => !o)} className={`rounded-lg px-2 py-1 text-xs font-bold transition-colors ${preferences ? "text-violet-600" : "text-stone-400 hover:text-violet-600"}`} title="Set our tastes — the concierge respects these">⚙️ tastes</button>
           </div>
+          {prefsOpen && (
+            <div className="border-b border-stone-100 bg-violet-50/40 px-4 py-2.5">
+              <textarea value={preferences} onChange={(e) => onSetPreferences && onSetPreferences(e.target.value)} rows={2} placeholder="e.g. we hate crowds, love hanok cafés, no raw seafood, mid budget, early risers" className="w-full resize-y rounded-lg border-2 border-stone-200 bg-white px-3 py-2 text-xs outline-none focus:border-violet-300" />
+              <p className="mt-1 text-xs text-stone-400">Shared · the concierge keeps these in mind for every answer.</p>
+            </div>
+          )}
           <div ref={scroller} className="flex-1 space-y-3 overflow-y-auto px-4 py-3">
             {msgs.length === 0 && (
               <div className="space-y-2">
@@ -3137,7 +3145,7 @@ export default function App() {
         {view === "essentials" && <EssentialsView copy={copy} updateCopy={updateCopy} />}
         </ErrorBoundary>
 
-        <ConciergePanel plans={plans} onAddIdea={(idea) => addPlan("seoul", idea)} />
+        <ConciergePanel plans={plans} onAddIdea={(idea) => addPlan("seoul", idea)} preferences={copy.preferences || ""} onSetPreferences={(v) => updateCopy("preferences", v)} />
 
         <footer className="mt-12 text-center text-xs text-stone-500">
           <p className="font-semibold">Made with ❄️ 🍱 🦦 🧸 ✨ for a very specific kind of cozy winter trip.</p>
