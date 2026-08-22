@@ -433,7 +433,10 @@ function SavedIdea({ plan, accent, onDelete, onAddComment, onEdit, onAddToItiner
             <EditText value={plan.location || ""} onSave={(v) => onEdit(plan.id, { location: v, lat: null, lng: null })} placeholder="add address / place…" className="text-xs" />
           </div>
         </div>
-        <DeleteButton onConfirm={() => onDelete(plan.id)} variant="icon-soft" size={17} />
+        <div className="flex flex-shrink-0 items-center gap-1.5">
+          <button onClick={() => onEdit(plan.id, { shortlist: !plan.shortlist })} className={`flex-shrink-0 transition-colors ${plan.shortlist ? "text-amber-400" : "text-stone-300 hover:text-amber-300"}`} title={plan.shortlist ? "On the must-do shortlist" : "Add to must-do shortlist"} aria-label="Shortlist"><Star size={17} fill={plan.shortlist ? "#fbbf24" : "none"} /></button>
+          <DeleteButton onConfirm={() => onDelete(plan.id)} variant="icon-soft" size={17} />
+        </div>
       </div>
 
       <div className="mt-2 flex flex-wrap gap-2">
@@ -581,6 +584,7 @@ function IdeaBoard({ dest, plans, onAdd, onDelete, onAddComment, onEdit, onAddTo
   const [hasDraft, setHasDraft] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  const [shortOnly, setShortOnly] = useState(false); // ⭐ must-do filter
   const fileRef = useRef(null);
   const photoRef = useRef(null);
 
@@ -757,7 +761,12 @@ function IdeaBoard({ dest, plans, onAdd, onDelete, onAddComment, onEdit, onAddTo
       {/* saved ideas */}
       {plans.length > 0 && (
         <div className="mt-4 space-y-2.5">
-          {plans.map((p) => (
+          {plans.some((p) => p.shortlist) && (
+            <div className="flex justify-end">
+              <button onClick={() => setShortOnly((o) => !o)} className={`rounded-full px-2.5 py-1 text-xs font-extrabold transition-colors ${shortOnly ? "bg-amber-400 text-white" : "border border-stone-200 text-stone-500 hover:text-amber-500"}`}>⭐ must-do only</button>
+            </div>
+          )}
+          {plans.filter((p) => !shortOnly || p.shortlist).map((p) => (
             <SavedIdea key={p.id} plan={p} accent={accent} onDelete={(planId) => onDelete(dest.id, planId)} onAddComment={(planId, comment) => onAddComment(dest.id, planId, comment)} onEdit={onEdit} onAddToItinerary={(day) => onAddToItinerary(day, p)} />
           ))}
         </div>
