@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect, useCallback } from "react";
 import { X } from "lucide-react";
 
 /**
- * Flappy Bunny — a pixel-art tap-to-flap side game. 🐰
+ * Flappy Bun — a pixel-art tap-to-flap side game. 🐰
  *
  * Deliberately gentler than real Flappy Bird: soft gravity, a floaty flap,
  * wide hedge gaps that only narrow slowly, no ceiling death, and a hitbox that
@@ -163,7 +163,7 @@ function draw(ctx, s) {
   if (s.phase !== "ready") digits(ctx, s.score, W / 2, 10, "#FFFFFF", 2);
 }
 
-export default function FlappyBunny({ high, onHigh, who, sound }) {
+export default function FlappyBun({ high, onHigh, who, sound }) {
   const [open, setOpen] = useState(false);
   const [score, setScore] = useState(0);
   const [carrots, setCarrots] = useState(0);
@@ -283,13 +283,13 @@ export default function FlappyBunny({ high, onHigh, who, sound }) {
     return () => window.removeEventListener("keydown", k);
   }, [open, flap]);
 
-  const quip = score >= 15 ? "certified bunny 🥕" : score >= 8 ? "ok pro ah" : score >= 3 ? "not bad leh" : "the hedge won 😭";
+  const quip = score >= 15 ? "certified bun 🥕" : score >= 8 ? "ok pro ah" : score >= 3 ? "not bad leh" : "the hedge won 😭";
 
   return (
     <>
       <div className="mx-auto mt-3 flex max-w-md items-center justify-center gap-2 rounded-2xl border border-stone-200 bg-white/70 px-4 py-2 backdrop-blur">
         <span className="text-base">🐰</span>
-        <span className="text-xs font-extrabold uppercase tracking-wide text-stone-500">Flappy Bunny</span>
+        <span className="text-xs font-extrabold uppercase tracking-wide text-stone-500">Flappy Bun</span>
         <span className="text-sm font-extrabold text-stone-600">
           {high?.score ? <>🏆 {high.score}{high.who ? " · " + (high.who === "ants" ? "Ants" : "Me") : ""}</> : "no high score yet"}
         </span>
