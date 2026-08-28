@@ -63,6 +63,7 @@ import { SortableContext, verticalListSortingStrategy, useSortable, arrayMove, s
 import { CSS } from "@dnd-kit/utilities";
 import { burstConfetti, floatEmoji, sound } from "./fx";
 import SeedRush from "./SeedRush";
+import FlappyBunny from "./FlappyBunny";
 
 const RoomContext = React.createContext({ sendTyping: function () {}, typingByDest: {} });
 const REACTIONS = ["💕", "😂", "🔥", "😍", "🥺", "🐔"];
@@ -3157,6 +3158,7 @@ export default function App() {
         {/* Games — shared high scores */}
         <GlaggleGame high={copy.glaggleHigh} onHigh={(h) => updateCopy("glaggleHigh", h)} />
         <SeedRush high={copy.seedRushHigh} onHigh={(h) => updateCopy("seedRushHigh", h)} sound={sound} />
+        <FlappyBunny high={copy.flappyBunnyHigh} onHigh={(h) => updateCopy("flappyBunnyHigh", h)} who={me || "me"} sound={sound} />
 
         {/* Live reactions dock — floats on both screens */}
         <div className="mx-auto mt-3 flex max-w-md items-center justify-center gap-1 rounded-2xl border border-stone-200 bg-white/70 px-3 py-1.5 backdrop-blur">
