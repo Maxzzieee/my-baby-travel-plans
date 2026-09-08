@@ -1450,9 +1450,10 @@ function BookingRow({ item, onChange, onRemove }) {
   const [value, setValue] = useState(item.value || "");
   useEffect(() => { setLabel(item.label || ""); setValue(item.value || ""); }, [item.id]);
   return (
-    <div className="flex items-center gap-2">
-      <input value={label} onChange={(e) => setLabel(e.target.value)} onBlur={() => label !== item.label && onChange(item.id, { label })} placeholder="e.g. Flight PNR" className="w-1/3 min-w-0 rounded-lg border border-stone-200 px-2 py-1.5 text-xs font-bold outline-none focus:border-rose-200" />
+    <div className="flex flex-wrap items-center gap-2">
+      <input value={label} onChange={(e) => setLabel(e.target.value)} onBlur={() => label !== item.label && onChange(item.id, { label })} placeholder="e.g. Flight PNR" className="w-1/3 min-w-[90px] flex-shrink-0 rounded-lg border border-stone-200 px-2 py-1.5 text-xs font-bold outline-none focus:border-rose-200" />
       <input value={value} onChange={(e) => setValue(e.target.value)} onBlur={() => value !== item.value && onChange(item.id, { value })} placeholder="confirmation # / details" className="min-w-0 flex-1 rounded-lg border border-stone-200 px-2 py-1.5 text-sm outline-none focus:border-rose-200" />
+      <input type="datetime-local" value={item.when || ""} onChange={(e) => onChange(item.id, { when: e.target.value })} className="rounded-lg border border-stone-200 px-2 py-1.5 text-xs text-stone-600 outline-none focus:border-rose-200" title="When (optional) — shows a countdown in the itinerary" />
       <button onClick={() => onRemove(item.id)} className="text-stone-400 hover:text-rose-400" aria-label="Remove"><Trash2 size={13} /></button>
     </div>
   );
@@ -1855,7 +1856,7 @@ function ItemEditor({ item, onUpdate, onRemove, onClose }) {
   );
 }
 
-function ItineraryView({ plans, onAddIdea }) {
+function ItineraryView({ plans, onAddIdea, bookings = [] }) {
   const dest = "seoul"; // trip is confirmed Seoul
   const city = DEST_BY_ID[dest] || DESTINATIONS[0];
   const accent = city.accent;
@@ -1961,6 +1962,11 @@ function ItineraryView({ plans, onAddIdea }) {
     });
     const scheduled = new Set(items.map((i) => i.idea_id).filter(Boolean)).size;
     return { daysPlanned: Object.keys(byDay).length, stops: items.length, km, scheduled, ideaTotal: ideas.length };
+  })();
+  const nextBooking = (() => {
+    const now = Date.now();
+    const up = (bookings || []).filter((b) => b.when).map((b) => ({ ...b, t: new Date(b.when).getTime() })).filter((b) => !isNaN(b.t) && b.t > now - 3 * 3600000).sort((a, b) => a.t - b.t);
+    return up[0] || null;
   })();
   const fmtWalk = (m) => (m < 60 ? `${m}m` : `${Math.floor(m / 60)}h${String(m % 60).padStart(2, "0")}`);
 
@@ -2196,6 +2202,9 @@ function ItineraryView({ plans, onAddIdea }) {
         <p className="mt-1 text-sm text-stone-500">Nov 27 – Dec 4 · {(() => { const d = Math.ceil((TRIP_START.getTime() - Date.now()) / 86400000); return d > 0 ? `✈️ ${d} day${d === 1 ? "" : "s"} to go` : todayIdx >= 0 ? "🎉 we're in Seoul!" : "trip's a wrap 🥲"; })()} · add a stop and watch it pin 📍</p>
         {items.length > 0 && (
           <p className="mt-1 text-xs font-bold text-stone-400">{tripOverview.daysPlanned}/{TRIP_DAYS} days planned · {tripOverview.stops} stops · ~{tripOverview.km.toFixed(0)}km{tripCost > 0 ? ` · S$${tripCost.toLocaleString()}` : ""}{tripOverview.ideaTotal > 0 ? ` · ${tripOverview.scheduled}/${tripOverview.scheduled + tripOverview.ideaTotal} ideas scheduled` : ""}</p>
+        )}
+        {nextBooking && (
+          <p className="mt-1 text-xs font-bold text-violet-600">🎫 next: {nextBooking.label || "booking"}{nextBooking.value ? ` (${nextBooking.value})` : ""} · {new Date(nextBooking.when).toLocaleString("en-SG", { weekday: "short", month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" })}{(() => { const h = (new Date(nextBooking.when).getTime() - Date.now()) / 3600000; return h >= 0 && h < 72 ? ` · in ${h < 1 ? "<1h" : h < 24 ? Math.round(h) + "h" : Math.round(h / 24) + "d"}` : ""; })()}</p>
         )}
         <div className="mt-3 flex flex-wrap justify-center gap-2">
           <button onClick={() => generatePlan()} className="inline-flex items-center gap-1.5 rounded-full px-4 py-2 text-sm font-extrabold text-white shadow-sm transition-transform hover:scale-105 active:scale-95" style={{ background: "linear-gradient(135deg,#f472b6,#a78bfa)" }}>✨ Auto-plan my trip</button>
@@ -3312,7 +3321,7 @@ export default function App() {
 
         {view === "photos" && <MemeWall />}
 
-        {view === "itinerary" && <ItineraryView plans={plans} onAddIdea={(idea) => addPlan("seoul", idea)} />}
+        {view === "itinerary" && <ItineraryView plans={plans} onAddIdea={(idea) => addPlan("seoul", idea)} bookings={copy.bookings || []} />}
 
         {view === "essentials" && <EssentialsView copy={copy} updateCopy={updateCopy} />}
         </ErrorBoundary>
