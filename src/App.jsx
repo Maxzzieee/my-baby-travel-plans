@@ -2571,13 +2571,15 @@ function ConciergePanel({ plans, onAddIdea, preferences = "", onSetPreferences }
       const byDay = {}; for (const it of its) (byDay[it.day] ??= []).push(it);
       Object.values(byDay).forEach((arr) => arr.sort((x, y) => (x.position ?? 0) - (y.position ?? 0)));
       const resolve = (h) => { const m = /d(\d+)s(\d+)/i.exec(h || ""); if (!m) return null; return (byDay[+m[1] - 1] || [])[+m[2] - 1] || null; };
-      const removed = new Set();
+      const removed = new Set(), moved = new Set();
       for (const a of actions) if (a.type === "remove") { const it = resolve(a.ref); if (it) { removed.add(it.id); await deleteItineraryItem(it.id); } }
+      for (const a of actions) if (a.type === "move" && a.toDay) { const it = resolve(a.ref); if (it) { moved.add(it.id); await updateItineraryItem(it.id, { day: (a.toDay || 1) - 1, position: 999 }); } }
+      for (const a of actions) if (a.type === "settime" && a.time) { const it = resolve(a.ref); if (it) await updateItineraryItem(it.id, { start_time: a.time }); }
       for (const a of actions) if (a.type === "reorder") {
         const day = (a.day || 1) - 1;
-        const ordered = (a.order || []).map(resolve).filter((it) => it && it.day === day && !removed.has(it.id));
+        const ordered = (a.order || []).map(resolve).filter((it) => it && it.day === day && !removed.has(it.id) && !moved.has(it.id));
         const seen = new Set(ordered.map((it) => it.id));
-        const rest = (byDay[day] || []).filter((it) => !seen.has(it.id) && !removed.has(it.id));
+        const rest = (byDay[day] || []).filter((it) => !seen.has(it.id) && !removed.has(it.id) && !moved.has(it.id));
         const ids = [...ordered, ...rest].map((it) => it.id);
         if (ids.length) await reorderItinerary(ids);
       }
@@ -2640,7 +2642,7 @@ function ConciergePanel({ plans, onAddIdea, preferences = "", onSetPreferences }
                     <div className="rounded-xl border border-emerald-200 bg-emerald-50/60 p-2.5">
                       <p className="text-xs font-black text-emerald-700">✨ {m.actions.length} change{m.actions.length > 1 ? "s" : ""} ready to apply</p>
                       <ul className="mt-1 space-y-0.5 text-xs text-stone-600">
-                        {m.actions.map((a, k) => (<li key={k}>• {a.type === "reorder" ? `reorder Day ${a.day} (${(a.order || []).length} stops)` : a.type === "remove" ? `drop ${handleTitle(a.ref) || "a stop"}` : `add ${a.name} → Day ${a.day}`}</li>))}
+                        {m.actions.map((a, k) => (<li key={k}>• {a.type === "reorder" ? `reorder Day ${a.day} (${(a.order || []).length} stops)` : a.type === "remove" ? `drop ${handleTitle(a.ref) || "a stop"}` : a.type === "move" ? `move ${handleTitle(a.ref) || "a stop"} → Day ${a.toDay}` : a.type === "settime" ? `set ${handleTitle(a.ref) || "a stop"} to ${a.time}` : `add ${a.name} → Day ${a.day}`}</li>))}
                       </ul>
                       <button onClick={() => applyActions(m.actions, i)} disabled={applied[i] === "applying" || applied[i] === "applied"} className="mt-1.5 flex items-center gap-1 rounded-lg px-3 py-1.5 text-xs font-extrabold text-white disabled:opacity-60" style={{ background: applied[i] === "applied" ? "#34C759" : "linear-gradient(135deg,#f472b6,#a78bfa)" }}>
                         {applied[i] === "applying" ? <Loader2 size={11} className="animate-spin" /> : applied[i] === "applied" ? "✓ Applied to itinerary" : applied[i] === "error" ? "⚠️ retry" : "✨ Apply to itinerary"}

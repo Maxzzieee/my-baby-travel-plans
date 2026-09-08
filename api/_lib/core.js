@@ -4,6 +4,9 @@
 import Anthropic from "@anthropic-ai/sdk";
 
 export const MODEL = "claude-opus-4-8";
+// Latency-sensitive chat/util calls run on a faster model (Opus stays for the
+// quality-critical extraction). Big win against concierge 504s.
+export const FAST_MODEL = "claude-sonnet-5";
 export const BROWSER_UA =
   "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36";
 export const KCAT = { FD6: "food", CE7: "food", MT1: "shop", CS2: "shop", AT4: "activity", CT1: "activity", AD5: "stay" };
@@ -200,7 +203,7 @@ export async function translateNames(items) {
   try {
     const lines = list.map((it, i) => `${i + 1}. ${it.name}${it.cat ? ` [${it.cat}]` : ""}`).join("\n");
     const response = await client.messages.create({
-      model: MODEL, max_tokens: 900,
+      model: FAST_MODEL, max_tokens: 900,
       output_config: { format: { type: "json_schema", schema: TRANSLATE_SCHEMA }, effort: "low" },
       messages: [{ role: "user", content:
         "Translate these Korean place names and categories to natural English for a traveler who can't read Korean. " +
@@ -292,7 +295,7 @@ export async function runDirections({ from, to }) {
   const loc = (p) => `${p.title || ""}${p.place ? ` — ${p.place}` : ""}${p.lat != null && p.lng != null ? ` [${(+p.lat).toFixed(4)},${(+p.lng).toFixed(4)}]` : ""}`;
   try {
     const response = await client.messages.create({
-      model: MODEL, max_tokens: 700,
+      model: FAST_MODEL, max_tokens: 700,
       output_config: { format: { type: "json_schema", schema: DIRECTIONS_SCHEMA }, effort: "low" },
       messages: [{ role: "user", content:
         "You are a Seoul local giving quick public-transport directions for a couple travelling on foot + subway/bus. " +
@@ -335,10 +338,12 @@ const CONCIERGE_SCHEMA = {
       items: {
         type: "object",
         properties: {
-          type: { type: "string", enum: ["reorder", "remove", "add"], description: "reorder a day; remove a stop; add a place to a day." },
+          type: { type: "string", enum: ["reorder", "remove", "add", "move", "settime"], description: "reorder a day; remove a stop; add a place; move a stop to another day; set a stop's start time." },
           day: { type: "integer", description: "1-based day number (for reorder / add)." },
           order: { type: "array", items: { type: "string" }, description: "reorder only: the day's stop handles in the NEW order — include EVERY stop staying in that day." },
-          ref: { type: "string", description: "remove only: the stop handle to delete (e.g. d2s5)." },
+          ref: { type: "string", description: "the stop handle (e.g. d2s5) for remove / move / settime." },
+          toDay: { type: "integer", description: "move only: the 1-based day to move the stop to." },
+          time: { type: "string", description: "settime only: 24h HH:MM start time (e.g. 19:00)." },
           name: { type: "string", description: "add only: the real place name to add (Korean preferred)." },
         },
         required: ["type"], additionalProperties: false,
@@ -355,7 +360,7 @@ export async function runConcierge({ message, context = "", history = [] }) {
     "You are the warm, witty travel concierge for a couple's cozy winter trip to Seoul (27 Nov – 4 Dec 2026), base camp in Jongno-gu. " +
     "Help them plan and adjust: be SPECIFIC and practical — name real Seoul places, group things by area to cut travel, suggest subway lines, respect a cozy-cold couple's vibe (cafés, hanok, markets, warm food). " +
     "Keep `reply` short and scannable: a sentence or two, or a tight bullet list. Use the couple's own itinerary below when relevant; if a day is packed or scattered, say so and suggest a fix. " +
-    "You CAN edit the plan. Each stop in the trip context is tagged with a [handle] like d2s1 (day 2, stop 1). When they ask you to tidy / reorder / drop / build a day, put concrete edits in `actions` using those handles: a 'reorder' carries the day's FULL new order of handles; a 'remove' carries one handle; an 'add' carries a real place name + day. Only reference handles that appear in the context, and always EXPLAIN what you changed in `reply`. For pure recommendations (not editing existing stops), use `places` and leave `actions` empty. For general questions leave both empty.\n\n" +
+    "You CAN edit the plan. Each stop in the trip context is tagged with a [handle] like d2s1 (day 2, stop 1). When they ask you to tidy / reorder / drop / move / retime / build a day, put concrete edits in `actions` using those handles: 'reorder' carries the day's FULL new order of handles; 'remove' carries one handle; 'move' carries a handle + toDay; 'settime' carries a handle + time (HH:MM); 'add' carries a real place name + day. Only reference handles that appear in the context, and always EXPLAIN what you changed in `reply`. For pure recommendations (not editing existing stops), use `places` and leave `actions` empty. For general questions leave both empty.\n\n" +
     "THEIR CURRENT TRIP:\n" + (context || "(no itinerary yet)");
   const msgs = [
     ...(Array.isArray(history) ? history : []).slice(-8).map((m) => ({ role: m.role === "assistant" ? "assistant" : "user", content: String(m.content || "") })),
@@ -363,7 +368,7 @@ export async function runConcierge({ message, context = "", history = [] }) {
   ];
   try {
     const response = await client.messages.create({
-      model: MODEL, max_tokens: 1000, system,
+      model: FAST_MODEL, max_tokens: 1000, system,
       output_config: { format: { type: "json_schema", schema: CONCIERGE_SCHEMA }, effort: "low" },
       messages: msgs,
     });
@@ -394,62 +399,6 @@ export async function runPlace(q) {
   } } };
 }
 
-// ---------------------------------------------------------------------------
-// House voice — rewrite an idea's details in the couple's own register:
-// first-person, broken Singlish, weird/dumb/random, NOT horny, NOT Western wit.
-// Two dials. Facts stay real; the delivery goes feral.
-// ---------------------------------------------------------------------------
-const VOICE_SYSTEM =
-  "You write a travel place's details AS one half of a specific Singaporean couple — chaotic, chronically-online, brainrot, deeply affectionate. Match their REAL texting voice (below) exactly. Always FIRST PERSON ('i', 'me n u'). Keep the real facts (place name, area, what it is, near base, walk time) but drown them in the voice. Output the summary + short 'what to do' fragments.\n\n" +
-  "TWO GEARS, mix them by mood:\n" +
-  "- HYPE (excited/good): ALLCAPS, mashed laugh-openers (HOOOHOOHO / OHOHOHO / OMGOMG / KOOOKEOEKEKE / JAJAJJAA / kekwkeke), stretched letters (EVERRRR, fuckkkkk, bruhhh, alreadyy, AAAAAAA), ironic hashtags (#lifeisworthalivingggg).\n" +
-  "- DEADPAN (tired/unbothered): lowercase, flat, 'ngl', 'lol', 'heh', a practical detail dropped flatly ('got free slippers heh', 'i could sleep here ngl').\n\n" +
-  "THEIR ACTUAL VOCAB & TICS — use these real ones, not generic Singlish:\n" +
-  "- signature curse (drop it when annoyed OR hyped, not every line): 'knnccb' (also 'kn','ccb'). petty anger: 'useless ahh mf', 'i hope they run out of business', 'no fucking way,,'.\n" +
-  "- brainrot: 'ahh' meaning ass ('useless ahh'), 'slop slop slop', 'sahur', 'eepies' (=sleep), 'ngl', 'aint nobody', 'mf', 'BROTHERR', 'finna'.\n" +
-  "- deliberately broken grammar: 'i just seen', 'poke it eyes' (not its), 'aint nobody paying for that'.\n" +
-  "- rhythm: double-comma ',,' as a beat; random non-sequiturs ('banana chicken stick', 'HELLO?!'); gremlin noises ('GRRR', 'EWIWIWII', 'ouh :p'); emoticons ':p' ':O'.\n" +
-  "- CANNIBAL-CUTE AFFECTION (this is literally how they love, Hannibal-coded): pet names 'baby hamster', 'chicken bird', 'stupidcute'; loving cute-violence aimed at the FOOD or the moment — 'im gonna poke it eyes (lovingly)', 'i wanna eat your flesh', 'ill cook you into stew', 'cough on you'. NEVER sexual/horny.\n" +
-  "- inside refs to sprinkle rarely: 'ong cheng beng', hannibal, peep show, house md, jacksepticeye.\n" +
-  "- when too funny, keyboard-mash: 'ASJJCKDCJJWFK£<¥¥]8495938(&'.\n\n" +
-  "NOT clever/witty Western metaphors, NOT constructed punchlines, NOT horny. It is dumb, cursed, random, loving chaos.\n\n" +
-  "EXAMPLES captioning a place:\n" +
-  "- korean fried chicken → 'OHOHOHO BROTHERR fried chicken HELLO?!,, im finna demolish the whole bird knnccb 🍗 skin so crispy i could cry ngl. me n u splitting or we fighting. banana chicken stick energy #lifeisworthalivingggg'\n" +
-  "- a closed museum → 'bruhhh CLOSED?? useless ahh mf i hope they run outta business slop slop 😐 we came all the way sahur. ok whatever i wanna eepies alreadyy GRRR'\n" +
-  "- cute hanok cafe near base → 'OMGOMG this hanok cafe so cute i cannot,, got a CAT AAAAAA im gonna poke it eyes (lovingly). soft floor i could sleep here ngl kekwkeke. near base so walk can already knnccb'";
-
-const VOICE_SCHEMA = {
-  type: "object",
-  properties: {
-    summary: { type: "string", description: "2-4 sentences in the house voice about THIS place. First person, broken Singlish, weird/dumb/random." },
-    activities: { type: "array", description: "3-6 very short first-person 'what to do' fragments in the same broken voice.", items: { type: "string" } },
-  },
-  required: ["summary", "activities"], additionalProperties: false,
-};
-
-export async function runVoice({ title, place, summary, dial = "max" }) {
-  const client = getClient();
-  if (!client) return { status: 500, json: { error: "AI not configured (ANTHROPIC_API_KEY missing)." } };
-  if (!title && !place && !summary) return { status: 400, json: { error: "Nothing to rewrite." } };
-  const intensity = dial === "mild"
-    ? "DIAL = MILD: light touch — a bit of the voice + first person, mostly readable. Fewer curses, no keyboard-mash, keep it short."
-    : "DIAL = MAX: full feral — pile on the real vocab (knnccb, slop, sahur, eepies, ahh, BROTHERR), stretched caps, ,, beats, cannibal-cute affection, keyboard-mash allowed. Go OFF.";
-  try {
-    const response = await client.messages.create({
-      model: MODEL, max_tokens: 700,
-      system: VOICE_SYSTEM,
-      output_config: { format: { type: "json_schema", schema: VOICE_SCHEMA }, effort: "low" },
-      messages: [{ role: "user", content:
-        `${intensity}\n\nRewrite THIS place's details in our voice:\nPLACE: ${title || "(unknown)"}${place ? `\nWHERE: ${place}` : ""}${summary ? `\nWHAT IT IS (facts to keep): ${summary}` : ""}` }],
-    });
-    if (response.stop_reason === "refusal") return { status: 422, json: { error: "Voice engine declined this one." } };
-    const textBlock = response.content.find((b) => b.type === "text");
-    const out = JSON.parse(textBlock?.text || "{}");
-    return { status: 200, json: { summary: out.summary || "", activities: Array.isArray(out.activities) ? out.activities.slice(0, 6) : [] } };
-  } catch (e) {
-    return { status: 500, json: { error: e?.message || "Voice rewrite failed." } };
-  }
-}
 
 // ---------------------------------------------------------------------------
 // Dare — the AI is an improv hype-man, NOT a ghostwriter. It throws ONE short
@@ -466,7 +415,7 @@ export async function runDare({ title, place, summary }) {
   if (!client) return { status: 500, json: { error: "AI not configured (ANTHROPIC_API_KEY missing)." } };
   try {
     const response = await client.messages.create({
-      model: MODEL, max_tokens: 120,
+      model: FAST_MODEL, max_tokens: 120,
       output_config: { format: { type: "json_schema", schema: DARE_SCHEMA }, effort: "low" },
       messages: [{ role: "user", content:
         "You are an improv hype-man for a chaotic Singaporean couple's travel app. Give ONE short punchy DARE that dares them to caption the place below in a funny/cursed/unhinged/brainrot way. It is a directive TO the writer, NOT the caption itself. VARY WILDLY every time — angles like: pretend the place personally wronged you; describe it as your last meal; hannibal-style; exactly N cursed words; hype it like the best thing that ever happened; review as a disappointed food critic; talk to the place directly; rate it in animal noises; caption like you're crying. Playful, never horny. Max ~14 words.\n\nPLACE: " +
