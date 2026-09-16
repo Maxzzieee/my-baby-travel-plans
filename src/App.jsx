@@ -53,6 +53,7 @@ import { hasSupabase, loadState, LOAD_FAILED, saveVotes, subscribe, loadGallery,
 import { geocodePlace, legLabel, SEOUL_CENTER, haversineKm } from "./lib/geo";
 import { romanize, enCategory, enDistrict, enPlaceLine, readable, hasHangul } from "./lib/ko";
 import ErrorBoundary from "./ErrorBoundary.jsx";
+import SeoulQuiz from "./Quiz.jsx";
 import { SiteDecor, FlyingButterfly, Bloom } from "./decor.jsx";
 import { buildAutoPlan, BASE_JONGNO } from "./autoplan";
 import "leaflet/dist/leaflet.css";
@@ -2896,6 +2897,7 @@ export default function App() {
   // First-run hints — surfaces the hidden features once; re-openable from the footer.
   const [showTips, setShowTips] = useState(() => { try { return localStorage.getItem("seen.tips.v1") !== "1"; } catch (e) { return false; } });
   const dismissTips = () => { setShowTips(false); try { localStorage.setItem("seen.tips.v1", "1"); } catch (e) {} };
+  const [quizOpen, setQuizOpen] = useState(false); // get-well Seoul-vibe quiz
   // hidden easter egg — press & hold anywhere for 4s and botanicals bloom from the spot
   const [blooms, setBlooms] = useState([]);
   useEffect(() => {
@@ -3136,6 +3138,7 @@ export default function App() {
     )}
     <div className="relative isolate min-h-screen w-full font-sans text-stone-800" style={{ backgroundColor: dark ? "#0b0b12" : "#FFFDF9", backgroundImage: dark ? "radial-gradient(circle at 50% -5%, #1c1830 0, transparent 40%), radial-gradient(circle at 15% 12%, #141024 0, transparent 45%), radial-gradient(circle at 85% 88%, #0d1622 0, transparent 48%)" : "radial-gradient(circle at 15% 10%, #FFF5F0 0, transparent 45%), radial-gradient(circle at 85% 90%, #EEF6F1 0, transparent 48%)" }}>
       {aero && <><AeroBubbles /><AeroScene /><AeroCritters /></>}
+      {quizOpen && <SeoulQuiz onClose={() => setQuizOpen(false)} onSaveVibe={(v) => updateCopy("preferences", (copy.preferences ? copy.preferences + " · " : "") + v)} />}
       {celebrate && (
         <div className="pointer-events-none fixed inset-0 z-[70] flex items-center justify-center">
           <div className="animate-pop rounded-3xl border-2 border-amber-200 bg-white/95 px-8 py-6 text-center shadow-2xl backdrop-blur">
@@ -3254,6 +3257,11 @@ export default function App() {
             );
           })()}
         </div>
+
+        {/* Get-well quiz launcher */}
+        <button onClick={() => setQuizOpen(true)} className="mx-auto mt-6 flex items-center gap-2 rounded-2xl border-2 border-violet-100 bg-white/80 px-4 py-2.5 text-sm font-black text-stone-700 backdrop-blur transition-transform hover:scale-[1.02] active:scale-95">
+          🦷💛 feel better Ants — take the "what Seoul day are you?" quiz
+        </button>
 
         {/* Seoul idea board — the one active trip */}
         <main className="mt-10 grid grid-cols-1 gap-6 lg:grid-cols-2">
